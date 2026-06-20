@@ -1,0 +1,31 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.swp
+
+# User secrets & environment
+appsettings.Development.json
+appsettings.*.local.json
+secrets.json
+
+# Frontend
+FE/node_modules/
+FE/dist/
+FE/.env
+FE/.env.local
+FE/.env.production
+
+# Build outputs
+*.nupkg
+*.snupkg
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
