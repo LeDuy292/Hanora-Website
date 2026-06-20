@@ -38,7 +38,7 @@ namespace Services
             {
                 var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new[] { _config["Google:ClientId"] }
+                    Audience = new[] { _config["Authentication:Google:ClientId"] }
                 };
                 payload = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
             }
