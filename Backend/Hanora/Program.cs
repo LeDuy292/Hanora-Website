@@ -92,7 +92,11 @@ namespace Hanora
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            // Avoid HTTP->HTTPS redirects in development so the React dev
+            // server (http://localhost:5173) can call the HTTP API directly.
+            if (!app.Environment.IsDevelopment())
+                app.UseHttpsRedirection();
+
             app.UseCors("FrontendPolicy");
             app.UseAuthentication();
             app.UseAuthorization();
