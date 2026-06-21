@@ -1,186 +1,130 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import axios from 'axios';
 
-const INITIAL_VOCABULARY = [
-  {
-    text: "学习",
-    pinyin: "xué xí",
-    translation: "to study; learn",
-    hsk: 1,
-    dateAdded: "2026-05-30",
-    difficulty: "medium",
-    srsLevel: 1,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "喜欢",
-    pinyin: "xǐ huan",
-    translation: "to like; be fond of",
-    hsk: 1,
-    dateAdded: "2026-05-31",
-    difficulty: "easy",
-    srsLevel: 2,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "咖啡",
-    pinyin: "kā fēi",
-    translation: "coffee",
-    hsk: 1,
-    dateAdded: "2026-06-01",
-    difficulty: "hard",
-    srsLevel: 0,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "谢谢",
-    pinyin: "xièxie",
-    translation: "to thank; thanks",
-    hsk: 1,
-    dateAdded: "2026-06-01",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "再见",
-    pinyin: "zàijiàn",
-    translation: "goodbye; see you again",
-    hsk: 1,
-    dateAdded: "2026-06-02",
-    difficulty: "medium",
-    srsLevel: 3,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "苹果",
-    pinyin: "píngguǒ",
-    translation: "apple",
-    hsk: 1,
-    dateAdded: "2026-06-02",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "面包",
-    pinyin: "miànbāo",
-    translation: "bread",
-    hsk: 1,
-    dateAdded: "2026-06-03",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "医生",
-    pinyin: "yīshēng",
-    translation: "doctor",
-    hsk: 1,
-    dateAdded: "2026-06-03",
-    difficulty: "medium",
-    srsLevel: 1,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  }
-];
+const API_BASE_URL = 'http://localhost:5187/api'; // Correct backend port from launchSettings.json
 
+export const useVocabularyStore = create((set, get) => ({
+  vocabList: [],
+  isLoading: false,
+  error: null,
 
-export const useVocabularyStore = create(
-  persist(
-    (set, get) => ({
-      vocabList: INITIAL_VOCABULARY,
-
-      isWordSaved: (text) => {
-        return get().vocabList.some(item => item.text === text);
-      },
-
-      addWord: (word) => set((state) => {
-        if (state.vocabList.some(item => item.text === word.text)) {
-          return {}; // Already saved
+  fetchUserFlashcards: async (userId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await axios.get(`${API_BASE_URL}/Flashcard/user/${userId}`);
+      
+      const mappedList = response.data.map(item => {
+        let definitions = [];
+        try {
+          definitions = typeof item.word.definitions === 'string' 
+            ? JSON.parse(item.word.definitions) 
+            : item.word.definitions || [];
+        } catch (e) {
+          console.error("Failed to parse definitions", e);
         }
-        
-        const newWord = {
-          text: word.text,
-          pinyin: word.pinyin || "",
-          translation: word.translation || "",
-          hsk: word.hsk || 1,
-          documentTitle: word.documentTitle,
-          documentId: word.documentId,
-          dateAdded: new Date().toISOString().split('T')[0],
-          difficulty: "medium",
-          srsLevel: 0,
-          nextReviewDate: new Date().toISOString().split('T')[0] // Review immediately
-        };
-        
+
+        let examples = [];
+        try {
+          examples = typeof item.word.exampleSentences === 'string'
+            ? JSON.parse(item.word.exampleSentences)
+            : item.word.exampleSentences || [];
+        } catch (e) {
+          console.error("Failed to parse examples", e);
+        }
+
         return {
-          vocabList: [newWord, ...state.vocabList]
+          id: item.id,
+          text: item.word.text,
+          pinyin: item.word.pinyin,
+          translation: definitions[0]?.meaning || 'No translation',
+          fullDefinitions: definitions,
+          hsk: item.word.hsk || 1,
+          wordType: item.word.wordType || 'Từ vựng',
+          examples: examples,
+          flipStatus: item.flipStatus,
+          learnStatus: item.learnStatus,
+          // Derive srsLevel for UI compatibility
+          srsLevel: item.flipStatus === 'know' ? 5 : (item.learnStatus === 'in_progress' ? 2 : 0)
         };
-      }),
+      });
 
-      removeWord: (text) => set((state) => ({
-        vocabList: state.vocabList.filter(item => item.text !== text)
-      })),
-
-      /**
-       * Reviews a vocabulary word and computes new Spaced Repetition (SRS) interval
-       * @param {string} text - Hanzi of word reviewed
-       * @param {'easy'|'good'|'hard'} rating - Learner self-assessment
-       */
-      reviewWord: (text, rating) => set((state) => {
-        const today = new Date();
-        
-        const updatedList = state.vocabList.map(item => {
-          if (item.text !== text) return item;
-          
-          let newSrsLevel;
-          let intervalDays;
-          
-          if (rating === 'easy') {
-            newSrsLevel = item.srsLevel + 2;
-            intervalDays = Math.max(4, newSrsLevel * 4);
-          } else if (rating === 'good') {
-            newSrsLevel = item.srsLevel + 1;
-            intervalDays = Math.max(2, newSrsLevel * 2);
-          } else { // 'hard' / review again
-            newSrsLevel = 0;
-            intervalDays = 1; // tomorrow
-          }
-          
-          const nextDate = new Date(today);
-          nextDate.setDate(today.getDate() + intervalDays);
-          
-          return {
-            ...item,
-            srsLevel: newSrsLevel,
-            difficulty: rating === 'easy' ? 'easy' : rating === 'good' ? 'medium' : 'hard',
-            nextReviewDate: nextDate.toISOString().split('T')[0]
-          };
-        });
-        
-        return { vocabList: updatedList };
-      }),
-
-      getReviewQueue: () => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        return get().vocabList.filter(item => item.nextReviewDate <= todayStr);
-      },
-
-      updateWordSrsLevel: (text, newSrsLevel) => set((state) => {
-        const updatedList = state.vocabList.map(item => {
-          if (item.text !== text) return item;
-          
-          return {
-            ...item,
-            srsLevel: newSrsLevel,
-            nextReviewDate: new Date().toISOString().split('T')[0]
-          };
-        });
-        
-        return { vocabList: updatedList };
-      })
-    }),
-    {
-      name: 'hanora-vocabulary-storage',
+      set({ vocabList: mappedList, isLoading: false });
+    } catch (err) {
+      console.error("Fetch error:", err);
+      set({ error: err.message, isLoading: false });
     }
-  )
-);
+  },
+
+  reviewWord: async (flashcardId, rating) => {
+    // Map rating to backend statuses
+    let flipStatus = 'still_learning';
+    let learnStatus = 'in_progress';
+
+    if (rating === 'easy' || rating === 'good') {
+      flipStatus = 'know';
+      learnStatus = 'mastered';
+    } else if (rating === 'hard' || rating === 'fail') {
+      flipStatus = 'still_learning';
+      learnStatus = 'in_progress';
+    }
+
+    try {
+      await axios.put(`${API_BASE_URL}/Flashcard/${flashcardId}/status`, {
+        flipStatus,
+        learnStatus
+      });
+
+      // Update local state
+      set((state) => ({
+        vocabList: state.vocabList.map(item => 
+          item.id === flashcardId 
+            ? { ...item, flipStatus, learnStatus, srsLevel: flipStatus === 'know' ? 5 : 2 } 
+            : item
+        )
+      }));
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  },
+
+  updateWordSrsLevel: async (flashcardId, newSrsLevel) => {
+    const flipStatus = newSrsLevel >= 4 ? 'know' : 'still_learning';
+    const learnStatus = newSrsLevel >= 4 ? 'mastered' : 'in_progress';
+
+    try {
+      await axios.put(`${API_BASE_URL}/Flashcard/${flashcardId}/status`, {
+        flipStatus,
+        learnStatus
+      });
+
+      set((state) => ({
+        vocabList: state.vocabList.map(item => 
+          item.id === flashcardId 
+            ? { ...item, flipStatus, learnStatus, srsLevel: newSrsLevel } 
+            : item
+        )
+      }));
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  },
+
+  toggleFavorite: (text) => set((state) => ({
+    vocabList: state.vocabList.map(item => 
+      item.text === text ? { ...item, is_favorite: !item.is_favorite } : item
+    )
+  })),
+
+  removeWord: (text) => set((state) => ({
+    vocabList: state.vocabList.filter(item => item.text !== text)
+  })),
+
+  isWordSaved: (text) => {
+    return get().vocabList.some(v => v.text === text);
+  },
+
+  getReviewQueue: () => {
+    // Filters words that aren't mastered yet (still_learning status)
+    return get().vocabList.filter(v => v.flipStatus === 'still_learning');
+  }
+}));

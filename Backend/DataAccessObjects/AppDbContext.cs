@@ -8,6 +8,9 @@ namespace DataAccessObjects
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<Vocabulary> Vocabularies { get; set; }
+        public DbSet<UserVocabulary> UserVocabularies { get; set; }
+        public DbSet<Flashcard> Flashcards { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
