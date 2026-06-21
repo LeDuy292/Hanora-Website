@@ -38,7 +38,7 @@ namespace Services
             {
                 var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new[] { _config["Google:ClientId"] }
+                    Audience = new[] { _config["Authentication:Google:ClientId"] }
                 };
                 payload = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
             }
@@ -61,7 +61,7 @@ namespace Services
                     GoogleId = payload.Subject,
                     DisplayName = payload.Name,
                     AvatarUrl = payload.Picture,
-                    PasswordHash = null,
+                    PasswordHash = "google_auth",
                 };
                 user = await _userRepo.CreateAsync(user);
             }
@@ -135,6 +135,6 @@ namespace Services
         }
 
         private static UserDto ToDto(User u) =>
-            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt);
+            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt ?? DateTime.UtcNow);
     }
 }

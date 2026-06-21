@@ -1,39 +1,55 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System;
+using System.Collections.Generic;
 
-namespace BusinessObjects.Models
+namespace BusinessObjects.Models;
+
+public partial class User
 {
-    [Table("users")]
-    public class User
-    {
-        [Column("id")]
-        public long Id { get; set; }
+    public long Id { get; set; }
 
-        [Required, MaxLength(50), Column("username")]
-        public string Username { get; set; } = string.Empty;
+    public string Username { get; set; } = null!;
 
-        [Required, MaxLength(255), Column("email")]
-        public string Email { get; set; } = string.Empty;
+    public string Email { get; set; } = null!;
 
-        [Column("password_hash")]
-        public string? PasswordHash { get; set; }
+    public string PasswordHash { get; set; } = null!;
 
-        [Column("google_id")]
-        public string? GoogleId { get; set; }
+    public string? DisplayName { get; set; }
 
-        [MaxLength(100), Column("display_name")]
-        public string? DisplayName { get; set; }
+    public string? AvatarUrl { get; set; }
 
-        [Column("avatar_url")]
-        public string? AvatarUrl { get; set; }
+    public bool? IsActive { get; set; }
 
-        [Column("is_active")]
-        public bool IsActive { get; set; } = true;
+    public DateTime? CreatedAt { get; set; }
 
-        [Column("created_at")]
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
 
-        [Column("updated_at")]
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    }
+    public string? GoogleId { get; set; }
+
+    public virtual ICollection<ChannelMember> ChannelMembers { get; set; } = new List<ChannelMember>();
+
+    public virtual ICollection<CommunityChannel> CommunityChannels { get; set; } = new List<CommunityChannel>();
+
+    public virtual ICollection<CommunityMessage> CommunityMessages { get; set; } = new List<CommunityMessage>();
+
+    public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
+
+    public virtual ICollection<LeaderboardSnapshot> LeaderboardSnapshots { get; set; } = new List<LeaderboardSnapshot>();
+
+    public virtual ICollection<LearningProgress> LearningProgresses { get; set; } = new List<LearningProgress>();
+
+    public virtual ICollection<MessageReaction> MessageReactions { get; set; } = new List<MessageReaction>();
+
+    public virtual ICollection<MessageReport> MessageReportReporters { get; set; } = new List<MessageReport>();
+
+    public virtual ICollection<MessageReport> MessageReportReviewedByNavigations { get; set; } = new List<MessageReport>();
+
+    public virtual ICollection<QuizSession> QuizSessions { get; set; } = new List<QuizSession>();
+
+    public virtual ICollection<StudySession> StudySessions { get; set; } = new List<StudySession>();
+
+    public virtual ICollection<UserAchievement> UserAchievements { get; set; } = new List<UserAchievement>();
+
+    public virtual UserStat? UserStat { get; set; }
+
+    public virtual ICollection<UserVocabulary> UserVocabularies { get; set; } = new List<UserVocabulary>();
 }
