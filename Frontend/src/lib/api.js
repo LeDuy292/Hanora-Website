@@ -37,3 +37,17 @@ export const getVocabulary = async (word) => {
   }
   return await response.json();
 };
+
+export const saveToNotebook = async (word, documentId) => {
+  const response = await fetch(`/api/vocabulary/${encodeURIComponent(word)}/save`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ documentId })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to save to notebook');
+  }
+  return await response.json();
+};

@@ -159,4 +159,13 @@ public class VocabularyService : IVocabularyService
             }
         }
     }
+
+    public async Task<bool> SaveToNotebookAsync(long userId, string word, long? documentId)
+    {
+        var vocab = await LookupWordAsync(word);
+        if (vocab == null) return false;
+
+        await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId);
+        return true;
+    }
 }
