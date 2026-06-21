@@ -16,12 +16,38 @@ namespace Hanora
             var builder = WebApplication.CreateBuilder(args);
 
             // Database
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.ChannelType>("channel_type_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.DocumentStatus>("document_status_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.FlashcardMode>("flashcard_mode_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.FlipResult>("flip_result_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.LeaderboardPeriod>("leaderboard_period_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.LearnQuestionType>("learn_question_type_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.LearnResult>("learn_result_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.QuizQuestionType>("quiz_question_type_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.ReportStatus>("report_status_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.RelationType>("relation_type_enum");
+            dataSourceBuilder.MapEnum<BusinessObjects.Models.WordType>("word_type_enum");
+
+            var dataSource = dataSourceBuilder.Build();
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseNpgsql(dataSource));
 
             // DI
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IAuthService, AuthService>();
+
+            // Document Processing & OCR
+            builder.Services.AddHttpClient();
+            builder.Services.AddSingleton<IBackgroundTaskQueue, DefaultBackgroundTaskQueue>();
+            builder.Services.AddHostedService<DocumentProcessingWorker>();
+            builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+            builder.Services.AddScoped<IS3StorageService, S3StorageService>();
+            builder.Services.AddScoped<IOcrService, OcrService>();
+            builder.Services.AddScoped<IDocumentProcessingService, DocumentProcessingService>();
+            builder.Services.AddScoped<IVocabularyRepository, VocabularyRepository>();
+            builder.Services.AddScoped<IDictionaryAiService, DictionaryAiService>();
+            builder.Services.AddScoped<IVocabularyService, VocabularyService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;

@@ -1,213 +1,185 @@
-import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, HelpCircle, ArrowLeft } from 'lucide-react';
-import { useReaderStore } from '../store/readerStore';
-import { useDocumentStore } from '../store/documentStore';
-import { useVocabularyStore } from '../store/vocabularyStore';
-import { ReadingToolbar } from '../components/reader/ReadingToolbar';
-import { ReaderContent } from '../components/reader/ReaderContent';
-import { WordPopup } from '../components/reader/WordPopup';
-import { SentencePopup } from '../components/reader/SentencePopup';
-import { UploadZone } from '../components/upload/UploadZone';
-import { FilePreview } from '../components/upload/FilePreview';
-import { UploadProgress } from '../components/upload/UploadProgress';
-import { readFileAsText } from '../utils/fileHelper';
-import { Button } from '../components/common/Button';
-import { THEMES } from '../utils/constants';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { getDocument, getVocabulary } from '../lib/api';
+import WordCard from '../components/WordCard';
+import UploadModal from '../components/UploadModal';
 
-export function ReaderPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { theme, selectedWord, setSelectedWord, selectedSentence, setSelectedSentence, clearSelection } = useReaderStore();
-  const { getActiveDocument, documents, addDocument } = useDocumentStore();
-  const { addWord, isWordSaved } = useVocabularyStore();
+const ReaderPage = () => {
+  const { id } = useParams();
+  const [document, setDocument] = useState(null);
+  const [segments, setSegments] = useState([]);
+  const [selectedWord, setSelectedWord] = useState(null);
+  const [vocabData, setVocabData] = useState(null);
+  const [isLoadingVocab, setIsLoadingVocab] = useState(false);
+  const [fontSize, setFontSize] = useState(28);
+  const [showPinyin, setShowPinyin] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(!id);
 
-  // Integrated Upload State
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadStep, setUploadStep] = useState('upload'); // upload, preview, progress
-  const [fileObject, setFileObject] = useState(null);
-  const [fileText, setFileText] = useState('');
-
-  const activeDoc = getActiveDocument();
-
-  // Check if Dashboard passed state to open the upload view directly
   useEffect(() => {
-    if (location.state?.openUpload) {
-      const timer = setTimeout(() => {
-        setShowUpload(true);
-        setUploadStep('upload');
-      }, 0);
-      window.history.replaceState({}, document.title);
-      return () => clearTimeout(timer);
+    if (!id) {
+      setDocument(null);
+      setSegments([]);
+      return;
     }
-  }, [location]);
+    const fetchDoc = async () => {
+      try {
+        const doc = await getDocument(id);
+        setDocument(doc);
+        if (doc.extractedText) {
+          const parsed = JSON.parse(doc.extractedText);
+          setSegments(parsed);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchDoc();
+  }, [id]);
 
-  // Clear selections when reader page unmounts
-  useEffect(() => {
-    return () => clearSelection();
-  }, [clearSelection]);
+  const handleWordClick = async (word) => {
+    // Skip spaces or punctuation if needed
+    if (!word || word.trim() === '') return;
+    
+    setSelectedWord(word);
+    setVocabData(null);
+    setIsLoadingVocab(true);
 
-  const handleFileSelect = async (file) => {
     try {
-      const text = await readFileAsText(file);
-      setFileObject(file);
-      setFileText(text);
-      setUploadStep('preview');
-    } catch (err) {
-      console.error("Failed to read file:", err);
+      const data = await getVocabulary(word);
+      setVocabData(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingVocab(false);
     }
   };
 
-  const handleConfirmUpload = (title) => {
-    setUploadStep('progress');
-    setFileObject(prev => ({ ...prev, customTitle: title }));
+  const closeWordCard = () => {
+    setSelectedWord(null);
+    setVocabData(null);
   };
 
-  const handleProgressComplete = () => {
-    addDocument(fileObject.customTitle || fileObject.name, fileText);
-    setShowUpload(false);
-    setUploadStep('upload');
-    setFileObject(null);
-    setFileText('');
-  };
+  return (
+    <div className="min-h-screen bg-[#f4f7fc] flex flex-col font-sans">
+      <UploadModal 
+        isOpen={isUploadModalOpen} 
+        onClose={() => setIsUploadModalOpen(false)} 
+      />
 
-  const handleSaveWord = (word) => {
-    addWord({
-      ...word,
-      documentTitle: activeDoc ? activeDoc.title : undefined,
-      documentId: activeDoc ? activeDoc.id : undefined,
-    });
-  };
-
-  const getThemeClass = () => {
-    return THEMES[theme]?.class || THEMES.light.class;
-  };
-
-  // Render Integrated File Upload Screens
-  if (documents.length === 0 || showUpload) {
-    return (
-      <div className="max-w-3xl mx-auto space-y-8 py-6 page-transition">
-        {/* Dynamic header depending on document count */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-extrabold font-display text-slate-800">
-              {documents.length === 0 ? 'Tải lên tài liệu học' : 'Nhập tài liệu mới'}
-            </h2>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              Tải lên tệp tin văn bản (.txt) hoặc tài liệu PDF (.pdf) tiếng Trung. Hệ thống sẽ tự phân tích HSK, từ vựng và tạo phiên âm Pinyin.
-            </p>
+      {/* Top Navigation Bar */}
+      <div className="bg-white rounded-full mx-8 mt-6 px-6 py-3 flex items-center justify-between shadow-sm border border-gray-100">
+        <div className="flex items-center gap-4">
+          <span className="text-gray-500 font-bold text-sm tracking-wider uppercase ml-2">VĂN BẢN ĐỌC:</span>
+          <div className="relative">
+            <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm font-medium rounded-full px-5 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors cursor-pointer">
+              <option>{document ? document.title : 'Chưa chọn tài liệu'}</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
           </div>
+          <button 
+            onClick={() => setIsUploadModalOpen(true)}
+            className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-full text-sm font-medium transition-colors border border-blue-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Tải file mới
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowPinyin(!showPinyin)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${showPinyin ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+            Pinyin
+          </button>
+          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden p-0.5">
+            <button onClick={() => setFontSize(Math.max(16, fontSize - 2))} className="px-3 py-1.5 hover:bg-white rounded-full text-gray-600 font-medium transition-colors">A-</button>
+            <span className="px-3 py-1.5 text-sm font-bold text-gray-800">{fontSize}px</span>
+            <button onClick={() => setFontSize(Math.min(48, fontSize + 2))} className="px-3 py-1.5 hover:bg-white rounded-full text-gray-600 font-medium transition-colors">A+</button>
+          </div>
+        </div>
+      </div>
 
-          {/* Only show back option if they already have other files to read */}
-          {documents.length > 0 && (
-            <button
-              onClick={() => setShowUpload(false)}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl transition-all self-start"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Quay lại trình đọc</span>
-            </button>
+      {/* Main Content Area */}
+      <div className="flex flex-1 p-8 gap-8 overflow-hidden h-[calc(100vh-90px)]">
+        
+        {/* Left: Document Reader */}
+        <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto relative">
+          {!document && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12">
+              <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">Chưa có tài liệu nào được chọn</h2>
+              <p className="text-gray-500 mb-8 max-w-md">Vui lòng tải lên một tài liệu tiếng Trung (PDF, ảnh) hoặc chọn một tài liệu từ danh sách để bắt đầu đọc và tra cứu.</p>
+              <button 
+                onClick={() => setIsUploadModalOpen(true)}
+                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-colors"
+              >
+                Tải lên tài liệu ngay
+              </button>
+            </div>
+          )}
+
+          {document && (
+            <div className="max-w-3xl mx-auto p-12">
+              <h1 className="text-4xl font-bold text-gray-900 mb-12 text-center leading-snug">{document.title}</h1>
+              
+              <div 
+                className="text-gray-800 font-sans tracking-wide break-words text-justify"
+                style={{ fontSize: `${fontSize}px`, lineHeight: '2.5' }}
+              >
+                {segments.map((word, index) => (
+                  <span
+                    key={index}
+                    onClick={() => handleWordClick(word)}
+                    className={`cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-200 ${selectedWord === word ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300' : 'hover:bg-blue-50 hover:text-blue-700'}`}
+                  >
+                    {word}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Upload Wizard steps */}
-        <div className="page-transition">
-          {uploadStep === 'upload' && (
-            <UploadZone onFileSelect={handleFileSelect} />
-          )}
-
-          {uploadStep === 'preview' && (
-            <FilePreview
-              file={fileObject}
-              text={fileText}
-              onConfirm={handleConfirmUpload}
-              onCancel={() => setUploadStep('upload')}
-            />
-          )}
-
-          {uploadStep === 'progress' && (
-            <UploadProgress onComplete={handleProgressComplete} />
+        {/* Right: Side Panel */}
+        <div className="w-[420px] bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto flex-shrink-0 relative">
+          {!selectedWord ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center">
+              <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-4">Tra cứu tương tác</h3>
+              <p className="text-gray-500 text-sm leading-relaxed max-w-[280px] mx-auto">
+                Nhấp chuột vào bất kỳ chữ Hán nào trong văn bản để xem phiên âm Pinyin, định nghĩa tiếng Việt, lưu vào sổ tay cá nhân hoặc tra cứu ngữ pháp AI.
+              </p>
+            </div>
+          ) : (
+            <div className="p-8">
+              <button 
+                onClick={closeWordCard}
+                className="absolute top-6 right-6 p-2 bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <WordCard 
+                word={selectedWord} 
+                data={vocabData} 
+                isLoading={isLoadingVocab}
+                onWordClick={handleWordClick}
+              />
+            </div>
           )}
         </div>
       </div>
-    );
-  }
-
-  // Render Reader Workspace
-  return (
-    <div className="h-full flex flex-col gap-6 max-w-7xl mx-auto page-transition">
-      {/* Reading toolbar with active upload toggle */}
-      <ReadingToolbar onUploadClick={() => setShowUpload(true)} />
-
-      {/* Main Grid: Reading Canvas (left) vs Inspection Sidebar (right) */}
-      {activeDoc ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start flex-1 min-h-[calc(100vh-14rem)]">
-
-          {/* Reading viewport (2 columns width) */}
-          <div className="lg:col-span-2 flex justify-center items-start min-h-[600px]">
-            <div className={`w-full max-w-[760px] md:min-h-[1075px] rounded-2xl p-10 md:p-16 shadow-[0_15px_45px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.03)] border border-slate-200/50 transition-all duration-300 ${getThemeClass()}`}>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-center mb-10 text-slate-800 tracking-tight leading-normal">
-                {activeDoc.title}
-              </h1>
-              <ReaderContent content={activeDoc.content} />
-            </div>
-          </div>
-
-          {/* Inspection sidebar panel (1 column width) */}
-          <div className="flex flex-col gap-6 lg:sticky lg:top-20">
-            {selectedWord ? (
-              <WordPopup
-                word={selectedWord}
-                onSave={handleSaveWord}
-                isSaved={isWordSaved(selectedWord.text)}
-                onClose={() => setSelectedWord(null)}
-              />
-            ) : null}
-
-            {selectedSentence ? (
-              <SentencePopup
-                sentence={selectedSentence}
-                onClose={() => setSelectedSentence(null)}
-              />
-            ) : null}
-
-            {!selectedWord && !selectedSentence && (
-              <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center space-y-4 flex flex-col items-center justify-center min-h-[260px] shadow-sm">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-slate-400 flex items-center justify-center">
-                  <HelpCircle className="w-5 h-5 animate-pulse-subtle" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tra cứu tương tác</h4>
-                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-xs mx-auto font-medium">
-                    Nhấp chuột vào bất kỳ chữ Hán nào trong văn bản để xem phiên âm Pinyin, định nghĩa tiếng Anh, lưu vào sổ tay cá nhân hoặc tra cứu ngữ pháp AI.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-        </div>
-      ) : (
-        /* Fallback empty reader card */
-        <div className="max-w-md mx-auto text-center p-8 bg-white border border-slate-100 rounded-3xl space-y-6 my-12 shadow-sm">
-          <BookOpen className="w-12 h-12 text-slate-400 mx-auto" />
-          <div>
-            <h3 className="text-base font-bold text-slate-850 mb-1" style={{ color: '#1e293b' }}>Chọn hoặc Tải văn bản</h3>
-            <p className="text-sm text-slate-500 leading-relaxed font-medium">
-              Bạn chưa chọn tài liệu học nào. Hãy tải lên tệp tin hoặc chọn một tệp có sẵn để bắt đầu.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" onClick={() => setShowUpload(true)}>
-              Tải Lên Tài Liệu
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/dashboard')}>
-              Về Trang Chủ
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
+};
+
 export default ReaderPage;
