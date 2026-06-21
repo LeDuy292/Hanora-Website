@@ -652,7 +652,22 @@ export function VocabularyPage() {
                             {row.pinyin}
                           </td>
                           <td className="py-4 px-4 font-sans font-semibold text-xs text-slate-600">
-                            {row.translation}
+                            {(() => {
+                              try {
+                                const parsed = JSON.parse(row.translation);
+                                if (Array.isArray(parsed)) {
+                                  const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
+                                  if (vnDef && vnDef.meaning) return vnDef.meaning;
+                                  if (parsed.length > 0 && parsed[0].meaning) return parsed[0].meaning;
+                                }
+                                if (parsed && typeof parsed === 'object' && parsed.meaning) {
+                                  return parsed.meaning;
+                                }
+                                return String(row.translation);
+                              } catch (e) {
+                                return row.translation;
+                              }
+                            })()}
                           </td>
                           <td className="py-4 px-4">
                             <span className={`inline-flex px-2.5 py-1 text-[10px] font-black rounded-lg border uppercase tracking-wider ${getSourceBadgeStyle(row.source)}`}>
@@ -1053,7 +1068,22 @@ export function VocabularyPage() {
                 <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Nghĩa</span>
                 <div className="bg-blue-50/20 border border-slate-150 rounded-2xl p-4 shadow-inner">
                   <p className="text-blue-650 font-black text-base select-text">
-                    {detailWord.translation}
+                    {(() => {
+                      try {
+                        const parsed = JSON.parse(detailWord.translation);
+                        if (Array.isArray(parsed)) {
+                          const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
+                          if (vnDef && vnDef.meaning) return vnDef.meaning;
+                          if (parsed.length > 0 && parsed[0].meaning) return parsed[0].meaning;
+                        }
+                        if (parsed && typeof parsed === 'object' && parsed.meaning) {
+                          return parsed.meaning;
+                        }
+                        return String(detailWord.translation);
+                      } catch (e) {
+                        return detailWord.translation;
+                      }
+                    })()}
                   </p>
                 </div>
               </div>

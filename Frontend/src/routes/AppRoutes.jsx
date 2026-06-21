@@ -6,7 +6,8 @@ import { useAuthStore } from '../store/authStore';
 // Pages
 import { LandingPage } from '../pages/LandingPage';
 import { DashboardPage } from '../pages/DashboardPage';
-import { ReaderPage } from '../pages/ReaderPage';
+import ReaderPage from '../pages/ReaderPage';
+import UploadPage from '../pages/UploadPage';
 import { FlashcardPage } from '../pages/FlashcardPage';
 import { VocabularyPage } from '../pages/VocabularyPage';
 import { PronunciationPage } from '../pages/PronunciationPage';
@@ -46,6 +47,16 @@ export function AppRoutes() {
         element={<Navigate to="/dashboard" replace />} 
       />
       <Route 
+        path="/reader/:id" 
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ReaderPage />
+            </MainLayout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
         path="/reader" 
         element={
           <ProtectedRoute>
@@ -56,7 +67,7 @@ export function AppRoutes() {
         } 
       />
       <Route 
-        path="/vocabulary" 
+        path="/vocabulary"  
         element={
           <ProtectedRoute>
             <MainLayout>
