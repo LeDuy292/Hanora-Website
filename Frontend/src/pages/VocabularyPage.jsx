@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { getMyDocuments } from '../lib/api';
 
 // Static database of details for HSK words (consistent with Flashcard.jsx)
 const WORD_DETAILS_DB = {
@@ -116,37 +117,26 @@ const WORD_DETAILS_DB = {
   }
 };
 
-// Seed vocabulary database to auto-generate the 772 high-fidelity mock list items
-const BASE_MOCK_WORDS = [
-  { text: "重要", pinyin: "zhòngyào", translation: "quan trọng", source: "SGK HSK 5 (1)", dateAdded: "2024-05-24", difficulty: "easy", state: "known" },
-  { text: "指挥", pinyin: "zhǐhuī", translation: "chỉ huy", source: "SGK HSK 5 (1)", dateAdded: "2024-05-21", difficulty: "medium", state: "learning" },
-  { text: "学习", pinyin: "xuéxí", translation: "học tập", source: "SGK HSK 5 (1)", dateAdded: "2024-05-18", difficulty: "easy", state: "known" },
-  { text: "分析", pinyin: "fēnxī", translation: "phân tích", source: "SGK HSK 5 (1)", dateAdded: "2024-05-15", difficulty: "medium", state: "learning" },
-  { text: "士兵", pinyin: "shìbīng", translation: "binh lính", source: "SBT HSK 5 (2)", dateAdded: "2024-05-23", difficulty: "easy", state: "learning" },
-  { text: "防御", pinyin: "fángyù", translation: "phòng thủ", source: "SBT HSK 5 (2)", dateAdded: "2024-05-20", difficulty: "hard", state: "unreviewed" },
-  { text: "再见", pinyin: "zàijiàn", translation: "tạm biệt", source: "SBT HSK 5 (2)", dateAdded: "2024-05-12", difficulty: "easy", state: "known" },
-  { text: "练习", pinyin: "liànxí", translation: "luyện tập", source: "SBT HSK 5 (2)", dateAdded: "2024-05-10", difficulty: "medium", state: "known" },
-  { text: "进攻", pinyin: "jìngōng", translation: "tiến công", source: "Sách logistic", dateAdded: "2024-05-23", difficulty: "medium", state: "learning" },
-  { text: "撤退", pinyin: "chètui", translation: "rút lui", source: "Sách logistic", dateAdded: "2024-05-22", difficulty: "hard", state: "learning" },
-  { text: "物流", pinyin: "wùliú", translation: "logistics", source: "Sách logistic", dateAdded: "2024-05-18", difficulty: "medium", state: "known" },
-  { text: "运输", pinyin: "yùnshū", translation: "vận chuyển", source: "Sách logistic", dateAdded: "2024-05-15", difficulty: "easy", state: "known" },
-  { text: "将军", pinyin: "jiāngjūn", translation: "tướng quân", source: "Đề Hanban", dateAdded: "2024-05-24", difficulty: "medium", state: "known" },
-  { text: "战斗", pinyin: "zhàndòu", translation: "chiến đấu", source: "Đề Hanban", dateAdded: "2024-05-22", difficulty: "hard", state: "learning" },
-  { text: "胜利", pinyin: "shènglì", translation: "chiến thắng", source: "Đề Hanban", dateAdded: "2024-05-20", difficulty: "medium", state: "known" },
-  { text: "语法", pinyin: "yǔfǎ", translation: "ngữ pháp", source: "Đề Hanban", dateAdded: "2024-05-14", difficulty: "easy", state: "unreviewed" },
-  { text: "策略", pinyin: "cèlüè", translation: "chiến lược", source: "Sách khởi nghiệp", dateAdded: "2024-05-21", difficulty: "hard", state: "unreviewed" },
-  { text: "创业", pinyin: "chuàngyè", translation: "khởi nghiệp", source: "Sách khởi nghiệp", dateAdded: "2024-05-19", difficulty: "medium", state: "learning" },
-  { text: "投资", pinyin: "tóuzī", translation: "đầu tư", source: "Sách khởi nghiệp", dateAdded: "2024-05-16", difficulty: "medium", state: "known" },
-  { text: "融资", pinyin: "róngzī", difficulty: "gọi vốn", source: "Sách khởi nghiệp", dateAdded: "2024-05-10", difficulty: "hard", state: "unreviewed" },
-  { text: "朋友", pinyin: "péngyou", translation: "bạn bè", source: "Khác", dateAdded: "2024-05-18", difficulty: "easy", state: "known" },
-  { text: "苹果", pinyin: "píngguǒ", translation: "quả táo", source: "Khác", dateAdded: "2024-05-14", difficulty: "easy", state: "known" },
-  { text: "下雨", pinyin: "xiàyǔ", translation: "mưa", source: "Khác", dateAdded: "2024-05-10", difficulty: "easy", state: "known" }
-];
+
 
 export function VocabularyPage() {
   const navigate = useNavigate();
   const { vocabList, removeWord } = useVocabularyStore();
   const { addXp } = useAuthStore();
+
+  const [documentsList, setDocumentsList] = useState([]);
+
+  useEffect(() => {
+    const fetchDocsList = async () => {
+      try {
+        const docs = await getMyDocuments();
+        setDocumentsList(docs);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchDocsList();
+  }, []);
 
   // Selected source filter tab at the top
   const [selectedSourceTab, setSelectedSourceTab] = useState('Tất cả');
@@ -175,101 +165,22 @@ export function VocabularyPage() {
   // Star state inside this UI (synchronizes with store where applicable)
   const [localStarred, setLocalStarred] = useState({});
 
-  // Generate complete 772 high-fidelity mock list items deterministically based on seed list
+  // Map user vocabulary to consistent structure
   const fullVocabularyDataset = useMemo(() => {
-    // Start with the user's actual words from the store, mapping them to realistic source structures
-    const userWordsMapped = vocabList.map((w, idx) => {
-      // Deterministically assign sources to make user words blend in
-      const mockSources = ['SGK HSK 5 (1)', 'SBT HSK 5 (2)', 'Sách logistic', 'Đề Hanban', 'Sách khởi nghiệp', 'Khác'];
-      const assignedSource = w.documentTitle || mockSources[idx % mockSources.length];
+    return vocabList.map((w) => {
       const state = w.srsLevel >= 4 ? 'known' : w.srsLevel > 0 ? 'learning' : 'not_started';
       
       return {
         text: w.text,
         pinyin: w.pinyin || "pīnyīn",
         translation: w.translation || "nghĩa",
-        source: assignedSource,
-        dateAdded: w.dateAdded || "2026-06-01",
+        source: w.documentTitle || "Chưa xác định",
+        dateAdded: w.dateAdded || new Date().toISOString().split('T')[0],
         difficulty: w.difficulty || "medium",
         state: state,
         isUserWord: true
       };
     });
-
-    const dataset = [...userWordsMapped];
-    const generatedKeys = new Set(dataset.map(w => w.text));
-
-    // Desired counts per source matching mockup exactly
-    const sourceTargetCounts = {
-      'SGK HSK 5 (1)': 128,
-      'SBT HSK 5 (2)': 96,
-      'Sách logistic': 245,
-      'Đề Hanban': 82,
-      'Sách khởi nghiệp': 167,
-      'Khác': 54
-    };
-
-    // Helper vocab templates to generate variations
-    const templates = [
-      { text: "策略", pinyin: "cèlüè", translation: "chiến lược", difficulty: "hard" },
-      { text: "撤退", pinyin: "chètui", translation: "rút lui", difficulty: "hard" },
-      { text: "战斗", pinyin: "zhàndòu", translation: "chiến đấu", difficulty: "hard" },
-      { text: "进攻", pinyin: "jìngōng", translation: "tiến công", difficulty: "medium" },
-      { text: "重要", pinyin: "zhòngyào", translation: "quan trọng", difficulty: "easy" },
-      { text: "指挥", pinyin: "zhǐhuī", translation: "chỉ huy", difficulty: "medium" },
-      { text: "士兵", pinyin: "shìbīng", translation: "binh lính", difficulty: "medium" },
-      { text: "防御", pinyin: "fángyù", translation: "phòng thủ", difficulty: "hard" },
-      { text: "胜利", pinyin: "shènglì", translation: "chiến thắng", difficulty: "medium" },
-      { text: "物流", pinyin: "wùliú", translation: "logistics", difficulty: "medium" },
-      { text: "运输", pinyin: "yùnshū", translation: "vận chuyển", difficulty: "easy" },
-      { text: "创业", pinyin: "chuàngyè", translation: "khởi nghiệp", difficulty: "medium" },
-      { text: "投资", pinyin: "tóuzī", translation: "đầu tư", difficulty: "medium" },
-      { text: "供应链", pinyin: "gōngyìngliàn", translation: "chuỗi cung ứng", difficulty: "hard" },
-      { text: "分析", pinyin: "fēnxī", translation: "phân tích", difficulty: "medium" },
-      { text: "创新", pinyin: "chuàngxīn", translation: "đổi mới sáng tạo", difficulty: "easy" }
-    ];
-
-    // Helper states for circular stats
-    const statePool = ['known', 'learning', 'not_started', 'unreviewed'];
-
-    // Fill each source category to its exact required mockup counts
-    Object.entries(sourceTargetCounts).forEach(([src, targetCount]) => {
-      // Calculate how many we currently have in dataset for this source
-      const currentCount = dataset.filter(w => w.source === src).length;
-      const countNeeded = targetCount - currentCount;
-      for (let i = 0; i < countNeeded; i++) {
-        const template = templates[(i + src.length) % templates.length];
-        const wordText = `${template.text}_${src.replace(/\s+/g, '')}_${i + 1}`; // Ensure unique Hanzi key
-
-        // Distribute states to match mockup stats: Known (316), Learning (286), Not Started (120), Unreviewed (50)
-        let determinedState = 'not_started';
-        const globalIdx = dataset.length;
-        if (globalIdx < 316) {
-          determinedState = 'known';
-        } else if (globalIdx < 316 + 286) {
-          determinedState = 'learning';
-        } else if (globalIdx < 316 + 286 + 50) {
-          determinedState = 'unreviewed';
-        }
-
-        // Generate synthetic date ranging in late May 2024
-        const day = 20 + (i % 5);
-        const mockDate = `2024-05-${day}`;
-
-        dataset.push({
-          text: wordText,
-          pinyin: template.pinyin,
-          translation: template.translation,
-          source: src,
-          dateAdded: mockDate,
-          difficulty: template.difficulty,
-          state: determinedState,
-          isUserWord: false
-        });
-      }
-    });
-
-    return dataset;
   }, [vocabList]);
 
   // Handle active filters & search queries
@@ -420,48 +331,34 @@ export function VocabularyPage() {
     }
   };
 
+  const learningStats = useMemo(() => {
+    const total = fullVocabularyDataset.length || 0;
+    const known = fullVocabularyDataset.filter(w => w.state === 'known').length;
+    const learning = fullVocabularyDataset.filter(w => w.state === 'learning').length;
+    const notStarted = fullVocabularyDataset.filter(w => w.state === 'not_started').length;
+    const unreviewed = fullVocabularyDataset.filter(w => w.state === 'unreviewed').length;
+    
+    const circum = 2 * Math.PI * 38;
+    const safeTotal = total || 1;
+    
+    const knownDash = (known / safeTotal) * circum;
+    const learningDash = (learning / safeTotal) * circum;
+    const notStartedDash = (notStarted / safeTotal) * circum;
+    const unreviewedDash = (unreviewed / safeTotal) * circum;
+    
+    return {
+      total, known, learning, notStarted, unreviewed,
+      circum, knownDash, learningDash, notStartedDash, unreviewedDash,
+      learningOffset: -knownDash,
+      notStartedOffset: -(knownDash + learningDash),
+      unreviewedOffset: -(knownDash + learningDash + notStartedDash)
+    };
+  }, [fullVocabularyDataset]);
+
   return (
     <div className="space-y-6 page-transition max-w-7xl mx-auto py-4 text-slate-700 font-sans">
       
-      {/* 1. TOP DOCUMENT TABS (EVEN GRID LAYOUT ON LARGE SCREENS) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 select-none">
-        {[
-          { name: 'Tất cả', count: 772, icon: BookMarked },
-          { name: 'SGK HSK 5 (1)', count: 128, icon: Layers },
-          { name: 'SBT HSK 5 (2)', count: 96, icon: FileText },
-          { name: 'Sách logistic', count: 245, icon: FileText },
-          { name: 'Đề Hanban', count: 82, icon: FileText },
-          { name: 'Sách khởi nghiệp', count: 167, icon: FileText },
-          { name: 'Khác', count: 54, icon: FileText }
-        ].map((tab) => {
-          const TabIcon = tab.icon;
-          const isActive = selectedSourceTab === tab.name;
 
-          return (
-            <button
-              key={tab.name}
-              onClick={() => setSelectedSourceTab(tab.name)}
-              className={`flex items-center gap-3 px-3.5 py-3 border rounded-2xl w-full transition-all text-left shadow-sm ${
-                isActive 
-                  ? 'bg-blue-50 border-blue-500/30 text-blue-600 ring-2 ring-blue-500/10 font-bold' 
-                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${
-                isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-400'
-              }`}>
-                <TabIcon className="w-4 h-4" />
-              </div>
-              <div className="leading-tight">
-                <span className="text-xs font-black block">{tab.name}</span>
-                <span className={`text-[10px] font-bold ${isActive ? 'text-blue-500' : 'text-slate-400'}`}>
-                  {tab.count} từ vựng
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
 
       {/* Main Two-Column Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -481,12 +378,9 @@ export function VocabularyPage() {
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none transition-colors cursor-pointer"
                 >
                   <option value="">Nguồn tài liệu</option>
-                  <option value="SGK HSK 5 (1)">SGK HSK 5 (1)</option>
-                  <option value="SBT HSK 5 (2)">SBT HSK 5 (2)</option>
-                  <option value="Sách logistic">Sách logistic</option>
-                  <option value="Đề Hanban">Đề Hanban</option>
-                  <option value="Sách khởi nghiệp">Sách khởi nghiệp</option>
-                  <option value="Khác">Khác</option>
+                  {documentsList.map(doc => (
+                    <option key={doc.id} value={doc.title}>{doc.title}</option>
+                  ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -499,11 +393,11 @@ export function VocabularyPage() {
                   onChange={(e) => setLearningFilter(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none transition-colors cursor-pointer"
                 >
-                  <option value="">Học tập</option>
-                  <option value="known">Đã biết (316)</option>
-                  <option value="learning">Đang học (286)</option>
-                  <option value="not_started">Chưa học (120)</option>
-                  <option value="unreviewed">Chưa ôn tập (50)</option>
+                  <option value="">Tất cả</option>
+                  <option value="known">Đã biết ({learningStats.known})</option>
+                  <option value="learning">Đang học ({learningStats.learning})</option>
+                  <option value="not_started">Chưa học ({learningStats.notStarted})</option>
+                  <option value="unreviewed">Chưa ôn tập ({learningStats.unreviewed})</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -832,53 +726,53 @@ export function VocabularyPage() {
                     className="stroke-slate-100 fill-transparent"
                     strokeWidth="8"
                   />
-                  {/* Know segment (316/772) */}
+                  {/* Know segment */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     className="stroke-emerald-500 fill-transparent transition-all duration-500"
                     strokeWidth="8"
-                    strokeDasharray="97.72 141.04"
+                    strokeDasharray={`${learningStats.knownDash} ${learningStats.circum - learningStats.knownDash}`}
                     strokeDashoffset="0"
                     strokeLinecap="round"
                   />
-                  {/* Learning segment (286/772) */}
+                  {/* Learning segment */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     className="stroke-blue-500 fill-transparent transition-all duration-500"
                     strokeWidth="8"
-                    strokeDasharray="88.43 150.33"
-                    strokeDashoffset="-97.72"
+                    strokeDasharray={`${learningStats.learningDash} ${learningStats.circum - learningStats.learningDash}`}
+                    strokeDashoffset={learningStats.learningOffset}
                     strokeLinecap="round"
                   />
-                  {/* Not started segment (120/772) */}
+                  {/* Not started segment */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     className="stroke-purple-400 fill-transparent transition-all duration-500"
                     strokeWidth="8"
-                    strokeDasharray="37.11 201.65"
-                    strokeDashoffset="-186.15"
+                    strokeDasharray={`${learningStats.notStartedDash} ${learningStats.circum - learningStats.notStartedDash}`}
+                    strokeDashoffset={learningStats.notStartedOffset}
                     strokeLinecap="round"
                   />
-                  {/* Unreviewed segment (50/772) */}
+                  {/* Unreviewed segment */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     className="stroke-amber-500 fill-transparent transition-all duration-500"
                     strokeWidth="8"
-                    strokeDasharray="15.46 223.3"
-                    strokeDashoffset="-223.26"
+                    strokeDasharray={`${learningStats.unreviewedDash} ${learningStats.circum - learningStats.unreviewedDash}`}
+                    strokeDashoffset={learningStats.unreviewedOffset}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                  <span className="text-lg font-black text-slate-800 font-display">772</span>
+                  <span className="text-lg font-black text-slate-800 font-display">{learningStats.total}</span>
                   <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tổng từ vựng</span>
                 </div>
               </div>
@@ -887,19 +781,19 @@ export function VocabularyPage() {
               <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] font-semibold text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="truncate">Đã biết: <span className="font-extrabold text-slate-800">316</span></span>
+                  <span className="truncate">Đã biết: <span className="font-extrabold text-slate-800">{learningStats.known}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                  <span className="truncate">Đang học: <span className="font-extrabold text-slate-800">286</span></span>
+                  <span className="truncate">Đang học: <span className="font-extrabold text-slate-800">{learningStats.learning}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-                  <span className="truncate">Chưa học: <span className="font-extrabold text-slate-800">120</span></span>
+                  <span className="truncate">Chưa học: <span className="font-extrabold text-slate-800">{learningStats.notStarted}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span className="truncate">Chưa ôn tập: <span className="font-extrabold text-slate-800">50</span></span>
+                  <span className="truncate">Chưa ôn tập: <span className="font-extrabold text-slate-800">{learningStats.unreviewed}</span></span>
                 </div>
               </div>
             </div>
@@ -922,14 +816,22 @@ export function VocabularyPage() {
             </div>
 
             <div className="space-y-3.5">
-              {[
-                { name: 'SGK HSK 5 (1)', count: 128, total: 772, color: 'bg-pink-500' },
-                { name: 'SBT HSK 5 (2)', count: 96, total: 772, color: 'bg-blue-500' },
-                { name: 'Sách logistic', count: 245, total: 772, color: 'bg-teal-500' },
-                { name: 'Đề Hanban', count: 82, total: 772, color: 'bg-purple-500' },
-                { name: 'Sách khởi nghiệp', count: 167, total: 772, color: 'bg-amber-500' },
-                { name: 'Khác', count: 54, total: 772, color: 'bg-slate-450' }
-              ].map((src) => {
+              {(() => {
+                const stats = {};
+                fullVocabularyDataset.forEach(w => {
+                  stats[w.source] = (stats[w.source] || 0) + 1;
+                });
+                
+                const colors = ['bg-pink-500', 'bg-blue-500', 'bg-teal-500', 'bg-purple-500', 'bg-amber-500', 'bg-slate-450'];
+                const totalVocab = fullVocabularyDataset.length || 1;
+                
+                return Object.keys(stats).map((sourceName, index) => ({
+                  name: sourceName,
+                  count: stats[sourceName],
+                  total: totalVocab,
+                  color: colors[index % colors.length]
+                })).sort((a, b) => b.count - a.count);
+              })().map((src) => {
                 const percent = Math.min(Math.round((src.count / src.total) * 100), 100);
                 
                 return (

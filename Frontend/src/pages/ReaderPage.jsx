@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getDocument, getVocabulary } from '../lib/api';
+import { getDocument, getVocabulary, getMyDocuments } from '../lib/api';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
+import { useNavigate } from 'react-router-dom';
 
 const ReaderPage = () => {
   const { id } = useParams();
@@ -14,6 +15,8 @@ const ReaderPage = () => {
   const [fontSize, setFontSize] = useState(28);
   const [showPinyin, setShowPinyin] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(!id);
+  const [documentsList, setDocumentsList] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!id) {
@@ -35,6 +38,18 @@ const ReaderPage = () => {
     };
     fetchDoc();
   }, [id]);
+
+  useEffect(() => {
+    const fetchDocsList = async () => {
+      try {
+        const docs = await getMyDocuments();
+        setDocumentsList(docs);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchDocsList();
+  }, []);
 
   const handleWordClick = async (word) => {
     // Skip spaces or punctuation if needed
@@ -71,8 +86,21 @@ const ReaderPage = () => {
         <div className="flex items-center gap-4">
           <span className="text-gray-500 font-bold text-sm tracking-wider uppercase ml-2">VĂN BẢN ĐỌC:</span>
           <div className="relative">
-            <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm font-medium rounded-full px-5 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors cursor-pointer">
-              <option>{document ? document.title : 'Chưa chọn tài liệu'}</option>
+            <select 
+              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm font-medium rounded-full px-5 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors cursor-pointer"
+              value={id || ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  navigate(`/reader/${e.target.value}`);
+                } else {
+                  navigate(`/reader`);
+                }
+              }}
+            >
+              <option value="">Chưa chọn tài liệu</option>
+              {documentsList.map(doc => (
+                <option key={doc.id} value={doc.id}>{doc.title}</option>
+              ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -173,6 +201,8 @@ const ReaderPage = () => {
                 data={vocabData} 
                 isLoading={isLoadingVocab}
                 onWordClick={handleWordClick}
+                documentId={id}
+                documentTitle={document?.title}
               />
             </div>
           )}

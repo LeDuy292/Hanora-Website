@@ -1,88 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const INITIAL_VOCABULARY = [
-  {
-    text: "学习",
-    pinyin: "xué xí",
-    translation: "to study; learn",
-    hsk: 1,
-    dateAdded: "2026-05-30",
-    difficulty: "medium",
-    srsLevel: 1,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "喜欢",
-    pinyin: "xǐ huan",
-    translation: "to like; be fond of",
-    hsk: 1,
-    dateAdded: "2026-05-31",
-    difficulty: "easy",
-    srsLevel: 2,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "咖啡",
-    pinyin: "kā fēi",
-    translation: "coffee",
-    hsk: 1,
-    dateAdded: "2026-06-01",
-    difficulty: "hard",
-    srsLevel: 0,
-    nextReviewDate: new Date().toISOString().split('T')[0], // Due today!
-  },
-  {
-    text: "谢谢",
-    pinyin: "xièxie",
-    translation: "to thank; thanks",
-    hsk: 1,
-    dateAdded: "2026-06-01",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "再见",
-    pinyin: "zàijiàn",
-    translation: "goodbye; see you again",
-    hsk: 1,
-    dateAdded: "2026-06-02",
-    difficulty: "medium",
-    srsLevel: 3,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "苹果",
-    pinyin: "píngguǒ",
-    translation: "apple",
-    hsk: 1,
-    dateAdded: "2026-06-02",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "面包",
-    pinyin: "miànbāo",
-    translation: "bread",
-    hsk: 1,
-    dateAdded: "2026-06-03",
-    difficulty: "easy",
-    srsLevel: 4,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  },
-  {
-    text: "医生",
-    pinyin: "yīshēng",
-    translation: "doctor",
-    hsk: 1,
-    dateAdded: "2026-06-03",
-    difficulty: "medium",
-    srsLevel: 1,
-    nextReviewDate: new Date().toISOString().split('T')[0],
-  }
-];
+const INITIAL_VOCABULARY = [];
 
 
 export const useVocabularyStore = create(
@@ -180,7 +99,7 @@ export const useVocabularyStore = create(
       })
     }),
     {
-      name: 'hanora-vocabulary-storage',
+      name: 'hanora-vocabulary-storage-v2',
     }
   )
 );
