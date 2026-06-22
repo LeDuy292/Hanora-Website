@@ -642,14 +642,26 @@ public partial class AppDbContext : DbContext
                 .HasDefaultValue(0)
                 .HasColumnName("correct_answers");
             entity.Property(e => e.ScorePercent)
-                .HasPrecision(5, 2)
-                .HasComputedColumnSql("\nCASE\n    WHEN (total_questions = 0) THEN (0)::numeric\n    ELSE round((((correct_answers)::numeric * 100.0) / (total_questions)::numeric), 2)\nEND", true)
+                .ValueGeneratedOnAddOrUpdate()
                 .HasColumnName("score_percent");
+            entity.Property(e => e.AccuracyPercent)
+                .HasPrecision(5, 2)
+                .HasColumnName("accuracy_percent");
+            entity.Property(e => e.TimeSpentSeconds).HasColumnName("time_spent_seconds");
+            entity.Property(e => e.AiFeedback).HasColumnName("ai_feedback");
+            entity.Property(e => e.SkillsJson)
+                .HasColumnType("jsonb")
+                .HasColumnName("skills_json");
             entity.Property(e => e.StartedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("started_at");
             entity.Property(e => e.TotalQuestions).HasColumnName("total_questions");
             entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.Property(e => e.Score).HasColumnName("score");
+            entity.Property(e => e.Xp).HasColumnName("xp");
+            entity.Property(e => e.XpEarned).HasColumnName("xp_earned");
+            entity.Property(e => e.Status).HasColumnName("status");
 
             entity.HasOne(d => d.User).WithMany(p => p.QuizSessions)
                 .HasForeignKey(d => d.UserId)
@@ -843,6 +855,10 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.SourcePage).HasColumnName("source_page");
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.VocabularyId).HasColumnName("vocabulary_id");
+            entity.Property(e => e.CorrectCount).HasColumnName("correct_count");
+            entity.Property(e => e.WrongCount).HasColumnName("wrong_count");
+            entity.Property(e => e.MasteryLevel).HasColumnName("mastery_level");
+            entity.Property(e => e.LastReviewed).HasColumnName("last_reviewed");
 
             entity.HasOne(d => d.SourceDocument).WithMany(p => p.UserVocabularies)
                 .HasForeignKey(d => d.SourceDocumentId)
