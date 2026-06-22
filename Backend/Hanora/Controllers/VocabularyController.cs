@@ -79,3 +79,4 @@ public class SaveVocabularyRequest
 {
     public long? DocumentId { get; set; }
 }
+

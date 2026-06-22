@@ -168,4 +168,9 @@ public class VocabularyService : IVocabularyService
         await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId);
         return true;
     }
+
+    public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
+    {
+        return await _vocabularyRepo.GetUserVocabularyAsync(userId);
+    }
 }

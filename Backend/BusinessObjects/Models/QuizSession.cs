@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -14,6 +14,22 @@ public partial class QuizSession
     public int? CorrectAnswers { get; set; }
 
     public decimal? ScorePercent { get; set; }
+    
+    public decimal? AccuracyPercent { get; set; }
+    
+    public int? Score { get; set; }
+    
+    public int? Xp { get; set; }
+
+    public int? TimeSpentSeconds { get; set; }
+    
+    public int? XpEarned { get; set; }
+
+    public string? AiFeedback { get; set; }
+
+    public string? SkillsJson { get; set; }
+
+    public string? Status { get; set; }
 
     public DateTime? StartedAt { get; set; }
 
