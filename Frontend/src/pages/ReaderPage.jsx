@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getDocument, getVocabulary, getMyDocuments } from '../lib/api';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
+import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { useNavigate } from 'react-router-dom';
 
 const ReaderPage = () => {
@@ -15,19 +16,24 @@ const ReaderPage = () => {
   const [fontSize, setFontSize] = useState(28);
   const [showPinyin, setShowPinyin] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(!id);
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [documentsList, setDocumentsList] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const readerContainerRef = React.useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!id) {
       setDocument(null);
       setSegments([]);
+      setCurrentPage(1);
       return;
     }
     const fetchDoc = async () => {
       try {
         const doc = await getDocument(id);
         setDocument(doc);
+        setCurrentPage(1);
         if (doc.extractedText) {
           const parsed = JSON.parse(doc.extractedText);
           setSegments(parsed);
@@ -74,6 +80,11 @@ const ReaderPage = () => {
     setVocabData(null);
   };
 
+  const WORDS_PER_PAGE = 500;
+  const totalPages = Math.ceil(segments.length / WORDS_PER_PAGE) || 1;
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
+
   return (
     <div className="min-h-screen bg-[#f4f7fc] flex flex-col font-sans">
       <UploadModal 
@@ -81,30 +92,31 @@ const ReaderPage = () => {
         onClose={() => setIsUploadModalOpen(false)} 
       />
 
+      <DocumentSelectModal
+        isOpen={isSelectModalOpen}
+        onClose={() => setIsSelectModalOpen(false)}
+        documents={documentsList}
+        currentId={id}
+        onSelect={(newId) => {
+          if (newId) navigate(`/reader/${newId}`);
+          else navigate(`/reader`);
+        }}
+      />
+
       {/* Top Navigation Bar */}
       <div className="bg-white rounded-full mx-8 mt-6 px-6 py-3 flex items-center justify-between shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
           <span className="text-gray-500 font-bold text-sm tracking-wider uppercase ml-2">VĂN BẢN ĐỌC:</span>
           <div className="relative">
-            <select 
-              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm font-medium rounded-full px-5 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors cursor-pointer"
-              value={id || ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  navigate(`/reader/${e.target.value}`);
-                } else {
-                  navigate(`/reader`);
-                }
-              }}
+            <button 
+              onClick={() => setIsSelectModalOpen(true)}
+              className="flex items-center justify-between w-64 bg-gray-50 border border-gray-200 text-gray-800 text-sm font-medium rounded-full px-5 py-2 focus:outline-none hover:bg-gray-100 transition-colors"
             >
-              <option value="">Chưa chọn tài liệu</option>
-              {documentsList.map(doc => (
-                <option key={doc.id} value={doc.id}>{doc.title}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-            </div>
+              <span className="truncate">
+                {id ? documentsList.find(d => d.id == id)?.title || 'Đang tải...' : 'Chưa chọn tài liệu'}
+              </span>
+              <svg className="w-4 h-4 text-gray-500 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
           </div>
           <button 
             onClick={() => setIsUploadModalOpen(true)}
@@ -135,7 +147,9 @@ const ReaderPage = () => {
       <div className="flex flex-1 p-8 gap-8 overflow-hidden h-[calc(100vh-90px)]">
         
         {/* Left: Document Reader */}
-        <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto relative">
+        <div 
+          className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative flex flex-col"
+        >
           {!document && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12">
               <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mb-6">
@@ -153,14 +167,15 @@ const ReaderPage = () => {
           )}
 
           {document && (
-            <div className="max-w-3xl mx-auto p-12">
-              <h1 className="text-4xl font-bold text-gray-900 mb-12 text-center leading-snug">{document.title}</h1>
+            <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto w-full pt-10 pb-6 px-12 overflow-hidden">
+              <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center leading-snug shrink-0">{document.title}</h1>
               
               <div 
-                className="text-gray-800 font-sans tracking-wide break-words text-justify"
+                ref={readerContainerRef}
+                className="flex-1 text-gray-800 font-sans tracking-wide break-words text-justify overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent"
                 style={{ fontSize: `${fontSize}px`, lineHeight: '2.5' }}
               >
-                {segments.map((word, index) => (
+                {currentSegments.map((word, index) => (
                   <span
                     key={index}
                     onClick={() => handleWordClick(word)}
@@ -170,6 +185,41 @@ const ReaderPage = () => {
                   </span>
                 ))}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
+                  <div className="flex items-center gap-6">
+                    <button 
+                      onClick={() => {
+                        setCurrentPage(p => Math.max(1, p - 1));
+                        readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={validCurrentPage === 1}
+                      className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      title="Trang trước"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    
+                    <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
+                      Trang {validCurrentPage} / {totalPages}
+                    </span>
+                    
+                    <button 
+                      onClick={() => {
+                        setCurrentPage(p => Math.min(totalPages, p + 1));
+                        readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={validCurrentPage === totalPages}
+                      className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      title="Trang tiếp theo"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

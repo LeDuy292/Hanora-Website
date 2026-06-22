@@ -183,12 +183,9 @@ export function ProfilePage() {
     // Clear all localStorage and stores
     useDocumentStore.setState({ documents: [], activeDocumentId: null });
     useVocabularyStore.setState({ vocabList: [] });
-    logout();
     localStorage.clear();
     setActiveModal(null);
-    navigate('/');
-    // Trigger window refresh to clear state
-    window.location.reload();
+    logout();
   };
 
   // Edit fields inside modal submit handlers

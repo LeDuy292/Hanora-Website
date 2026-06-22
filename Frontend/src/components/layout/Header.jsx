@@ -24,7 +24,6 @@ export function Header({ offsetTop }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
   };
 
   return (

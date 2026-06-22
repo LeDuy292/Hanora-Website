@@ -10,7 +10,7 @@ namespace Hanora.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-// [Authorize]
+[Authorize]
 public class DocumentsController : ControllerBase
 {
     private readonly IDocumentProcessingService _documentProcessingService;
