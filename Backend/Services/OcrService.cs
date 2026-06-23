@@ -99,7 +99,7 @@ public class OcrService : IOcrService
             // Run PaddleOCR
             using var img = OpenCvSharp.Cv2.ImDecode(bytes, OpenCvSharp.ImreadModes.Color);
             var model = Sdcb.PaddleOCR.Models.Local.LocalFullModels.ChineseV5;
-            using var all = new Sdcb.PaddleOCR.PaddleOcrAll(model, Sdcb.PaddleInference.PaddleDevice.Mkldnn());
+            using var all = new Sdcb.PaddleOCR.PaddleOcrAll(model, Sdcb.PaddleInference.PaddleDevice.Cpu());
             
             var result = all.Run(img);
             text = result.Text;
