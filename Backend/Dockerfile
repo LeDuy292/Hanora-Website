@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y \
     libsm6 \
     libxext6 \
     libgl1 \
+    libgomp1 \
     libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
