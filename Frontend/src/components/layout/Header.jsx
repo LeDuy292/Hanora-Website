@@ -31,10 +31,10 @@ export function Header({ offsetTop }) {
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <NavLink to="/" className="hover:opacity-90 transition-opacity group">
-          <img 
-            src={logoImg} 
-            className="h-12 md:h-16 w-auto object-contain brightness-0 invert filter transition-transform duration-500 group-hover:scale-105" 
-            alt="Hanora logo" 
+          <img
+            src={logoImg}
+            className="h-12 md:h-16 w-auto object-contain brightness-0 invert filter transition-transform duration-500 group-hover:scale-105"
+            alt="Hanora logo"
           />
         </NavLink>
       </div>
@@ -47,10 +47,9 @@ export function Header({ offsetTop }) {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `relative font-bold text-[15px] py-2 transition-all duration-300 group tracking-tight ${
-                isActive
-                  ? 'text-white'
-                  : 'text-white/70 hover:text-white'
+              `relative font-bold text-[15px] py-2 transition-all duration-300 group tracking-tight ${isActive
+                ? 'text-white'
+                : 'text-white/70 hover:text-white'
               }`
             }
           >
@@ -69,7 +68,7 @@ export function Header({ offsetTop }) {
         {user ? (
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
-               <div className="flex items-center gap-1.5 text-white">
+              <div className="flex items-center gap-1.5 text-white">
                 <Flame className="w-4 h-4 fill-white/20" />
                 <span>{user.streak ?? 0} NGÀY</span>
               </div>
@@ -105,7 +104,7 @@ export function Header({ offsetTop }) {
           </div>
 
         ) : (
-          <NavLink 
+          <NavLink
             to="/login"
             className="px-8 py-2.5 text-sm font-black text-[#32A0F4] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
           >
@@ -114,7 +113,7 @@ export function Header({ offsetTop }) {
         )}
 
         {/* Mobile menu toggle */}
-        <button 
+        <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className="lg:hidden p-2 text-white hover:text-white/80 transition-colors"
         >
@@ -132,8 +131,7 @@ export function Header({ offsetTop }) {
               end={item.end}
               onClick={() => setIsMenuOpen(false)}
               className={({ isActive }) =>
-                `font-black text-lg py-1 transition-all ${
-                  isActive ? 'text-white border-l-4 border-white pl-4' : 'text-white/70 pl-0'
+                `font-black text-lg py-1 transition-all ${isActive ? 'text-white border-l-4 border-white pl-4' : 'text-white/70 pl-0'
                 }`
               }
             >
@@ -141,7 +139,7 @@ export function Header({ offsetTop }) {
             </NavLink>
           ))}
           {user && (
-            <button 
+            <button
               onClick={() => { setIsMenuOpen(false); handleLogout(); }}
               className="text-white/90 font-black text-lg text-left mt-4 uppercase tracking-widest border-t border-white/20 pt-4"
             >

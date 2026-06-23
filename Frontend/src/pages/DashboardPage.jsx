@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { progressApi } from '../services/progressService';
 import { Button } from '../components/common/Button';
+import StreakImage from '../assets/StreakImage.png';
 
 // Maps the short weekday label used by the growth chart from an ISO date.
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -291,12 +292,13 @@ export function DashboardPage() {
           </div>
 
           <div className="relative w-36 h-36 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 130 130">
+            <img src={StreakImage} alt="Progress" className="absolute w-[98px] h-[98px] rounded-full object-cover shadow-inner" />
+            <svg className="w-full h-full transform -rotate-90 z-10 relative" viewBox="0 0 130 130">
               <circle
                 cx="65"
                 cy="65"
                 r={radius}
-                className="stroke-slate-100 fill-transparent"
+                className="stroke-slate-100/50 fill-transparent"
                 strokeWidth={strokeWidth}
               />
               <circle
@@ -310,12 +312,12 @@ export function DashboardPage() {
                 strokeLinecap="round"
               />
             </svg>
-            <div className="absolute flex flex-col items-center justify-center">
-              <span className="text-2xl font-black text-slate-800 font-display">
+            <div className="absolute flex flex-col items-center justify-center z-20 bg-white/80 backdrop-blur-md rounded-full w-[76px] h-[76px] shadow-sm border border-white/50">
+              <span className="text-xl font-black text-slate-800 font-display leading-none">
                 {progressPercent}%
               </span>
-              <span className="text-[9px] text-slate-500 font-bold tracking-wide mt-0.5">
-                {todayMins} / {targetMinutes} phút
+              <span className="text-[9px] text-slate-600 font-bold tracking-wide mt-1 leading-none">
+                {todayMins}/{targetMinutes}p
               </span>
             </div>
           </div>
@@ -330,7 +332,6 @@ export function DashboardPage() {
         {/* Streak card with daily sequence */}
         <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
           <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
-          <div className="pointer-events-none absolute right-6 top-8 h-24 w-24 rounded-full bg-white/20"></div>
 
           <div className="flex flex-col xl:flex-row justify-between items-start gap-6">
             <div className="max-w-xl">

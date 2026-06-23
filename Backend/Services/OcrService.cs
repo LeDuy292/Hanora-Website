@@ -20,7 +20,7 @@ public class OcrService : IOcrService
         _httpClient = httpClient;
     }
 
-    public async Task<string> ExtractTextAsync(Stream fileStream, string fileName, string contentType)
+    public async Task<(string? ExtractedText, byte[]? GeneratedPdfBytes, string? ErrorMessage)> ExtractTextAndPdfAsync(Stream fileStream, string fileName, string contentType)
     {
         try
         {
@@ -31,36 +31,35 @@ public class OcrService : IOcrService
             if (contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase))
             {
                 var text = ExtractFromPdf(memoryStream);
-                var chineseCharCount = System.Text.RegularExpressions.Regex.Matches(text, @"\p{IsCJKUnifiedIdeographs}").Count;
+                var chineseCharCount = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
                 
                 if (!string.IsNullOrWhiteSpace(text) && chineseCharCount > 10)
                 {
-                    return text;
+                    return (text, null, null);
                 }
                 
-                _logger.LogInformation("PDF seems to be scanned or contains unmapped CJK fonts. Falling back to Gemini.");
-                memoryStream.Position = 0;
-                return await ExtractWithGeminiAsync(memoryStream, contentType);
+                _logger.LogInformation("PDF seems to be scanned or contains unmapped CJK fonts. Rejecting.");
+                return (null, null, "File PDF có định dạng chữ bất thường hoặc quá mờ.");
             }
             else if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                var text = ExtractWithTesseract(memoryStream);
-                if (!string.IsNullOrWhiteSpace(text) && text.Trim().Length > 5)
+                var (text, pdfBytes) = ExtractWithTesseractAndPdf(memoryStream, fileName);
+                
+                if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 5)
                 {
-                    return text;
+                    _logger.LogInformation("Tesseract extraction failed or yielded little text. Rejecting image.");
+                    return (null, null, "Ảnh quá mờ không thể dịch thuật được.");
                 }
 
-                _logger.LogInformation("Tesseract extraction failed or yielded little text. Falling back to Gemini.");
-                memoryStream.Position = 0;
-                return await ExtractWithGeminiAsync(memoryStream, contentType);
+                return (text, pdfBytes, null);
             }
 
-            return string.Empty;
+            return (null, null, "Định dạng file không được hỗ trợ.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error extracting text.");
-            throw;
+            return (null, null, "Đã xảy ra lỗi trong quá trình xử lý tài liệu.");
         }
     }
 
@@ -82,7 +81,7 @@ public class OcrService : IOcrService
         return text.ToString();
     }
 
-    private string ExtractWithTesseract(Stream fileStream)
+    private (string? text, byte[]? pdfBytes) ExtractWithTesseractAndPdf(Stream fileStream, string fileName)
     {
         try
         {
@@ -96,78 +95,35 @@ public class OcrService : IOcrService
                 tessDataPath = Path.Combine(Directory.GetCurrentDirectory(), "tessdata");
             }
 
-            using var engine = new TesseractEngine(tessDataPath, "chi_sim", EngineMode.Default);
-            using var img = Pix.LoadFromMemory(bytes);
-            using var page = engine.Process(img);
+            string text = "";
+            var tempPdfPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             
-            return page.GetText();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Tesseract failed to extract text.");
-            return string.Empty;
-        }
-    }
-
-    private async Task<string> ExtractWithGeminiAsync(Stream fileStream, string contentType)
-    {
-        try
-        {
-            using var ms = new MemoryStream();
-            await fileStream.CopyToAsync(ms);
-            var base64Data = Convert.ToBase64String(ms.ToArray());
-            var apiKey = _config["Gemini:ApiKey"];
-            if (string.IsNullOrEmpty(apiKey)) return string.Empty;
-
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
-
-            var payload = new
+            using (var renderer = ResultRenderer.CreatePdfRenderer(tempPdfPath, tessDataPath, false))
             {
-                contents = new[]
+                using (renderer.BeginDocument(fileName))
                 {
-                    new
-                    {
-                        parts = new object[]
-                        {
-                            new { text = "Extract all Chinese text from this document. Provide only the extracted Chinese text without any markdown or conversational filler." },
-                            new
-                            {
-                                inline_data = new
-                                {
-                                    mime_type = contentType,
-                                    data = base64Data
-                                }
-                            }
-                        }
-                    }
+                    using var engine = new TesseractEngine(tessDataPath, "chi_sim", EngineMode.Default);
+                    using var img = Pix.LoadFromMemory(bytes);
+                    using var page = engine.Process(img);
+                    
+                    renderer.AddPage(page);
+                    text = page.GetText();
                 }
-            };
-
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Gemini API returned {StatusCode}", response.StatusCode);
-                return string.Empty;
             }
 
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseJson);
-            
-            var text = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
+            byte[]? pdfBytes = null;
+            if (File.Exists(tempPdfPath + ".pdf"))
+            {
+                pdfBytes = File.ReadAllBytes(tempPdfPath + ".pdf");
+                File.Delete(tempPdfPath + ".pdf");
+            }
 
-            return text ?? string.Empty;
+            return (text, pdfBytes);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Gemini OCR failed.");
-            return string.Empty;
+            _logger.LogWarning(ex, "Tesseract failed to extract text and pdf.");
+            return (null, null);
         }
     }
 }

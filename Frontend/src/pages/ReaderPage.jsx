@@ -6,6 +6,7 @@ import UploadModal from '../components/UploadModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { useNavigate } from 'react-router-dom';
 import { pinyin } from 'pinyin-pro';
+import PdfVisualReader from '../components/reader/PdfVisualReader';
 
 const ReaderPage = () => {
   const { id } = useParams();
@@ -58,6 +59,48 @@ const ReaderPage = () => {
     fetchDocsList();
   }, []);
 
+  // Use a ref to track poll count across re-renders so we don't reset it when vocabData updates
+  const pollCountRef = React.useRef(0);
+
+  // Reset poll count when a new word is selected
+  useEffect(() => {
+    pollCountRef.current = 0;
+  }, [selectedWord]);
+
+  // Silent polling to check if background AI translation/relations have finished
+  useEffect(() => {
+    let timeoutId;
+    const MAX_POLLS = 4; // Max 12 seconds of polling
+    
+    const checkUpdates = async () => {
+      if (!selectedWord || !vocabData) return;
+      if (pollCountRef.current >= MAX_POLLS) return;
+      
+      // Check if we need to poll (missing viText in examples, or empty relations)
+      const needsTranslation = vocabData.examples?.some(ex => ex.enText && !ex.viText);
+      const missingRelations = (!vocabData.synonyms || vocabData.synonyms.length === 0) && 
+                              (!vocabData.antonyms || vocabData.antonyms.length === 0) &&
+                              (!vocabData.compounds || vocabData.compounds.length === 0);
+                              
+      // Only poll for a few times, so we don't spam the server indefinitely if it's genuinely empty
+      if (needsTranslation || missingRelations) {
+        timeoutId = setTimeout(async () => {
+          try {
+            pollCountRef.current++;
+            const freshData = await getVocabulary(selectedWord);
+            setVocabData(freshData); // Update silently without showing loading indicator
+          } catch (e) {
+            console.error("Failed to poll vocabulary updates", e);
+          }
+        }, 3000);
+      }
+    };
+    
+    checkUpdates();
+    
+    return () => clearTimeout(timeoutId);
+  }, [vocabData, selectedWord]);
+
   const handleWordClick = async (word) => {
     // Skip spaces or punctuation if needed
     if (!word || word.trim() === '') return;
@@ -86,6 +129,8 @@ const ReaderPage = () => {
   const validCurrentPage = Math.min(currentPage, totalPages);
   const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
 
+  const isPdfDocument = document?.fileUrl?.toLowerCase().includes('.pdf') || document?.title?.toLowerCase().endsWith('.pdf');
+
   return (
     <div className="min-h-screen bg-[#f4f7fc] flex flex-col font-sans">
       <UploadModal 
@@ -105,7 +150,7 @@ const ReaderPage = () => {
       />
 
       {/* Top Navigation Bar */}
-      <div className="bg-white rounded-full mx-8 mt-6 px-6 py-3 flex items-center justify-between shadow-sm border border-gray-100">
+      <div className="bg-white rounded-full mx-8 mt-6 px-6 py-3 flex items-center justify-start shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
           <span className="text-gray-500 font-bold text-sm tracking-wider uppercase ml-2">VĂN BẢN ĐỌC:</span>
           <div className="relative">
@@ -128,20 +173,7 @@ const ReaderPage = () => {
           </button>
         </div>
         
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setShowPinyin(!showPinyin)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${showPinyin ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-            Pinyin
-          </button>
-          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden p-0.5">
-            <button onClick={() => setFontSize(Math.max(16, fontSize - 2))} className="px-3 py-1.5 hover:bg-white rounded-full text-gray-600 font-medium transition-colors">A-</button>
-            <span className="px-3 py-1.5 text-sm font-bold text-gray-800">{fontSize}px</span>
-            <button onClick={() => setFontSize(Math.min(48, fontSize + 2))} className="px-3 py-1.5 hover:bg-white rounded-full text-gray-600 font-medium transition-colors">A+</button>
-          </div>
-        </div>
+        {/* Right side controls removed per user request */}
       </div>
 
       {/* Main Content Area */}
@@ -167,73 +199,104 @@ const ReaderPage = () => {
             </div>
           )}
 
-          {document && (
-            <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto w-full pt-10 pb-6 px-12 overflow-hidden">
-              <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center leading-snug shrink-0">{document.title}</h1>
-              
-              <div 
-                ref={readerContainerRef}
-                className="flex-1 text-gray-800 font-sans tracking-wide break-words text-justify overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent"
-                style={{ fontSize: `${fontSize}px`, lineHeight: '2.5' }}
-              >
-                {currentSegments.map((word, index) => (
-                  <span
-                    key={index}
-                    onClick={() => handleWordClick(word)}
-                    className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-200 ${selectedWord === word ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300' : 'hover:bg-blue-50 hover:text-blue-700'} align-bottom`}
-                  >
-                    <span className="leading-none">{word}</span>
-                    {showPinyin && (
-                      <span className="text-[0.4em] text-gray-500 font-normal leading-none mt-1.5 select-none text-center">
-                        {pinyin(word, { type: 'string' })}
-                      </span>
-                    )}
-                  </span>
-                ))}
+          {document && document.status === 2 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12 bg-red-50/30">
+              <div className="w-20 h-20 bg-red-50 text-red-400 rounded-full flex items-center justify-center mb-6 border border-red-100">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
-                  <div className="flex items-center gap-6">
-                    <button 
-                      onClick={() => {
-                        setCurrentPage(p => Math.max(1, p - 1));
-                        readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      disabled={validCurrentPage === 1}
-                      className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      title="Trang trước"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    
-                    <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
-                      Trang {validCurrentPage} / {totalPages}
-                    </span>
-                    
-                    <button 
-                      onClick={() => {
-                        setCurrentPage(p => Math.min(totalPages, p + 1));
-                        readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      disabled={validCurrentPage === totalPages}
-                      className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      title="Trang tiếp theo"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                    </button>
+              <h2 className="text-2xl font-bold text-red-700 mb-2">Lỗi xử lý tài liệu</h2>
+              <p className="text-red-500 mb-8 max-w-md font-medium">{document.extractedText || "Đã xảy ra lỗi không xác định trong quá trình xử lý tài liệu."}</p>
+              <button 
+                onClick={() => setIsUploadModalOpen(true)}
+                className="bg-red-600 text-white px-6 py-3 rounded-xl font-medium shadow-md shadow-red-600/20 hover:bg-red-700 transition-colors"
+              >
+                Tải lên tài liệu khác
+              </button>
+            </div>
+          ) : document && document.status === 0 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12">
+              <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6 border border-blue-100 animate-pulse">
+                <svg className="w-10 h-10 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </div>
+              <h2 className="text-2xl font-bold text-blue-700 mb-2">Đang xử lý tài liệu...</h2>
+              <p className="text-blue-500 max-w-md font-medium">Hệ thống đang trích xuất văn bản và nhận diện từ vựng. Quá trình này có thể mất vài phút.</p>
+            </div>
+          ) : document ? (
+            <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
+              {isPdfDocument ? (
+                <PdfVisualReader 
+                  fileUrl={document.fileUrl} 
+                  onWordClick={handleWordClick} 
+                />
+              ) : (
+                <div className="flex-1 flex flex-col h-full max-w-4xl mx-auto w-full pt-10 pb-6 px-12 overflow-hidden">
+                  <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center leading-snug shrink-0">{document.title}</h1>
+                  
+                  <div 
+                    ref={readerContainerRef}
+                    className="flex-1 text-gray-800 font-sans tracking-wide break-words text-justify overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent"
+                    style={{ fontSize: `${fontSize}px`, lineHeight: '2.5' }}
+                  >
+                    {currentSegments.map((word, index) => (
+                      <span
+                        key={index}
+                        onClick={() => handleWordClick(word)}
+                        className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-200 ${selectedWord === word ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300' : 'hover:bg-blue-50 hover:text-blue-700'} align-bottom`}
+                      >
+                        <span className="leading-none">{word}</span>
+                        {showPinyin && (
+                          <span className="text-[0.4em] text-gray-500 font-normal leading-none mt-1.5 select-none text-center">
+                            {pinyin(word, { type: 'string' })}
+                          </span>
+                        )}
+                      </span>
+                    ))}
                   </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
+                      <div className="flex items-center gap-6">
+                        <button 
+                          onClick={() => {
+                            setCurrentPage(p => Math.max(1, p - 1));
+                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          disabled={validCurrentPage === 1}
+                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          title="Trang trước"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        
+                        <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
+                          Trang {validCurrentPage} / {totalPages}
+                        </span>
+                        
+                        <button 
+                          onClick={() => {
+                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          disabled={validCurrentPage === totalPages}
+                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          title="Trang tiếp theo"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Right: Side Panel */}
-        <div className="w-[420px] bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto flex-shrink-0 relative">
+        <div className="w-[300px] lg:w-[320px] h-fit max-h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto flex-shrink-0 relative">
           {!selectedWord ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center">
+            <div className="flex flex-col items-center justify-center p-10 text-center min-h-[300px]">
               <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mb-6">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
