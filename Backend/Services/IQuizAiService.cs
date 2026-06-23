@@ -4,14 +4,14 @@ public interface IQuizAiService
 {
     bool IsConfigured { get; }
 
-    /// <summary>Ask Gemini to author questions for the given vocabulary. Returns null on failure.</summary>
+    /// <summary>Ask Deepseek to author questions for the given vocabulary. Returns null on failure.</summary>
     Task<List<AiQuestionDto>?> GenerateQuestionsAsync(
         IEnumerable<AiVocabItem> vocabulary,
         List<string> questionTypes,
         string difficulty,
         int questionCount);
 
-    /// <summary>Ask Gemini for personalized feedback + per-wrong-answer explanations. Returns null on failure.</summary>
+    /// <summary>Ask Deepseek for personalized feedback + per-wrong-answer explanations. Returns null on failure.</summary>
     Task<AiAnalysisDto?> AnalyzeResultAsync(AiAnalysisRequest request);
 }
 

@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Services;
 
 /// <summary>
-/// Gemini-backed generation and analysis for the Flashcard AI Practice Test.
+/// Deepseek-backed generation and analysis for the Flashcard AI Practice Test.
 /// Mirrors the HTTP pattern used by <see cref="DictionaryAiService"/>.
 /// All methods return null on failure so the caller can fall back to local logic.
 /// </summary>
@@ -16,13 +16,12 @@ public class QuizAiService : IQuizAiService
     private readonly string _apiKey;
     private readonly ILogger<QuizAiService> _logger;
 
-    private const string Endpoint =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
+    private const string Endpoint = "https://api.deepseek.com/chat/completions";
 
     public QuizAiService(HttpClient httpClient, IConfiguration config, ILogger<QuizAiService> logger)
     {
         _httpClient = httpClient;
-        _apiKey = config["Gemini:ApiKey"] ?? string.Empty;
+        _apiKey = config["Deepseek:ApiKey"] ?? string.Empty;
         _logger = logger;
     }
 
@@ -76,7 +75,7 @@ Return ONLY a valid JSON array (no markdown fences) matching this schema:
 Vocabulary list (JSON): {vocabJson}
 ";
 
-        var text = await CallGeminiAsync(prompt, "GenerateQuestions");
+        var text = await CallDeepseekAsync(prompt, "GenerateQuestions");
         if (string.IsNullOrEmpty(text)) return null;
 
         try
@@ -94,7 +93,7 @@ Vocabulary list (JSON): {vocabJson}
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to parse Gemini quiz questions.");
+            _logger.LogError(ex, "Failed to parse Deepseek quiz questions.");
             return null;
         }
     }
@@ -122,7 +121,7 @@ Provide a wrongExplanations entry for EVERY question where isCorrect is false, k
 Test data (JSON): {payloadJson}
 ";
 
-        var text = await CallGeminiAsync(prompt, "AnalyzeResult");
+        var text = await CallDeepseekAsync(prompt, "AnalyzeResult");
         if (string.IsNullOrEmpty(text)) return null;
 
         try
@@ -132,29 +131,33 @@ Test data (JSON): {payloadJson}
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to parse Gemini analysis.");
+            _logger.LogError(ex, "Failed to parse Deepseek analysis.");
             return null;
         }
     }
 
-    private async Task<string?> CallGeminiAsync(string prompt, string label)
+    private async Task<string?> CallDeepseekAsync(string prompt, string label)
     {
-        var url = $"{Endpoint}{_apiKey}";
+        var url = Endpoint;
         var payload = new
         {
-            contents = new[] { new { parts = new[] { new { text = prompt } } } },
-            generationConfig = new { responseMimeType = "application/json" }
+            model = "deepseek-chat",
+            messages = new[] { new { role = "user", content = prompt } },
+            response_format = new { type = "json_object" }
         };
 
         try
         {
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
 
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Gemini API error ({Label}): {StatusCode} {Error}", label, response.StatusCode, error);
+                _logger.LogWarning("Deepseek API error ({Label}): {StatusCode} {Error}", label, response.StatusCode, error);
                 return null;
             }
 
@@ -162,15 +165,14 @@ Test data (JSON): {payloadJson}
             using var doc = JsonDocument.Parse(responseJson);
 
             return doc.RootElement
-                .GetProperty("candidates")[0]
+                .GetProperty("choices")[0]
+                .GetProperty("message")
                 .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
                 .GetString();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Gemini call failed ({Label}).", label);
+            _logger.LogError(ex, "Deepseek call failed ({Label}).", label);
             return null;
         }
     }

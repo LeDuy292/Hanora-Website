@@ -58,4 +58,49 @@ public class S3StorageService : IS3StorageService
         var response = await _s3Client.GetObjectAsync(request);
         return response.ResponseStream;
     }
+
+    public async Task<(string PresignedUrl, string FileUrl)> GeneratePreSignedUrlAsync(string fileName, string contentType, string folderPath = "Hanora")
+    {
+        var fileExtension = Path.GetExtension(fileName);
+        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+        var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
+
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _bucketName,
+            Key = key,
+            Verb = HttpVerb.PUT,
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            ContentType = contentType
+        };
+
+        var presignedUrl = _s3Client.GetPreSignedURL(request);
+        var fileUrl = $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+
+        return (presignedUrl, fileUrl);
+    }
+
+    public async Task<string> UploadBytesAsync(byte[] bytes, string fileName, string contentType, string folderPath = "Hanora")
+    {
+        var fileExtension = Path.GetExtension(fileName);
+        if (string.IsNullOrEmpty(fileExtension) && contentType.Contains("pdf")) fileExtension = ".pdf";
+        
+        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+        var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
+
+        using var newMemoryStream = new MemoryStream(bytes);
+
+        var uploadRequest = new TransferUtilityUploadRequest
+        {
+            InputStream = newMemoryStream,
+            Key = key,
+            BucketName = _bucketName,
+            ContentType = contentType
+        };
+
+        var fileTransferUtility = new TransferUtility(_s3Client);
+        await fileTransferUtility.UploadAsync(uploadRequest);
+
+        return $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+    }
 }
