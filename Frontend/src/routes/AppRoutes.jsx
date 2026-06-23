@@ -15,6 +15,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { PronunciationPracticePage } from '../pages/PronunciationPracticePage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { QuizPage } from '../pages/QuizPage';
+import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
 
 
 export function AppRoutes() {
@@ -114,15 +115,26 @@ export function AppRoutes() {
         } 
       />
 
-      <Route 
-        path="/quiz" 
+      <Route
+        path="/quiz"
         element={
           <ProtectedRoute>
             <MainLayout>
               <QuizPage />
             </MainLayout>
           </ProtectedRoute>
-        } 
+        }
+      />
+
+      <Route
+        path="/practice/history"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <PracticeHistoryPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
       />
 
       <Route 
