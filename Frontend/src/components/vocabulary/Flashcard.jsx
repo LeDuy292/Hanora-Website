@@ -53,6 +53,14 @@ export function Flashcard({
               Nghe phát âm
             </button>
           </div>
+
+          <div className="front-footer animate-fade-in" style={{ marginTop: 'auto', paddingTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <span className="touch-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <span>👆 Click hoặc nhấn</span>
+              <kbd style={{ padding: '0.125rem 0.375rem', fontSize: '0.6875rem', fontFamily: 'monospace', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.375rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Space</kbd>
+              <span>để lật</span>
+            </span>
+          </div>
         </div>
 
         {/* BACK FACE */}
@@ -114,7 +122,11 @@ export function Flashcard({
           </div>
 
           <div className="back-footer">
-            <span className="touch-indicator">👆 Nhấp vào thẻ để quay lại</span>
+            <span className="touch-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <span>👆 Click hoặc nhấn</span>
+              <kbd style={{ padding: '0.125rem 0.375rem', fontSize: '0.6875rem', fontFamily: 'monospace', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.375rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Space</kbd>
+              <span>để lật lại</span>
+            </span>
           </div>
         </div>
       </div>

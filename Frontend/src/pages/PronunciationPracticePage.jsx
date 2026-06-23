@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, ChevronRight, AlertCircle, RefreshCw, Award, Smil
 import confetti from 'canvas-confetti';
 import { useAuthStore } from '../store/authStore';
 import { PRONUNCIATION_SAMPLES } from '../utils/constants';
+import { statsApi } from '../services/statsService';
 
 import marketContextImg from '../assets/market_context_1780676138450.png';
 
@@ -75,6 +76,9 @@ export function PronunciationPracticePage() {
 
     setScore(finalScore);
     setScoreDetails(details);
+
+    // Save pronunciation stats to the database in real-time
+    statsApi.savePronunciationScore(finalScore).catch(() => {});
 
     if (finalScore >= 80) {
       addXp(10);

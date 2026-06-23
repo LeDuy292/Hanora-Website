@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -34,6 +34,10 @@ public partial class UserStat
     public int? XpThisWeek { get; set; }
 
     public int? XpThisMonth { get; set; }
+
+    public decimal? AveragePronunciationScore { get; set; }
+
+    public int? TotalPronunciationAttempts { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
 

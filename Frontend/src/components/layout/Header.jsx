@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Flame, Sparkles, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import logoImg from '../../assets/logo.png';
 
 export function Header({ offsetTop }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, refreshProfile } = useAuthStore();
+
+  useEffect(() => {
+    if (user) {
+      refreshProfile();
+    }
+  }, [refreshProfile]);
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -20,6 +26,7 @@ export function Header({ offsetTop }) {
     { to: '/flashcards', label: 'Flashcard' },
     { to: '/reader', label: 'Dịch thuật' },
     { to: '/pronunciation', label: 'Luyện phát âm' },
+    { to: '/leaderboard', label: 'Bảng xếp hạng' },
   ];
 
   const handleLogout = () => {

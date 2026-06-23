@@ -31,4 +31,42 @@ public class StatsController : ControllerBase
         var stats = await _statsService.TouchAndGetAsync(userId);
         return Ok(stats);
     }
+
+    public record TrackTimeRequest(int Minutes);
+
+    /// <summary>
+    /// Logs active learning study time (in minutes) for the user.
+    /// </summary>
+    [HttpPost("track-time")]
+    public async Task<IActionResult> TrackTime([FromBody] TrackTimeRequest req)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        if (req.Minutes <= 0)
+            return BadRequest("Minutes must be greater than 0.");
+
+        await _statsService.TrackTimeAsync(userId, req.Minutes);
+        return Ok(new { success = true });
+    }
+
+    public record TrackPronunciationScoreRequest(double Score);
+
+    /// <summary>
+    /// Logs pronunciation practice session score.
+    /// </summary>
+    [HttpPost("pronunciation-score")]
+    public async Task<IActionResult> TrackPronunciationScore([FromBody] TrackPronunciationScoreRequest req)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        if (req.Score < 0 || req.Score > 100)
+            return BadRequest("Score must be between 0 and 100.");
+
+        await _statsService.TrackPronunciationScoreAsync(userId, req.Score);
+        return Ok(new { success = true });
+    }
 }

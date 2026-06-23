@@ -9,4 +9,18 @@ export const statsApi = {
   me: async () => {
     return apiRequest("/stats/me", { auth: true });
   },
+  trackTime: async (minutes) => {
+    return apiRequest("/stats/track-time", {
+      method: "POST",
+      auth: true,
+      body: { minutes }
+    });
+  },
+  savePronunciationScore: async (score) => {
+    return apiRequest("/stats/pronunciation-score", {
+      method: "POST",
+      auth: true,
+      body: { score }
+    });
+  },
 };

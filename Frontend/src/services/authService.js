@@ -51,6 +51,14 @@ export const authApi = {
   me: async () => {
     return apiRequest("/auth/me", { auth: true });
   },
+
+  updateProfile: async (profileData) => {
+    return apiRequest("/auth/profile", {
+      method: "PUT",
+      body: profileData,
+      auth: true,
+    });
+  },
 };
 
 export function loadGoogleScript() {

@@ -12,8 +12,9 @@ public interface IStatsService
     /// </summary>
     Task<UserStatsDto> TouchAndGetAsync(long userId);
 
-    /// <summary>Reads the user's stats without advancing the streak.</summary>
     Task<UserStatsDto> GetAsync(long userId);
+    Task TrackTimeAsync(long userId, int minutes);
+    Task TrackPronunciationScoreAsync(long userId, double score);
 }
 
 /// <summary>Shape the frontend consumes for the header/dashboard gamification.</summary>
@@ -31,6 +32,8 @@ public record UserStatsDto
     public int TotalWordsMastered { get; init; }
     public int TotalDocumentsRead { get; init; }
     public int TotalQuizzesDone { get; init; }
+    public double AveragePronunciationScore { get; init; }
+    public int TotalPronunciationAttempts { get; init; }
     public string? LastActiveDate { get; init; }
 }
 
@@ -100,21 +103,24 @@ public class StatsService : IStatsService
     {
         int goal = await _statsRepo.GetDailyGoalMinutesAsync(userId);
         int todayMinutes = await _statsRepo.GetMinutesOnDateAsync(userId, today);
+        int totalXp = await _statsRepo.GetTotalXpAsync(userId);
 
         return new UserStatsDto
         {
             Streak = stats.CurrentStreakDays ?? 0,
             LongestStreak = stats.LongestStreakDays ?? 0,
-            Xp = stats.TotalXp ?? 0,
+            Xp = totalXp,
             XpToday = stats.XpToday ?? 0,
             XpThisWeek = stats.XpThisWeek ?? 0,
-            Level = LevelForXp(stats.TotalXp ?? 0),
+            Level = LevelForXp(totalXp),
             TodayMinutes = todayMinutes,
             TargetDailyMinutes = goal,
             TotalWordsSaved = stats.TotalWordsSaved ?? 0,
             TotalWordsMastered = stats.TotalWordsMastered ?? 0,
             TotalDocumentsRead = stats.TotalDocumentsRead ?? 0,
             TotalQuizzesDone = stats.TotalQuizzesDone ?? 0,
+            AveragePronunciationScore = (double)(stats.AveragePronunciationScore ?? 0.00m),
+            TotalPronunciationAttempts = stats.TotalPronunciationAttempts ?? 0,
             LastActiveDate = stats.LastActiveDate?.ToString("yyyy-MM-dd"),
         };
     }
@@ -126,5 +132,16 @@ public class StatsService : IStatsService
         if (xp > 500) return "HSK 3";
         if (xp > 200) return "HSK 2";
         return "HSK 1";
+    }
+
+    public async Task TrackTimeAsync(long userId, int minutes)
+    {
+        var today = TodayVn();
+        await _statsRepo.IncrementStudyMinutesAsync(userId, today, minutes);
+    }
+
+    public async Task TrackPronunciationScoreAsync(long userId, double score)
+    {
+        await _statsRepo.UpdatePronunciationScoreAsync(userId, score);
     }
 }

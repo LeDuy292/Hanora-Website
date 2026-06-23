@@ -27,6 +27,7 @@ export function Sidebar() {
     { to: '/flashcards', label: 'Flashcard', icon: Layers },
     { to: '/reader', label: 'Dịch thuật', icon: BookOpen },
     { to: '/pronunciation', label: 'Luyện phát âm', icon: Mic },
+    { to: '/leaderboard', label: 'Bảng xếp hạng', icon: Award },
   ];
 
   return (
