@@ -110,7 +110,7 @@ const UploadModal = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 relative animate-scale-in">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 relative animate-scale-in max-h-[90vh] flex flex-col">
         <button 
           onClick={onClose}
           disabled={isUploading || (processingId && !isFailed)}
@@ -170,10 +170,10 @@ const UploadModal = ({ isOpen, onClose }) => {
         )}
 
         {status && (
-          <div className="mt-8 text-center">
-            <p className={`text-sm font-medium mb-4 ${isFailed ? 'text-red-600' : 'text-gray-700'}`}>{status}</p>
+          <div className="mt-8 text-center flex-1 overflow-hidden flex flex-col">
+            <p className={`text-sm font-medium mb-4 overflow-y-auto max-h-48 pr-2 custom-scrollbar ${isFailed ? 'text-red-600' : 'text-gray-700'}`}>{status}</p>
             {processingId && !isFailed && (
-              <div className="w-full bg-blue-50 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-blue-50 rounded-full h-2 overflow-hidden shrink-0">
                 <div className="bg-blue-600 h-2 rounded-full animate-pulse w-full"></div>
               </div>
             )}
