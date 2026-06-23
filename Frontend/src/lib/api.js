@@ -1,11 +1,13 @@
 import { getToken } from '../services/apiClient';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5187/api';
+
 export const uploadDocument = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
 
   const token = getToken();
-  const response = await fetch('/api/documents/upload', {
+  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: 'POST',
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -22,7 +24,7 @@ export const uploadDocument = async (file) => {
 
 export const getDocument = async (id) => {
   const token = getToken();
-  const response = await fetch(`/api/documents/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
@@ -35,7 +37,7 @@ export const getDocument = async (id) => {
 
 export const getMyDocuments = async () => {
   const token = getToken();
-  const response = await fetch('/api/documents/my-documents', {
+  const response = await fetch(`${API_BASE_URL}/documents/my-documents`, {
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
@@ -48,7 +50,7 @@ export const getMyDocuments = async () => {
 
 export const getVocabulary = async (word) => {
   const token = getToken();
-  const response = await fetch(`/api/vocabulary/${encodeURIComponent(word)}`, {
+  const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}`, {
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
@@ -61,7 +63,7 @@ export const getVocabulary = async (word) => {
 
 export const saveToNotebook = async (word, documentId) => {
   const token = getToken();
-  const response = await fetch(`/api/vocabulary/${encodeURIComponent(word)}/save`, {
+  const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}/save`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
