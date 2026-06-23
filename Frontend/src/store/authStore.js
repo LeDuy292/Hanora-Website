@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, getToken } from '../services/authService';
+import { statsApi } from '../services/statsService';
 import { useDocumentStore } from './documentStore';
 import { useVocabularyStore } from './vocabularyStore';
 
-// UI-only fields the backend does not (yet) track. Kept locally so the
-// gamified dashboard/header keep working until those endpoints exist.
+// Gamification fields (streak/xp/level/today) are owned by the backend and
+// loaded via statsApi.me(). These are only placeholders shown for the brief
+// moment before the first stats fetch resolves.
 const DEFAULT_PROFILE = {
   streak: 0,
   xp: 0,
@@ -21,6 +23,26 @@ const DEFAULT_PROFILE = {
     defaultFlashcardMode: 'Flashcard (Q -> A)',
   },
 };
+
+// Maps the backend stats DTO onto the flat fields the header/dashboard read.
+function mapStats(stats) {
+  if (!stats) return {};
+  return {
+    streak: stats.streak ?? 0,
+    longestStreak: stats.longestStreak ?? 0,
+    xp: stats.xp ?? 0,
+    xpToday: stats.xpToday ?? 0,
+    xpThisWeek: stats.xpThisWeek ?? 0,
+    level: stats.level || 'HSK 1',
+    todayMinutes: stats.todayMinutes ?? 0,
+    targetDailyMinutes: stats.targetDailyMinutes ?? 20,
+    totalWordsSaved: stats.totalWordsSaved ?? 0,
+    totalWordsMastered: stats.totalWordsMastered ?? 0,
+    totalDocumentsRead: stats.totalDocumentsRead ?? 0,
+    totalQuizzesDone: stats.totalQuizzesDone ?? 0,
+    lastActiveDate: stats.lastActiveDate ?? null,
+  };
+}
 
 /**
  * Maps a backend UserDto ({ id, username, email, displayName, avatarUrl, createdAt })
@@ -57,6 +79,7 @@ export const useAuthStore = create(
         try {
           const { user } = await authApi.login(email, password);
           set({ user: mapUser(user, get().user || {}), isAuthenticated: true, isLoading: false });
+          get().refreshStats();
           return true;
         } catch (err) {
           set({ error: err.message, isLoading: false, isAuthenticated: false });
@@ -69,6 +92,7 @@ export const useAuthStore = create(
         try {
           const { user } = await authApi.register(username, email, password);
           set({ user: mapUser(user), isAuthenticated: true, isLoading: false });
+          get().refreshStats();
           return true;
         } catch (err) {
           set({ error: err.message, isLoading: false, isAuthenticated: false });
@@ -81,6 +105,7 @@ export const useAuthStore = create(
         try {
           const { user } = await authApi.googleLogin(idToken);
           set({ user: mapUser(user, get().user || {}), isAuthenticated: true, isLoading: false });
+          get().refreshStats();
           return true;
         } catch (err) {
           set({ error: err.message, isLoading: false, isAuthenticated: false });
@@ -101,7 +126,8 @@ export const useAuthStore = create(
       clearError: () => set({ error: null }),
 
       // Re-validate the persisted token against the backend on app load.
-      // If the token is missing or rejected, drop the session.
+      // If the token is missing or rejected, drop the session. On success,
+      // pull fresh gamification stats (which also advances the daily streak).
       hydrate: async () => {
         if (!getToken()) {
           set({ user: null, isAuthenticated: false });
@@ -110,9 +136,25 @@ export const useAuthStore = create(
         try {
           await authApi.me();
           set({ isAuthenticated: true });
+          await get().refreshStats();
         } catch {
           authApi.logout();
           set({ user: null, isAuthenticated: false });
+        }
+      },
+
+      // Pulls streak/xp/level/today-minutes from the backend and advances the
+      // daily-login streak. Safe to call repeatedly; the streak only moves once
+      // per calendar day server-side.
+      refreshStats: async () => {
+        if (!getToken()) return;
+        try {
+          const stats = await statsApi.me();
+          set((state) => ({
+            user: state.user ? { ...state.user, ...mapStats(stats) } : state.user,
+          }));
+        } catch {
+          // Non-fatal: keep whatever stats we already have rather than logging out.
         }
       },
 
@@ -130,27 +172,6 @@ export const useAuthStore = create(
           },
         } : null,
       })),
-
-      addXp: (amount) => set((state) => {
-        if (!state.user) return {};
-        const newXp = (state.user.xp || 0) + amount;
-        let level;
-        if (newXp > 800) level = 'HSK 4';
-        else if (newXp > 500) level = 'HSK 3';
-        else if (newXp > 200) level = 'HSK 2';
-        else level = 'HSK 1';
-        return { user: { ...state.user, xp: newXp, level } };
-      }),
-
-      incrementStudyTime: (minutes) => set((state) => {
-        if (!state.user) return {};
-        return { user: { ...state.user, todayMinutes: (state.user.todayMinutes || 0) + minutes } };
-      }),
-
-      incrementStreak: () => set((state) => {
-        if (!state.user) return {};
-        return { user: { ...state.user, streak: (state.user.streak || 0) + 1 } };
-      }),
     }),
     {
       name: 'hanora-auth-storage',
