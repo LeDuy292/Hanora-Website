@@ -29,9 +29,17 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libgomp1 \
     libc6-dev \
+    libgomp1 \
+    libiomp5 \
+    libmklml \
+    libmkl-core \
+    libmkl-intel-thread \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
+
+# Set library path for PaddleOCR native libraries
+ENV LD_LIBRARY_PATH=/app/runtimes/linux-x64/native:$LD_LIBRARY_PATH
 
 # Expose the port your application will run on (Railway uses PORT environment variable, which ASP.NET Core respects, but we can set 8080 as a fallback)
 EXPOSE 8080
