@@ -35,7 +35,7 @@ Return ONLY a valid JSON object matching exactly this schema:
   ""definitions"": ""Vietnamese meaning"",
   ""usageNotes"": ""Ngữ cảnh sử dụng, các trường hợp dùng từ này (tiếng Việt)"",
   ""wordType"": ""Verb"" (Must be exactly one of: Noun, Verb, Adjective, Adverb, Pronoun, Preposition, Conjunction, Particle, MeasureWord, Interjection, Other),
-  ""examples"": [
+  ""examples"": [ // Provide ONLY 1 to 2 example sentences here. Do NOT provide more than 2.
     {{
       ""zhText"": ""Chinese example sentence"",
       ""viText"": ""Vietnamese translation""

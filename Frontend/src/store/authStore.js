@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, getToken } from '../services/authService';
+import { useDocumentStore } from './documentStore';
+import { useVocabularyStore } from './vocabularyStore';
 
 // UI-only fields the backend does not (yet) track. Kept locally so the
 // gamified dashboard/header keep working until those endpoints exist.
@@ -89,6 +91,11 @@ export const useAuthStore = create(
       logout: () => {
         authApi.logout();
         set({ user: null, isAuthenticated: false, error: null });
+        localStorage.removeItem('hanora-documents-storage');
+        localStorage.removeItem('hanora-vocabulary-storage-v2');
+        useDocumentStore.setState({ documents: [], activeDocumentId: null });
+        useVocabularyStore.setState({ vocabList: [] });
+        window.location.href = '/login';
       },
 
       clearError: () => set({ error: null }),
