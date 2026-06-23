@@ -127,8 +127,9 @@ public class OcrService : IOcrService
         }
         catch (Exception ex)
         {
+            var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
             _logger.LogWarning(ex, "Tesseract failed to extract text and pdf.");
-            return (null, null, ex.Message);
+            return (null, null, fullError);
         }
     }
 }
