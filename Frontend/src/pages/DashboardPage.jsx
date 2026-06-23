@@ -281,48 +281,47 @@ export function DashboardPage() {
 
         {/* SVG Goal Ring */}
         <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
-          <div className="w-full flex justify-between items-center border-b border-slate-100 pb-3 text-left">
+          <div className="w-full flex justify-between items-center border-b border-slate-50 pb-3 text-left">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
               Mục Tiêu Mỗi Ngày
             </h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-md">
-              Hôm Nay
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
+              HÔM NAY
             </span>
           </div>
 
-          <div className="relative w-36 h-36 flex items-center justify-center">
-            <img src={StreakImage} alt="Progress" className="absolute w-[98px] h-[98px] rounded-full object-cover shadow-inner" />
+          <div className="relative w-40 h-40 flex items-center justify-center my-4">
             <svg className="w-full h-full transform -rotate-90 z-10 relative" viewBox="0 0 130 130">
               <circle
                 cx="65"
                 cy="65"
                 r={radius}
-                className="stroke-slate-100/50 fill-transparent"
+                className="stroke-slate-100 fill-transparent"
                 strokeWidth={strokeWidth}
               />
               <circle
                 cx="65"
                 cy="65"
                 r={radius}
-                className="stroke-blue-600 fill-transparent transition-all duration-500"
+                className="stroke-blue-600 fill-transparent transition-all duration-1000 ease-out"
                 strokeWidth={strokeWidth}
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
               />
             </svg>
-            <div className="absolute flex flex-col items-center justify-center z-20 bg-white/80 backdrop-blur-md rounded-full w-[76px] h-[76px] shadow-sm border border-white/50">
-              <span className="text-xl font-black text-slate-800 font-display leading-none">
+            <div className="absolute flex flex-col items-center justify-center z-20 w-full h-full">
+              <span className="text-3xl font-black text-slate-800 font-display leading-tight">
                 {progressPercent}%
               </span>
-              <span className="text-[9px] text-slate-600 font-bold tracking-wide mt-1 leading-none">
-                {todayMins}/{targetMinutes}p
+              <span className="text-xs text-slate-500 font-bold mt-1">
+                {todayMins} / {targetMinutes} phút
               </span>
             </div>
           </div>
 
-          <div className="text-xs text-slate-500 leading-relaxed font-medium">
+          <div className="text-xs text-slate-500 font-medium">
             {progressPercent >= 100
               ? '🎉 Tuyệt vời! Bạn đã hoàn thành mục tiêu học tập hôm nay!'
               : `Còn ${Math.max(targetMinutes - todayMins, 0)} phút nữa để đạt chỉ tiêu ngày.`}
@@ -330,58 +329,65 @@ export function DashboardPage() {
         </div>
 
         {/* Streak card with daily sequence */}
-        <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
+        <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1E5BDB] to-[#3B82F6] p-7 shadow-lg text-white flex flex-col justify-between">
+          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
 
-          <div className="flex flex-col xl:flex-row justify-between items-start gap-6">
-            <div className="max-w-xl">
-              <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-semibold">
-                Chuỗi ngày học
+          <div className="flex justify-between items-start relative z-10">
+            <div className="flex flex-col gap-4">
+              <span className="text-xs uppercase tracking-[0.2em] text-blue-100/90 font-bold">
+                CHUỖI NGÀY HỌC
               </span>
-              <div className="mt-4 flex items-end gap-4">
-                <div>
-                  <h3 className="text-[3.5rem] font-extrabold tracking-tight text-white leading-none">
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col">
+                  <h3 className="text-[5rem] font-extrabold tracking-tighter text-white leading-[1]">
                     {streak}
                   </h3>
-                  <p className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-100/80 mt-1">
-                    ngày liên tiếp
+                  <p className="text-sm font-bold uppercase tracking-wider text-blue-100/90 mt-1">
+                    NGÀY LIÊN TIẾP
                   </p>
                 </div>
-                <div className="rounded-[1.7rem] bg-white/15 px-4 py-3 border border-white/20 shadow-inner flex items-center justify-center">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-rose-400 shadow-[0_14px_32px_-18px_rgba(252,165,24,0.9)]">
-                    <Flame className="h-5 w-5 text-white drop-shadow-lg" />
+                <div className="rounded-[2rem] bg-white/10 p-4 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FFB03A] to-[#FF8116] shadow-[0_4px_12px_rgba(255,129,22,0.5)]">
+                    <Flame className="h-6 w-6 text-white drop-shadow-sm" fill="currentColor" />
                   </span>
                 </div>
               </div>
             </div>
+
+            {/* Panda Image / Mascot */}
+            <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
+              <img src={StreakImage} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
+            </div>
           </div>
 
-          <div className="mt-8 rounded-[2rem] bg-white/10 border border-white/15 p-4 shadow-inner">
-            <div className="flex justify-between items-center gap-4 mb-3">
+          <div className="mt-8 rounded-[1.5rem] bg-white/10 border border-white/15 p-5 backdrop-blur-md relative z-10">
+            <div className="flex justify-between items-center mb-5">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-semibold">
-                  Tuần này
+                <p className="text-xs font-bold uppercase tracking-widest text-white">
+                  TUẦN NÀY
                 </p>
-                <p className="text-xs text-sky-100/80 mt-1">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
+                <p className="text-[11px] text-blue-100 mt-1 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
               </div>
-              <div className="rounded-full bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-sky-100/80 border border-white/15">
-                {streak} ngày
+              <div className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
+                {streak} NGÀY
               </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div className="flex justify-between items-center px-1">
               {streakDisplayDays.map((day, idx) => (
                 <div key={idx} className="flex flex-col items-center gap-2">
-                  <div className={`relative flex h-12 w-12 items-center justify-center rounded-3xl border text-sm font-bold transition ${day.completed ? 'bg-white text-sky-700 border-white shadow-sm' : day.today ? 'border-orange-300 bg-orange-100/20 text-white shadow-[0_0_0_4px_rgba(255,255,255,0.08)]' : 'border-white/15 bg-white/10 text-sky-100'}`}>
+                  <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
+                    day.completed 
+                      ? 'bg-white text-[#1E5BDB]' 
+                      : 'border border-white/20 bg-white/5 text-blue-100'
+                  }`}>
                     {day.completed ? (
-                      <Check className="h-4 w-4" />
-                    ) : day.today ? (
-                      <Flame className="h-4 w-4" />
+                      <Check className="h-5 w-5" strokeWidth={3} />
                     ) : (
-                      day.name
+                      <span className="font-bold">{day.name}</span>
                     )}
                   </div>
-                  <span className="text-[10px] uppercase tracking-[0.25em] text-sky-100/80">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-100">
                     {day.name}
                   </span>
                 </div>
@@ -389,7 +395,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-6 text-sm leading-relaxed text-sky-100/80">
+          <div className="mt-5 text-xs sm:text-[13px] leading-relaxed text-blue-100/90 font-medium relative z-10">
             Tiếp tục học mỗi ngày và giữ chuỗi ổn định. Bạn đang trên đường xây dựng thói quen học tiếng Trung bền vững.
           </div>
         </div>
