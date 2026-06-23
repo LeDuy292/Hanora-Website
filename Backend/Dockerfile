@@ -29,11 +29,6 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libgomp1 \
     libc6-dev \
-    libgomp1 \
-    libiomp5 \
-    libmklml \
-    libmkl-core \
-    libmkl-intel-thread \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
