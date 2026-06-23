@@ -52,6 +52,7 @@ export function FlashcardPage() {
   const [isShuffled, setIsShuffled] = useState(false);
   const [shuffledList, setShuffledList] = useState([]);
   const [showRating, setShowRating] = useState(false);
+  const [isMarkedKnown, setIsMarkedKnown] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [sessionStats, setSessionStats] = useState({ cardsSeen: 0, easyCount: 0, hardCount: 0 });
 
@@ -123,6 +124,7 @@ export function FlashcardPage() {
     setCurrentIndex(0);
     setIsFlipped(false);
     setShowRating(false);
+    setIsMarkedKnown(false);
     setIsSessionComplete(false);
     setSessionStats({ cardsSeen: 0, easyCount: 0, hardCount: 0 });
   }, [selectedDeck?.id]);
@@ -145,13 +147,23 @@ export function FlashcardPage() {
     setShowRating(false);
     setSessionStats(prev => ({ ...prev, cardsSeen: prev.cardsSeen + 1 }));
 
-    // Logic for "New" deck: Mark word as learning (level 1)
-    if (selectedDeck?.id === 'new' && currentWord) {
-      await updateWordSrsLevel(currentWord.text, 1);
-      // Wait a bit for store to update and activeList to recompute
-      if (activeList.length <= 1) {
-        setIsSessionComplete(true);
+    const wordToUpdate = currentWord;
+    const wasMarkedKnown = isMarkedKnown;
+
+    // Reset toggle for the next card
+    setIsMarkedKnown(false);
+
+    if (wordToUpdate) {
+      if (wasMarkedKnown) {
+        await updateWordSrsLevel(wordToUpdate.text, 5);
+      } else if (selectedDeck?.id === 'new') {
+        await updateWordSrsLevel(wordToUpdate.text, 1);
       }
+    }
+
+    // Wait for update list to recalculate if the word was removed from the activeList
+    if ((wasMarkedKnown || selectedDeck?.id === 'new') && activeList.length <= 1) {
+      setIsSessionComplete(true);
       return;
     }
 
@@ -165,6 +177,7 @@ export function FlashcardPage() {
   const handlePrev = () => {
     setIsFlipped(false);
     setShowRating(false);
+    setIsMarkedKnown(false); // Reset toggle when navigating backwards
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     } else {
@@ -191,12 +204,12 @@ export function FlashcardPage() {
     setCurrentIndex(0);
     setIsFlipped(false);
     setShowRating(false);
+    setIsMarkedKnown(false);
   };
 
-  const handleMarkAsKnown = async () => {
+  const handleMarkAsKnown = () => {
     if (currentWord) {
-      await updateWordSrsLevel(currentWord.text, 5);
-      handleNext();
+      setIsMarkedKnown(prev => !prev);
     }
   };
 
@@ -214,6 +227,52 @@ export function FlashcardPage() {
     }
     return () => clearTimeout(timer);
   }, [isPlaying, showRating, currentIndex]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger shortcuts if user is focusing an input or editable element
+      if (
+        e.target.tagName === 'INPUT' || 
+        e.target.tagName === 'TEXTAREA' || 
+        e.target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (isSessionComplete) return;
+
+      switch (e.key) {
+        case ' ': // Spacebar
+        case 'ArrowUp':
+        case 'ArrowDown':
+          e.preventDefault(); // Prevent scrolling the page
+          handleFlip();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNext();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrev();
+          break;
+        case 'Enter':
+        case 'k':
+        case 'K':
+          e.preventDefault();
+          handleMarkAsKnown();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSessionComplete, activeList, currentIndex, isFlipped, currentWord, isMarkedKnown]);
 
   if (!selectedDeck && vocabList.length > 0) return <div className="p-20 text-center">Đang tải dữ liệu...</div>;
 
@@ -297,7 +356,7 @@ export function FlashcardPage() {
             <div className="progress-text">Đang học thẻ {currentIndex + 1} / {activeList.length}</div>
             <div className="time-remaining">
               <Clock className="w-3.5 h-3.5" />
-              Đã học {user?.todayMinutes || 0} phút hôm nay
+              Đã học {user?.todayMinutes || 0} / {user?.targetDailyMinutes || 20} phút hôm nay
             </div>
           </div>
           <div className="progress-bar-container">
@@ -383,52 +442,32 @@ export function FlashcardPage() {
                 </div>
 
                 <div className="nav-group">
-                  <button className="nav-btn known-quick-btn" onClick={handleMarkAsKnown}>
-                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                  <button 
+                    className={`nav-btn known-quick-btn transition-all duration-200 ${isMarkedKnown ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' : 'bg-transparent text-slate-600 hover:bg-slate-50'}`} 
+                    onClick={handleMarkAsKnown}
+                  >
+                    <CheckCircle2 className={`w-4 h-4 ${isMarkedKnown ? 'text-white fill-blue-700' : 'text-blue-500'}`} />
                     Đã thuộc
+                    <kbd className={`hidden sm:inline-block ml-1.5 px-1 py-0.5 text-[9px] font-mono rounded ${isMarkedKnown ? 'text-blue-100 bg-blue-700 border-blue-800' : 'text-slate-400 bg-slate-50 border border-slate-200'}`}>K</kbd>
                   </button>
                 </div>
 
-                <div className="nav-center-badge">
-                  {currentIndex + 1} / {activeList.length}
-                </div>
 
                 <div className="nav-group">
                   <button className="nav-btn prev-btn" onClick={handlePrev}>
+                    <kbd className="hidden sm:inline-block mr-1.5 px-1 py-0.5 text-[9px] font-mono text-slate-400 bg-slate-50 border border-slate-200 rounded">←</kbd>
                     <ChevronLeft className="w-5 h-5" />
                     Trước
                   </button>
                   <button className="nav-btn next-btn primary" onClick={handleNext}>
                     Sau
                     <ChevronRight className="w-5 h-5" />
+                    <kbd className="hidden sm:inline-block ml-1.5 px-1 py-0.5 text-[9px] font-mono text-blue-200 bg-blue-600 border border-blue-500 rounded">→</kbd>
                   </button>
                 </div>
               </div>
 
-              {/* 6. Rating Controls */}
-              {showRating && (
-                <div className="rating-controls">
-                  <p className="rating-question">Bạn nhớ từ này như thế nào?</p>
-                  <div className="rating-buttons">
-                    <button className="rating-btn fail" onClick={() => handleRating('hard')}>
-                      <span>❌</span>
-                      <span>Quên</span>
-                    </button>
-                    <button className="rating-btn hard" onClick={() => handleRating('hard')}>
-                      <span>😐</span>
-                      <span>Khó</span>
-                    </button>
-                    <button className="rating-btn good" onClick={() => handleRating('good')}>
-                      <span>🙂</span>
-                      <span>Tạm ổn</span>
-                    </button>
-                    <button className="rating-btn easy" onClick={() => handleRating('easy')}>
-                      <span>😄</span>
-                      <span>Dễ</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+
             </>
           ) : (
             <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm">
@@ -476,7 +515,7 @@ export function FlashcardPage() {
                     cx="50" cy="50" r="22" 
                     className="chart-ring ring-orange"
                     strokeDasharray="138"
-                    strokeDashoffset={138 * (1 - Math.min(1, (user?.todayMinutes || 0) / 30))}
+                    strokeDashoffset={138 * (1 - Math.min(1, (user?.todayMinutes || 0) / (user?.targetDailyMinutes || 20)))}
                   />
                 </svg>
                 <div className="chart-center-text">
@@ -506,7 +545,7 @@ export function FlashcardPage() {
                 <span className="dot dot-orange"></span>
                 <div className="stat-text-group">
                   <span className="stat-name">Thời gian học today</span>
-                  <span className="stat-figure">{user?.todayMinutes || 0}m</span>
+                  <span className="stat-figure">{user?.todayMinutes || 0}m / {user?.targetDailyMinutes || 20}m</span>
                 </div>
               </div>
             </div>

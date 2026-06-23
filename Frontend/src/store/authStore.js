@@ -134,12 +134,55 @@ export const useAuthStore = create(
           return;
         }
         try {
-          await authApi.me();
-          set({ isAuthenticated: true });
+          const userDto = await authApi.me();
+          set((state) => ({
+            user: mapUser(userDto, state.user || {}),
+            isAuthenticated: true,
+          }));
           await get().refreshStats();
         } catch {
           authApi.logout();
           set({ user: null, isAuthenticated: false });
+        }
+      },
+
+      refreshProfile: async () => {
+        if (!getToken()) return;
+        try {
+          const userDto = await authApi.me();
+          set((state) => ({
+            user: mapUser(userDto, state.user || {}),
+          }));
+          await get().refreshStats();
+        } catch {
+          // Non-fatal
+        }
+      },
+
+      updateProfileOnServer: async (updatedData) => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await authApi.updateProfile({
+            displayName: updatedData.name,
+            email: updatedData.email,
+            currentPassword: updatedData.currentPassword,
+            newPassword: updatedData.newPassword,
+            dailyMinutesGoal: updatedData.dailyMinutesGoal
+          });
+          if (res?.user) {
+            set((state) => ({
+              user: mapUser(res.user, state.user || {}),
+              isLoading: false
+            }));
+            if (res.token) {
+              setToken(res.token);
+            }
+          }
+          await get().refreshStats();
+          return { success: true };
+        } catch (err) {
+          set({ error: err.message, isLoading: false });
+          return { success: false, error: err.message };
         }
       },
 
@@ -155,6 +198,16 @@ export const useAuthStore = create(
           }));
         } catch {
           // Non-fatal: keep whatever stats we already have rather than logging out.
+        }
+      },
+
+      trackStudyTime: async (minutes) => {
+        if (!getToken()) return;
+        try {
+          await statsApi.trackTime(minutes);
+          await get().refreshStats();
+        } catch {
+          // Non-fatal
         }
       },
 

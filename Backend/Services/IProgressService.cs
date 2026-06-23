@@ -120,9 +120,7 @@ public class ProgressService : IProgressService
         int reviewToday = CountDue(savedWords);
 
         int goalTarget = await _statsRepo.GetDailyGoalMinutesAsync(userId);
-        var todayQuiz = await _repo.GetQuizStatsInRangeAsync(userId, todayStartUtc, tomorrowStartUtc);
-        int todayStudyMinutes = await _repo.GetStudyMinutesInRangeAsync(userId, todayStartUtc, tomorrowStartUtc);
-        int goalCurrent = todayQuiz.timeSeconds / 60 + todayStudyMinutes;
+        int goalCurrent = await _statsRepo.GetMinutesOnDateAsync(userId, today);
 
         var notebook = (await _repo.GetNotebookProgressAsync(userId))
             .Select(n => new NotebookProgressDto
@@ -151,15 +149,15 @@ public class ProgressService : IProgressService
 
         // Weekly stats over the last 7 days.
         var weekQuiz = await _repo.GetQuizStatsInRangeAsync(userId, weekStartUtc, tomorrowStartUtc);
-        int weekStudyMinutes = await _repo.GetStudyMinutesInRangeAsync(userId, weekStartUtc, tomorrowStartUtc);
         int weekFlips = await _repo.GetFlipReviewsInRangeAsync(userId, weekStartUtc, tomorrowStartUtc);
+        int weeklyStudyMinutes = await _statsRepo.GetMinutesInRangeAsync(userId, today.AddDays(-6), today);
         var weekly = new WeeklyStatsDto
         {
             FlashcardsReviewed = weekFlips,
             PracticeTests = weekQuiz.count,
             // No reader write-path yet, so "documents read this week" stays 0 by design.
             DocumentsRead = 0,
-            StudyMinutes = weekQuiz.timeSeconds / 60 + weekStudyMinutes,
+            StudyMinutes = weeklyStudyMinutes,
             XpEarned = weekQuiz.xp,
         };
 

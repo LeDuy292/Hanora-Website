@@ -924,6 +924,13 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("updated_at");
+            entity.Property(e => e.AveragePronunciationScore)
+                .HasPrecision(5, 2)
+                .HasDefaultValue(0.00m)
+                .HasColumnName("average_pronunciation_score");
+            entity.Property(e => e.TotalPronunciationAttempts)
+                .HasDefaultValue(0)
+                .HasColumnName("total_pronunciation_attempts");
             entity.Property(e => e.XpThisMonth)
                 .HasDefaultValue(0)
                 .HasColumnName("xp_this_month");
