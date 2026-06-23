@@ -122,7 +122,7 @@ public class OcrService : IOcrService
                 // Draw image at (0, 0)
                 canvas.AddImageAt(imageData, 0, 0, false);
 
-                // Setup font (CID font for Asian languages)
+                // Setup font (use standard font for cross-platform compatibility)
                 var font = iText.Kernel.Font.PdfFontFactory.CreateFont("STSong-Light", "UniGB-UTF16-H", iText.Kernel.Font.PdfFontFactory.EmbeddingStrategy.PREFER_NOT_EMBEDDED);
 
                 foreach (var region in result.Regions)
