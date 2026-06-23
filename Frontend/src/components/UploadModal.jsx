@@ -23,7 +23,7 @@ const UploadModal = ({ isOpen, onClose }) => {
             navigate(`/reader/${processingId}`);
           } else if (doc.status === 'Failed' || doc.status === 'failed' || doc.status === 2) {
             clearInterval(interval);
-            setStatus('Lỗi xử lý tài liệu.');
+            setStatus(doc.extractedText || 'Lỗi xử lý tài liệu.');
           }
         } catch (error) {
           console.error(error);
