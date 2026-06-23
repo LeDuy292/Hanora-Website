@@ -55,4 +55,43 @@ public class VocabularyRepository : IVocabularyRepository
             await _db.SaveChangesAsync();
         }
     }
+
+    public async Task SaveToNotebookAsync(long userId, long vocabId, long? documentId)
+    {
+        var existing = await _db.UserVocabularies.FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabId);
+        if (existing == null)
+        {
+            _db.UserVocabularies.Add(new UserVocabulary
+            {
+                UserId = userId,
+                VocabularyId = vocabId,
+                SourceDocumentId = documentId,
+                SavedAt = DateTime.UtcNow,
+                IsMastered = false
+            });
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
+    {
+        return await _db.UserVocabularies
+            .Include(uv => uv.Vocabulary)
+            .ThenInclude(v => v.ExampleSentencesNavigation)
+            .Include(uv => uv.Flashcard)
+            .Where(uv => uv.UserId == userId)
+            .ToListAsync();
+    }
+
+    public async Task<UserVocabulary?> GetUserVocabularyByIdsAsync(long userId, long vocabularyId)
+    {
+        return await _db.UserVocabularies
+            .Include(uv => uv.Flashcard)
+            .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId);
+    }
+    public async Task UpdateUserVocabularyAsync(UserVocabulary userVocabulary)
+    {
+        _db.UserVocabularies.Update(userVocabulary);
+        await _db.SaveChangesAsync();
+    }
 }

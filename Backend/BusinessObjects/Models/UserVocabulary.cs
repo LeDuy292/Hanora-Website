@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -18,6 +18,14 @@ public partial class UserVocabulary
     public string? PersonalNote { get; set; }
 
     public bool? IsMastered { get; set; }
+
+    public int CorrectCount { get; set; } = 0;
+
+    public int WrongCount { get; set; } = 0;
+
+    public DateTime? LastReviewed { get; set; }
+
+    public int MasteryLevel { get; set; } = 0;
 
     public DateTime? SavedAt { get; set; }
 

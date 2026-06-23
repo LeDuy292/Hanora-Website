@@ -9,4 +9,8 @@ public interface IVocabularyRepository
     Task UpdateAsync(Vocabulary vocabulary);
     Task EnsureWordExistsAsync(string word);
     Task AddRelationAsync(long vocabId, long relatedId, RelationType type);
+    Task SaveToNotebookAsync(long userId, long vocabId, long? documentId);
+    Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId);
+    Task<UserVocabulary?> GetUserVocabularyByIdsAsync(long userId, long vocabularyId);
+    Task UpdateUserVocabularyAsync(UserVocabulary userVocabulary);
 }

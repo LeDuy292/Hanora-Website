@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Hanora")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7c3eeff1bac2df20a02508b603abb4182bd30638")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6336ef64361f41b3faa1a67d75c6d7e422e28cd")]
 [assembly: System.Reflection.AssemblyProductAttribute("Hanora")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Hanora")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

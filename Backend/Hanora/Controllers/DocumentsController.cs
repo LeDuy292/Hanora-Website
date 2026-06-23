@@ -10,7 +10,7 @@ namespace Hanora.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-// [Authorize]
+[Authorize]
 public class DocumentsController : ControllerBase
 {
     private readonly IDocumentProcessingService _documentProcessingService;
@@ -30,6 +30,12 @@ public class DocumentsController : ControllerBase
         if (file == null || file.Length == 0)
         {
             return BadRequest("No file uploaded.");
+        }
+
+        const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
+        if (file.Length > MaxFileSize)
+        {
+            return BadRequest("File size exceeds the 5MB limit.");
         }
 
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);

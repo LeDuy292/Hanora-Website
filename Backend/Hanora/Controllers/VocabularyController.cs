@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Services;
+using System.Security.Claims;
 
 namespace Hanora.Controllers;
 
@@ -37,7 +38,7 @@ public class VocabularyController : ControllerBase
             result.Definitions,
             result.UsageNotes,
             WordType = result.WordType?.ToString() ?? "Other",
-            Examples = result.ExampleSentencesNavigation.Select(e => new
+            Examples = result.ExampleSentencesNavigation.Take(2).Select(e => new
             {
                 e.ZhText,
                 e.ViText,
@@ -49,4 +50,33 @@ public class VocabularyController : ControllerBase
             Compounds = result.WordRelationVocabs.Where(wr => wr.RelationType == BusinessObjects.Models.RelationType.Compound).Select(wr => wr.Related.Word).ToList()
         });
     }
+
+    [HttpPost("{word}/save")]
+    public async Task<IActionResult> SaveToNotebook(string word, [FromBody] SaveVocabularyRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(word))
+        {
+            return BadRequest("Word is required.");
+        }
+
+        var userIdString = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId))
+        {
+            userId = 1; 
+        }
+
+        var success = await _vocabularyService.SaveToNotebookAsync(userId, word, request.DocumentId);
+        if (!success)
+        {
+            return BadRequest("Could not save to notebook.");
+        }
+
+        return Ok(new { Message = "Saved successfully." });
+    }
 }
+
+public class SaveVocabularyRequest
+{
+    public long? DocumentId { get; set; }
+}
+

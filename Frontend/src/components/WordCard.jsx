@@ -1,11 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { saveToNotebook } from '../lib/api';
+import { useVocabularyStore } from '../store/vocabularyStore';
 
-const WordCard = ({ word, data, isLoading, onWordClick }) => {
+const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitle }) => {
+  const addWord = useVocabularyStore(state => state.addWord);
+
   const playAudio = () => {
     if (!word) return;
     const utterance = new SpeechSynthesisUtterance(word);
     utterance.lang = 'zh-CN';
     window.speechSynthesis.speak(utterance);
+  };
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveToNotebook = async () => {
+    if (!word) return;
+    setIsSaving(true);
+    try {
+      await saveToNotebook(word, documentId);
+      
+      // Update frontend store so it appears in Vocabulary page
+      addWord({
+        text: data.word,
+        pinyin: data.pinyin,
+        translation: data.definitions,
+        documentId: documentId,
+        documentTitle: documentTitle
+      });
+      
+      alert('Đã lưu vào sổ tay thành công!');
+    } catch (error) {
+      console.error(error);
+      alert('Có lỗi xảy ra khi lưu vào sổ tay.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading) {
@@ -170,8 +200,12 @@ const WordCard = ({ word, data, isLoading, onWordClick }) => {
 
       {/* Action Buttons */}
       <div className="mt-10 pt-6 border-t border-gray-100 flex gap-3">
-        <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-sm">
-          Lưu Sổ Tay
+        <button 
+          onClick={handleSaveToNotebook}
+          disabled={isSaving}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors shadow-sm"
+        >
+          {isSaving ? 'Đang lưu...' : 'Lưu Sổ Tay'}
         </button>
         <button className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
           Báo cáo
