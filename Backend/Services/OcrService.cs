@@ -43,8 +43,13 @@ public class OcrService : IOcrService
             }
             else if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                var (text, pdfBytes) = ExtractWithTesseractAndPdf(memoryStream, fileName);
+                var (text, pdfBytes, tesseractError) = ExtractWithTesseractAndPdf(memoryStream, fileName);
                 
+                if (!string.IsNullOrEmpty(tesseractError))
+                {
+                    return (null, null, $"Tesseract Error: {tesseractError}");
+                }
+
                 if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 5)
                 {
                     _logger.LogInformation("Tesseract extraction failed or yielded little text. Rejecting image.");
@@ -81,7 +86,7 @@ public class OcrService : IOcrService
         return text.ToString();
     }
 
-    private (string? text, byte[]? pdfBytes) ExtractWithTesseractAndPdf(Stream fileStream, string fileName)
+    private (string? text, byte[]? pdfBytes, string? errorMessage) ExtractWithTesseractAndPdf(Stream fileStream, string fileName)
     {
         try
         {
@@ -118,12 +123,12 @@ public class OcrService : IOcrService
                 File.Delete(tempPdfPath + ".pdf");
             }
 
-            return (text, pdfBytes);
+            return (text, pdfBytes, null);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Tesseract failed to extract text and pdf.");
-            return (null, null);
+            return (null, null, ex.Message);
         }
     }
 }
