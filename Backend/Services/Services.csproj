@@ -14,7 +14,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260602" />
-    <PackageReference Include="OpenCvSharp4.official.runtime.linux-x64" Version="4.13.0.20260602" />
+    <PackageReference Include="OpenCvSharp4.official.runtime.linux-x64.slim" Version="4.13.0.20260602" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260602" />
     <PackageReference Include="PdfPig" Version="0.1.14" />
     <PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="2.6.0-rc2" />
