@@ -52,6 +52,10 @@ namespace Hanora
             builder.Services.AddScoped<IQuizService, QuizService>();
             builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
             builder.Services.AddScoped<IFlashcardService, FlashcardService>();
+            builder.Services.AddScoped<IStatsRepository, StatsRepository>();
+            builder.Services.AddScoped<IStatsService, StatsService>();
+            builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
+            builder.Services.AddScoped<IProgressService, ProgressService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
