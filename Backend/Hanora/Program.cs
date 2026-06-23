@@ -48,6 +48,10 @@ namespace Hanora
             builder.Services.AddScoped<IVocabularyRepository, VocabularyRepository>();
             builder.Services.AddScoped<IDictionaryAiService, DictionaryAiService>();
             builder.Services.AddScoped<IVocabularyService, VocabularyService>();
+            builder.Services.AddScoped<IQuizRepository, QuizRepository>();
+            builder.Services.AddScoped<IQuizService, QuizService>();
+            builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
+            builder.Services.AddScoped<IFlashcardService, FlashcardService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -83,7 +87,12 @@ namespace Hanora
                 });
             });
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+                    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+                });
             builder.Services.AddEndpointsApiExplorer();
 
             // Swagger with JWT support

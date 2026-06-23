@@ -38,7 +38,7 @@ public class VocabularyController : ControllerBase
             result.Definitions,
             result.UsageNotes,
             WordType = result.WordType?.ToString() ?? "Other",
-            Examples = result.ExampleSentencesNavigation.Select(e => new
+            Examples = result.ExampleSentencesNavigation.Take(2).Select(e => new
             {
                 e.ZhText,
                 e.ViText,
@@ -79,3 +79,4 @@ public class SaveVocabularyRequest
 {
     public long? DocumentId { get; set; }
 }
+
