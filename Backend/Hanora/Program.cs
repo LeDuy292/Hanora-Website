@@ -24,7 +24,6 @@ namespace Hanora
             dataSourceBuilder.MapEnum<BusinessObjects.Models.LeaderboardPeriod>("leaderboard_period_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.LearnQuestionType>("learn_question_type_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.LearnResult>("learn_result_enum");
-            dataSourceBuilder.MapEnum<BusinessObjects.Models.QuizQuestionType>("quiz_question_type_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.ReportStatus>("report_status_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.RelationType>("relation_type_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.WordType>("word_type_enum");
@@ -49,6 +48,7 @@ namespace Hanora
             builder.Services.AddScoped<IDictionaryAiService, DictionaryAiService>();
             builder.Services.AddScoped<IVocabularyService, VocabularyService>();
             builder.Services.AddScoped<IQuizRepository, QuizRepository>();
+            builder.Services.AddScoped<IQuizAiService, QuizAiService>();
             builder.Services.AddScoped<IQuizService, QuizService>();
             builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
             builder.Services.AddScoped<IFlashcardService, FlashcardService>();
