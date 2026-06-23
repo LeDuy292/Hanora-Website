@@ -134,31 +134,39 @@ public class OcrService : IOcrService
                     float rectWidth = bounds.Width;
                     float rectHeight = bounds.Height;
 
-                    if (rectHeight <= 0) continue;
+                    if (rectHeight <= 0 || string.IsNullOrEmpty(region.Text)) continue;
 
-                    canvas.SaveState();
-                    canvas.BeginText();
-                    
-                    // Set invisible text mode (TextRenderingMode.INVISIBLE)
-                    canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
-                    
-                    // Set font and size to match bounding box height
-                    canvas.SetFontAndSize(font, rectHeight);
-                    
-                    // Calculate horizontal scaling to fit the width
-                    float textWidth = font.GetWidth(region.Text, rectHeight);
-                    if (textWidth > 0)
+                    // Calculate width per character assuming monospaced (typical for Chinese)
+                    float charWidth = rectWidth / region.Text.Length;
+
+                    for (int i = 0; i < region.Text.Length; i++)
                     {
-                        float scale = (rectWidth / textWidth) * 100f;
-                        canvas.SetHorizontalScaling(scale);
-                    }
+                        canvas.SaveState();
+                        canvas.BeginText();
+                        
+                        // Set invisible text mode (TextRenderingMode.INVISIBLE)
+                        canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
+                        
+                        // Set font and size to match bounding box height
+                        canvas.SetFontAndSize(font, rectHeight);
+                        
+                        string singleChar = region.Text[i].ToString();
+                        float singleCharWidth = font.GetWidth(singleChar, rectHeight);
+                        
+                        // Calculate horizontal scaling to fit the character width
+                        if (singleCharWidth > 0)
+                        {
+                            float scale = (charWidth / singleCharWidth) * 100f;
+                            canvas.SetHorizontalScaling(scale);
+                        }
 
-                    // Move text cursor
-                    canvas.MoveText(rectX, rectY);
-                    canvas.ShowText(region.Text);
-                    
-                    canvas.EndText();
-                    canvas.RestoreState();
+                        // Move text cursor to the character's specific position
+                        canvas.MoveText(rectX + (i * charWidth), rectY);
+                        canvas.ShowText(singleChar);
+                        
+                        canvas.EndText();
+                        canvas.RestoreState();
+                    }
                 }
             }
             
