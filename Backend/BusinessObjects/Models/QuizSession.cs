@@ -31,11 +31,20 @@ public partial class QuizSession
 
     public string? Status { get; set; }
 
+    // Test configuration captured at creation time.
+    public string? Difficulty { get; set; }            // 'easy' | 'medium' | 'hard' | 'adaptive'
+
+    public string? QuestionTypes { get; set; }          // JSON array of selected question kinds
+
+    public string? Generator { get; set; }              // 'ai' | 'local'
+
     public DateTime? StartedAt { get; set; }
 
     public DateTime? CompletedAt { get; set; }
 
     public virtual ICollection<QuizQuestion> QuizQuestions { get; set; } = new List<QuizQuestion>();
+
+    public virtual ICollection<QuizReview> QuizReviews { get; set; } = new List<QuizReview>();
 
     public virtual User User { get; set; } = null!;
 }

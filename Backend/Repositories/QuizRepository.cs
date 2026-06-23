@@ -23,8 +23,10 @@ public class QuizRepository : IQuizRepository
     public async Task<QuizSession?> GetSessionAsync(long id)
     {
         return await _db.QuizSessions
-            .Include(s => s.QuizQuestions)
+            .Include(s => s.QuizQuestions.OrderBy(q => q.QuestionOrder))
             .ThenInclude(q => q.Vocabulary)
+            .Include(s => s.QuizReviews)
+            .ThenInclude(r => r.Vocabulary)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
@@ -37,6 +39,12 @@ public class QuizRepository : IQuizRepository
     public async Task AddQuestionAsync(QuizQuestion question)
     {
         _db.QuizQuestions.Add(question);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task AddQuestionsAsync(IEnumerable<QuizQuestion> questions)
+    {
+        _db.QuizQuestions.AddRange(questions);
         await _db.SaveChangesAsync();
     }
 
@@ -59,5 +67,36 @@ public class QuizRepository : IQuizRepository
             .Where(s => s.UserId == userId)
             .OrderByDescending(s => s.StartedAt)
             .ToListAsync();
+    }
+
+    public async Task<QuizSession?> GetLatestInProgressAsync(long userId)
+    {
+        return await _db.QuizSessions
+            .Include(s => s.QuizQuestions.OrderBy(q => q.QuestionOrder))
+            .ThenInclude(q => q.Vocabulary)
+            .Where(s => s.UserId == userId
+                        && s.Status == "In Progress"
+                        // Only resumable if the user has actually answered something.
+                        && s.QuizQuestions.Any(q => q.UserAnswer != null))
+            .OrderByDescending(s => s.StartedAt)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<int> AbandonInProgressSessionsAsync(long userId)
+    {
+        var open = await _db.QuizSessions
+            .Where(s => s.UserId == userId && s.Status == "In Progress")
+            .ToListAsync();
+        foreach (var s in open)
+            s.Status = "Abandoned";
+        if (open.Count > 0)
+            await _db.SaveChangesAsync();
+        return open.Count;
+    }
+
+    public async Task AddReviewsAsync(IEnumerable<QuizReview> reviews)
+    {
+        _db.QuizReviews.AddRange(reviews);
+        await _db.SaveChangesAsync();
     }
 }

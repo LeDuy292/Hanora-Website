@@ -42,6 +42,9 @@ export function FlashcardPage() {
   // Selected deck state
   const [selectedDeck, setSelectedDeck] = useState(null);
 
+  // Weak words handed off from the Practice Test ("Ôn lại từ yếu").
+  const reviewWords = location.state?.reviewWords || null;
+
   // Player state
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -70,9 +73,18 @@ export function FlashcardPage() {
     list.push({ id: 'learning', title: 'Đang học', count: learningCount, getWords: () => vocabList.filter(v => v.srsLevel > 0 && v.srsLevel < 4) });
     list.push({ id: 'known', title: 'Đã thuộc', count: knownCount, getWords: () => vocabList.filter(v => v.srsLevel >= 4) });
     // Removed 'due' deck as requested
-    
+
+    // Review deck from a Practice Test weak-word handoff.
+    if (reviewWords && reviewWords.length > 0) {
+      const reviewSet = new Set(reviewWords);
+      const reviewList = vocabList.filter(v => reviewSet.has(v.text));
+      if (reviewList.length > 0) {
+        list.unshift({ id: 'review', title: 'Ôn từ yếu', count: reviewList.length, getWords: () => vocabList.filter(v => reviewSet.has(v.text)) });
+      }
+    }
+
     return { decks: list, counts: { dueCount: dueWords.length, newCount, learningCount, knownCount } };
-  }, [vocabList]);
+  }, [vocabList, reviewWords]);
 
   // Local state for statistics (using user data if available)
   const totalItems = (counts.knownCount + counts.learningCount + counts.newCount) || 1;

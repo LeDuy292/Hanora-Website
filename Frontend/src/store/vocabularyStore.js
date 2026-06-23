@@ -125,11 +125,18 @@ export const useVocabularyStore = create(
         return get().vocabList.filter(item => item.nextReviewDate <= todayStr);
       },
 
-      startQuiz: async (count = 10) => {
+      startQuiz: async (config = {}) => {
         set({ quizLoading: true });
+        // config: { questionCount, questionTypes: [], difficulty }
+        const body = {
+          questionCount: config.questionCount ?? 10,
+          questionTypes: config.questionTypes ?? [],
+          difficulty: config.difficulty ?? 'medium'
+        };
         try {
-          const session = await apiRequest(`/practice/start?count=${count}`, {
+          const session = await apiRequest(`/practice/start`, {
             method: 'POST',
+            body,
             auth: true
           });
           if (session) {
@@ -157,6 +164,20 @@ export const useVocabularyStore = create(
         }
       },
 
+      flagQuestion: async (questionId, flagged) => {
+        try {
+          await apiRequest(`/practice/flag`, {
+            method: 'POST',
+            body: { questionId, flagged },
+            auth: true
+          });
+          return true;
+        } catch (error) {
+          console.error("Error flagging question:", error);
+          return false;
+        }
+      },
+
       finishQuiz: async (sessionId) => {
         set({ quizLoading: true });
         try {
@@ -173,6 +194,34 @@ export const useVocabularyStore = create(
         }
         set({ quizLoading: false });
         return null;
+      },
+
+      fetchQuizResult: async (sessionId) => {
+        try {
+          return await apiRequest(`/practice/result/${sessionId}`, { auth: true });
+        } catch (error) {
+          console.error("Error fetching quiz result:", error);
+          return null;
+        }
+      },
+
+      fetchQuizHistory: async () => {
+        try {
+          return await apiRequest(`/practice/history`, { auth: true });
+        } catch (error) {
+          console.error("Error fetching quiz history:", error);
+          return [];
+        }
+      },
+
+      fetchInProgressQuiz: async () => {
+        try {
+          // 204 No Content => apiRequest resolves to null/empty
+          return await apiRequest(`/practice/in-progress`, { auth: true });
+        } catch (error) {
+          console.error("Error fetching in-progress quiz:", error);
+          return null;
+        }
       },
 
       fetchUserFlashcards: async () => {
