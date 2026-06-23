@@ -1,40 +1,98 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Flame, 
-  Clock, 
-  Bookmark, 
-  Layers, 
-  Plus, 
-  FileText, 
-  ArrowRight, 
-  Trash2, 
-  Trophy, 
-  TrendingUp, 
-  Check, 
-  Lock, 
-  Award, 
-  BookOpen, 
-  Mic 
+import {
+  Flame,
+  Clock,
+  Bookmark,
+  Layers,
+  Plus,
+  FileText,
+  ArrowRight,
+  Trophy,
+  TrendingUp,
+  Check,
+  Lock,
+  Award,
+  BookOpen,
+  Mic
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useDocumentStore } from '../store/documentStore';
-import { useVocabularyStore } from '../store/vocabularyStore';
+import { progressApi } from '../services/progressService';
 import { Button } from '../components/common/Button';
-import { formatDate } from '../utils/formatDate';
-import pandaImg from '../assets/Gemini_Generated_Image_idwcryidwcryidwc.png';
+
+// Maps the short weekday label used by the growth chart from an ISO date.
+const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+// Default icon per achievement code so the trophy room keeps its visual variety.
+const ACHIEVEMENT_ICONS = {
+  first_doc: BookOpen,
+  streak_3: Flame,
+  streak_7: Flame,
+  streak_30: Flame,
+  vocab_10: Bookmark,
+  vocab_50: Bookmark,
+  vocab_100: Bookmark,
+  vocab_500: Bookmark,
+  mastered_10: Award,
+  mastered_100: Award,
+  first_quiz: Layers,
+  perfect_quiz: Trophy,
+  match_master: Layers,
+  flashcard_100: Layers,
+  top10_weekly: Trophy,
+};
+
+function formatVnDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { documents, setActiveDocument, deleteDocument } = useDocumentStore();
-  const { vocabList, getReviewQueue } = useVocabularyStore();
 
-  const dueQueue = getReviewQueue();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Daily target configuration
-  const targetMinutes = user?.targetDailyMinutes || 20;
-  const todayMins = user?.todayMinutes || 0;
-  const progressPercent = Math.min(Math.round((todayMins / targetMinutes) * 100), 100);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const dashboard = await progressApi.getDashboard();
+        if (!cancelled) {
+          setData(dashboard);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Không thể tải bảng điều khiển.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Safe accessors with graceful fallbacks while loading / on error.
+  const streak = data?.streak ?? 0;
+  const xp = data?.xp ?? 0;
+  const level = data?.level ?? 1;
+  const wordsSaved = data?.wordsSaved ?? 0;
+  const reviewToday = data?.reviewToday ?? 0;
+
+  const targetMinutes = data?.dailyGoal?.target ?? 20;
+  const todayMins = data?.dailyGoal?.current ?? 0;
+  const progressPercent = targetMinutes > 0
+    ? Math.min(Math.round((todayMins / targetMinutes) * 100), 100)
+    : 0;
+
+  const notebookProgress = data?.notebookProgress ?? [];
+  const growthChart = data?.growthChart ?? [];
+  const recentDocuments = data?.recentDocuments ?? [];
+  const achievements = data?.achievements ?? [];
 
   // SVG circle specifications
   const radius = 55;
@@ -59,10 +117,10 @@ export function DashboardPage() {
 
   const isDayCompleted = (idx) => {
     if (idx < todayIdx) {
-      return (user?.streak || 0) >= (todayIdx - idx);
+      return streak >= (todayIdx - idx);
     }
     if (idx === todayIdx) {
-      return todayMins > 0 || (user?.streak || 0) > 0;
+      return todayMins > 0 || streak > 0;
     }
     return false;
   };
@@ -73,114 +131,62 @@ export function DashboardPage() {
     today: idx === todayIdx,
   }));
 
-  const streakLength = user?.streak || 0;
+  // Growth chart points derived from the backend's 7-day series.
+  const graphPoints = growthChart.map((p) => {
+    const d = new Date(p.date);
+    const label = Number.isNaN(d.getTime()) ? '' : WEEKDAY_LABELS[d.getDay()];
+    return { day: label, count: p.count ?? 0 };
+  });
 
-  // Vocabulary HSK stats grouping
-  const hsk1Count = vocabList.filter(v => v.hsk === 1).length;
-  const hsk2Count = vocabList.filter(v => v.hsk === 2).length;
-  const hsk3Count = vocabList.filter(v => v.hsk === 3).length;
-
-  const hskLevels = [
-    { level: 'HSK 1', count: hsk1Count, target: 150, color: 'from-blue-600 to-sky-400' },
-    { level: 'HSK 2', count: hsk2Count, target: 150, color: 'from-blue-500 to-indigo-400' },
-    { level: 'HSK 3', count: hsk3Count, target: 300, color: 'from-indigo-600 to-purple-500' }
-  ];
-
-  // Graph Points for growth tracking
-  const graphPoints = [
-    { day: "Mon", count: 8 },
-    { day: "Tue", count: 12 },
-    { day: "Wed", count: 18 },
-    { day: "Thu", count: 15 },
-    { day: "Fri", count: 24 },
-    { day: "Sat", count: 28 },
-    { day: "Sun", count: vocabList.length }
-  ];
-
-  const maxVal = Math.max(...graphPoints.map(p => p.count), 30);
+  const maxVal = Math.max(...graphPoints.map(p => p.count), 10);
   const svgPoints = graphPoints.map((p, idx) => {
     const x = 40 + idx * 70;
     const y = 100 - (p.count / maxVal) * 80;
     return `${x},${y}`;
   }).join(' ');
 
-  // Achievements
-  const achievements = [
-    {
-      id: 'beginner_reader',
-      title: 'Độc giả tập sự',
-      desc: 'Tải lên tài liệu học đầu tiên của bạn để dịch thuật.',
-      icon: BookOpen,
-      unlocked: documents.length > 0,
-      requirement: 'Tải lên ít nhất 1 tài liệu',
-      progress: `${documents.length}/1`,
-      badgeColor: 'bg-blue-50 border-blue-100 text-blue-600',
-      iconColor: 'text-blue-500'
-    },
-    {
-      id: 'streak_master',
-      title: 'Chiến thần chuyên cần',
-      desc: 'Duy trì chuỗi học tập liên tục 5 ngày để tạo thói quen tốt.',
-      icon: Flame,
-      unlocked: (user?.streak || 0) >= 5,
-      requirement: 'Đạt chuỗi học tập từ 5 ngày',
-      progress: `${user?.streak || 0}/5`,
-      badgeColor: 'bg-orange-50 border-orange-100 text-orange-600',
-      iconColor: 'text-orange-500'
-    },
-    {
-      id: 'vocab_collector',
-      title: 'Nhà sưu tầm từ vựng',
-      desc: 'Lưu 20 từ vựng trở lên vào sổ tay ghi nhớ của riêng bạn.',
-      icon: Bookmark,
-      unlocked: vocabList.length >= 20,
-      requirement: 'Lưu ít nhất 20 từ vựng',
-      progress: `${vocabList.length}/20`,
-      badgeColor: 'bg-sky-50 border-sky-100 text-sky-600',
-      iconColor: 'text-sky-500'
-    },
-    {
-      id: 'ai_speaker',
-      title: 'Phát âm chuẩn AI',
-      desc: 'Đạt điểm số từ 90% trở lên khi luyện đọc phát âm với AI.',
-      icon: Mic,
-      unlocked: !!user?.hasHighSpeechScore,
-      requirement: 'Điểm phát âm AI đạt từ 90%+',
-      progress: user?.hasHighSpeechScore ? '1/1' : '0/1',
-      badgeColor: 'bg-indigo-50 border-indigo-100 text-indigo-600',
-      iconColor: 'text-indigo-500'
-    }
-  ];
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
 
-  // Helper for XP milestones
-  const getXpProgress = () => {
-    const xp = user?.xp || 0;
-    if (xp < 200) {
-      return { current: xp, next: 200, percent: (xp / 200) * 100, nextLevel: 'HSK 2' };
-    } else if (xp < 500) {
-      return { current: xp - 200, next: 300, percent: ((xp - 200) / 300) * 100, nextLevel: 'HSK 3' };
-    } else if (xp < 800) {
-      return { current: xp - 500, next: 300, percent: ((xp - 500) / 300) * 100, nextLevel: 'HSK 4' };
-    } else {
-      return { current: xp - 800, next: 1200, percent: Math.min(((xp - 800) / 1200) * 100, 100), nextLevel: 'HSK 5 Max' };
-    }
-  };
-
-  const xpProgress = getXpProgress();
-
+  // XP milestone progress: distance to the next 1000-XP level band (spec thresholds).
+  const xpBandSize = xp < 100 ? 100 : xp < 300 ? 300 : xp < 600 ? 600 : 1000;
+  const xpBandStart = xp < 100 ? 0 : xp < 300 ? 100 : xp < 600 ? 300 : Math.floor(xp / 1000) * 1000;
+  const xpBandEnd = xp < 100 ? 100 : xp < 300 ? 300 : xp < 600 ? 600 : xpBandStart + 1000;
+  const xpPercent = Math.min(
+    Math.round(((xp - xpBandStart) / (xpBandEnd - xpBandStart)) * 100),
+    100
+  );
 
   const handleOpenDoc = (id) => {
-    setActiveDocument(id);
-    navigate('/reader');
+    navigate(`/reader/${id}`);
   };
+
+  if (loading && !data) {
+    return (
+      <div className="space-y-8 page-transition">
+        <div className="h-32 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-white border border-slate-100 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+        <div className="h-80 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 page-transition">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold rounded-2xl">
+          {error}
+        </div>
+      )}
+
       {/* Top Welcome / XP Progress Milestone Header Card */}
       {user && (
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-8 bg-white border border-slate-100 rounded-3xl gap-6 relative overflow-hidden shadow-sm">
           <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
-          
+
           <div className="space-y-3 flex-grow max-w-2xl">
             <span className="text-blue-600 text-xs font-extrabold uppercase tracking-widest block">
               Bảng điều khiển học tập
@@ -189,29 +195,29 @@ export function DashboardPage() {
               Chào mừng trở lại, {user.name}!
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Cấp độ của bạn: <span className="text-blue-600 font-bold">{user.level || 'HSK 1'}</span> ({user.xp} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
+              Cấp độ của bạn: <span className="text-blue-600 font-bold">Level {level}</span> ({xp} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
             </p>
 
             {/* XP progress bar */}
             <div className="space-y-2 pt-1 max-w-md">
               <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                <span>Tiến trình lên {xpProgress.nextLevel}</span>
-                <span>{user.xp} / {xpProgress.next === 1200 ? '2000' : xpProgress.next + (user.xp < 200 ? 0 : user.xp < 500 ? 200 : 500)} XP</span>
+                <span>Tiến trình lên Level {level + 1}</span>
+                <span>{xp} / {xpBandEnd} XP</span>
               </div>
               <div className="h-2 bg-slate-100 border border-slate-200/50 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500" 
-                  style={{ width: `${xpProgress.percent}%` }}
+                <div
+                  className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
+                  style={{ width: `${xpPercent}%` }}
                 ></div>
               </div>
             </div>
           </div>
-          
+
           {/* Action buttons */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 w-full lg:w-auto">
-            <Button 
-              variant="primary" 
-              icon={Plus} 
+            <Button
+              variant="primary"
+              icon={Plus}
               onClick={() => navigate('/reader', { state: { openUpload: true } })}
             >
               Nhập tài liệu mới
@@ -222,7 +228,7 @@ export function DashboardPage() {
 
       {/* Grid: Stat Summary Blocks */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        
+
         {/* Streak card */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-orange-500 flex items-center justify-center">
@@ -230,7 +236,7 @@ export function DashboardPage() {
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Chuỗi học tập</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{user?.streak || 0} Ngày</h4>
+            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{streak} Ngày</h4>
           </div>
         </div>
 
@@ -241,7 +247,7 @@ export function DashboardPage() {
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Học hôm nay</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{user?.todayMinutes || 0} / {user?.targetDailyMinutes || 20} phút</h4>
+            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{todayMins} / {targetMinutes} phút</h4>
           </div>
         </div>
 
@@ -252,7 +258,7 @@ export function DashboardPage() {
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Sổ tay từ vựng</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{vocabList.length} Từ đã lưu</h4>
+            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{wordsSaved} Từ đã lưu</h4>
           </div>
         </div>
 
@@ -263,7 +269,7 @@ export function DashboardPage() {
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Cần ôn tập SRS</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{dueQueue.length} Từ đến hạn</h4>
+            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{reviewToday} Từ đến hạn</h4>
           </div>
         </div>
 
@@ -271,7 +277,7 @@ export function DashboardPage() {
 
       {/* Grid: SVG Goal Ring (left) vs Streak Calendar (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* SVG Goal Ring */}
         <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
           <div className="w-full flex justify-between items-center border-b border-slate-100 pb-3 text-left">
@@ -315,7 +321,7 @@ export function DashboardPage() {
           </div>
 
           <div className="text-xs text-slate-500 leading-relaxed font-medium">
-            {progressPercent >= 100 
+            {progressPercent >= 100
               ? '🎉 Tuyệt vời! Bạn đã hoàn thành mục tiêu học tập hôm nay!'
               : `Còn ${Math.max(targetMinutes - todayMins, 0)} phút nữa để đạt chỉ tiêu ngày.`}
           </div>
@@ -334,7 +340,7 @@ export function DashboardPage() {
               <div className="mt-4 flex items-end gap-4">
                 <div>
                   <h3 className="text-[3.5rem] font-extrabold tracking-tight text-white leading-none">
-                    {streakLength}
+                    {streak}
                   </h3>
                   <p className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-100/80 mt-1">
                     ngày liên tiếp
@@ -347,15 +353,6 @@ export function DashboardPage() {
                 </div>
               </div>
             </div>
-
-            <div className="relative flex-shrink-0">
-              <div className="absolute inset-0 rounded-3xl border border-white/20 bg-white/10 blur-sm"></div>
-              <img
-                src={pandaImg}
-                alt="Panda streak"
-                className="relative z-10 h-36 w-36 rounded-[2rem] object-cover shadow-2xl shadow-slate-900/10"
-              />
-            </div>
           </div>
 
           <div className="mt-8 rounded-[2rem] bg-white/10 border border-white/15 p-4 shadow-inner">
@@ -367,7 +364,7 @@ export function DashboardPage() {
                 <p className="text-xs text-sky-100/80 mt-1">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
               </div>
               <div className="rounded-full bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-sky-100/80 border border-white/15">
-                {streakLength} ngày
+                {streak} ngày
               </div>
             </div>
 
@@ -398,9 +395,9 @@ export function DashboardPage() {
 
       </div>
 
-      {/* Grid: SRS Study Card + HSK Distribution */}
+      {/* Grid: SRS Study Card + Notebook Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
+
         {/* SRS quick study widget */}
         <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 space-y-4.5 shadow-sm">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-3">
@@ -410,7 +407,7 @@ export function DashboardPage() {
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-4">
             <div>
               <span className="text-2xl font-black text-slate-800 font-display block">
-                {dueQueue.length}
+                {reviewToday}
               </span>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">
                 từ vựng cần ôn tập hôm nay
@@ -422,47 +419,55 @@ export function DashboardPage() {
             </p>
 
             <Button
-              variant={dueQueue.length > 0 ? 'primary' : 'secondary'}
+              variant={reviewToday > 0 ? 'primary' : 'secondary'}
               className="w-full shadow-sm"
               icon={Layers}
               onClick={() => navigate('/flashcards')}
-              disabled={vocabList.length === 0}
+              disabled={wordsSaved === 0}
             >
               Bắt đầu ôn tập ngay
             </Button>
           </div>
         </div>
 
-        {/* HSK Vocabulary notebook distribution */}
+        {/* Vocabulary notebook distribution (per document) */}
         <div className="lg:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 space-y-5 shadow-sm">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-blue-550" style={{ color: '#2563eb' }} />
-              Sổ Tay Từ Vựng HSK
+              <Bookmark className="w-4 h-4" style={{ color: '#2563eb' }} />
+              Sổ Tay Từ Vựng
             </h3>
             <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
-              Phân bố từ vựng đã lưu theo cấp độ HSK
+              Tiến độ học từ vựng theo từng tài liệu
             </p>
           </div>
 
           <div className="space-y-4">
-            {hskLevels.map((hsk, idx) => {
-              const percent = Math.min(Math.round((hsk.count / hsk.target) * 100), 100);
-              return (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-800">{hsk.level}</span>
-                    <span className="text-slate-500 font-semibold">{hsk.count} / {hsk.target} từ ({percent}%)</span>
+            {notebookProgress.length > 0 ? (
+              notebookProgress.map((doc) => {
+                const percent = doc.total > 0
+                  ? Math.min(Math.round((doc.learned / doc.total) * 100), 100)
+                  : 0;
+                return (
+                  <div key={doc.documentId} className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-800 truncate max-w-[60%]">{doc.title}</span>
+                      <span className="text-slate-500 font-semibold">{doc.learned} / {doc.total || '?'} từ ({percent}%)</span>
+                    </div>
+                    <div className="h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
+                        style={{ width: `${percent || 2}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden relative">
-                    <div 
-                      className={`h-full bg-gradient-to-r ${hsk.color} rounded-full transition-all duration-500`}
-                      style={{ width: `${percent || 2}%` }} 
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="py-6 text-center text-slate-400 text-xs font-semibold">
+                Chưa có từ vựng nào được lưu theo tài liệu.
+              </div>
+            )}
           </div>
         </div>
 
@@ -476,13 +481,13 @@ export function DashboardPage() {
             Biểu Đồ Tăng Trưởng Từ Vựng
           </h3>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">
-            Tuần Này
+            7 Ngày Qua
           </span>
         </div>
 
         <div className="w-full bg-slate-50 rounded-2xl p-4 border border-slate-100">
-          <svg 
-            viewBox="0 0 500 130" 
+          <svg
+            viewBox="0 0 500 130"
             className="w-full overflow-visible"
           >
             <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
@@ -495,10 +500,12 @@ export function DashboardPage() {
                 <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <path
-              d={`M 40,100 L ${svgPoints} L 460,100 Z`}
-              fill="url(#chartProgressGlow)"
-            />
+            {graphPoints.length > 0 && (
+              <path
+                d={`M 40,100 L ${svgPoints} L ${40 + (graphPoints.length - 1) * 70},100 Z`}
+                fill="url(#chartProgressGlow)"
+              />
+            )}
 
             <polyline
               fill="none"
@@ -553,14 +560,14 @@ export function DashboardPage() {
             <FileText className="w-4 h-4 text-blue-500" />
             Tài liệu đọc gần đây
           </h3>
-          <span className="text-xs text-slate-400 font-semibold">{documents.length} Tài liệu</span>
+          <span className="text-xs text-slate-400 font-semibold">{recentDocuments.length} Tài liệu</span>
         </div>
 
-        {documents.length > 0 ? (
+        {recentDocuments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {documents.map((doc) => (
-              <div 
-                key={doc.id} 
+            {recentDocuments.map((doc) => (
+              <div
+                key={doc.id}
                 className="group flex flex-col justify-between p-5 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm transition-all duration-200 gap-4"
               >
                 <div className="flex justify-between items-start">
@@ -569,36 +576,28 @@ export function DashboardPage() {
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 
+                      <h4
                         onClick={() => handleOpenDoc(doc.id)}
                         className="text-xs font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
                       >
                         {doc.title}
                       </h4>
                       <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                        Ngày tải: {formatDate(doc.date)}
+                        Đọc gần nhất: {formatVnDate(doc.lastReadAt)}
                       </p>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => deleteDocument(doc.id)}
-                    className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Xóa tài liệu"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 </div>
 
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
                     <span>Tiến trình đọc</span>
-                    <span>{doc.progress || 0}%</span>
+                    <span>{Math.round(doc.progressPercent || 0)}%</span>
                   </div>
                   <div className="h-1 bg-slate-100 border border-slate-200/55 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full" 
-                      style={{ width: `${doc.progress || 0}%` }}
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"
+                      style={{ width: `${doc.progressPercent || 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -607,9 +606,9 @@ export function DashboardPage() {
                   <div className="flex items-center gap-3 font-semibold">
                     <span>{doc.charCount} ký tự</span>
                     <span>&bull;</span>
-                    <span>{doc.readTimeMins} phút đọc</span>
+                    <span>{doc.readingMinutes} phút đọc</span>
                   </div>
-                  
+
                   <button
                     onClick={() => handleOpenDoc(doc.id)}
                     className="flex items-center gap-1.5 text-xs text-blue-600 font-bold hover:text-blue-500"
@@ -639,20 +638,23 @@ export function DashboardPage() {
               Huy hiệu vinh danh cá nhân và cột mốc học tập
             </p>
           </div>
-          
+
           <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-100/50 px-3 py-1 rounded-full flex items-center gap-1.5">
-            <Award className="w-4 h-4 fill-amber-500/10" /> 
-            {achievements.filter(a => a.unlocked).length} / {achievements.length} Đạt được
+            <Award className="w-4 h-4 fill-amber-500/10" />
+            {unlockedCount} / {achievements.length} Đạt được
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {achievements.map((achievement) => {
-            const Icon = achievement.icon;
-            
+            const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
+            const progressText = achievement.target > 0
+              ? `${achievement.progress}/${achievement.target}`
+              : '—';
+
             return (
-              <div 
-                key={achievement.id}
+              <div
+                key={achievement.code}
                 className={`p-5 rounded-2xl border flex flex-col justify-between h-[180px] transition-all duration-300 relative overflow-hidden group ${
                   achievement.unlocked
                     ? 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md'
@@ -666,12 +668,12 @@ export function DashboardPage() {
                 <div className="flex justify-between items-start">
                   <div className={`p-3 rounded-2xl border transition-colors ${
                     achievement.unlocked
-                      ? achievement.badgeColor
+                      ? 'bg-blue-50 border-blue-100 text-blue-600'
                       : 'bg-slate-100 border-slate-150 text-slate-400'
                   }`}>
                     <Icon className="w-5 h-5" />
                   </div>
-                  
+
                   <div className="flex items-center">
                     {achievement.unlocked ? (
                       <span className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
@@ -687,17 +689,17 @@ export function DashboardPage() {
 
                 <div className="space-y-1 mt-3">
                   <h4 className={`text-xs font-bold ${achievement.unlocked ? 'text-slate-800' : 'text-slate-400'}`}>
-                    {achievement.title}
+                    {achievement.name}
                   </h4>
                   <p className="text-[10px] text-slate-500 leading-normal line-clamp-2">
-                    {achievement.desc}
+                    {achievement.description}
                   </p>
                 </div>
 
                 <div className="mt-2.5 pt-2 border-t border-slate-100 flex justify-between items-center text-[9px] text-slate-400 font-bold">
-                  <span>{achievement.requirement}</span>
+                  <span>+{achievement.xpReward} XP</span>
                   <span className={achievement.unlocked ? 'text-blue-600 font-extrabold' : 'text-slate-500'}>
-                    {achievement.progress}
+                    {progressText}
                   </span>
                 </div>
               </div>

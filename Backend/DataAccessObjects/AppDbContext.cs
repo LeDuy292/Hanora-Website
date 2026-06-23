@@ -24,6 +24,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<DocumentPage> DocumentPages { get; set; }
 
+    public virtual DbSet<DocumentReadingProgress> DocumentReadingProgresses { get; set; }
+
     public virtual DbSet<ExampleSentence> ExampleSentences { get; set; }
 
     public virtual DbSet<Flashcard> Flashcards { get; set; }
@@ -48,11 +50,15 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<QuizSession> QuizSessions { get; set; }
 
+    public virtual DbSet<QuizReview> QuizReviews { get; set; }
+
     public virtual DbSet<StudySession> StudySessions { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<UserAchievement> UserAchievements { get; set; }
+
+    public virtual DbSet<UserLearningGoal> UserLearningGoals { get; set; }
 
     public virtual DbSet<UserStat> UserStats { get; set; }
 
@@ -244,6 +250,9 @@ public partial class AppDbContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnName("updated_at");
             entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.TotalVocabularyCount)
+                .HasDefaultValue(0)
+                .HasColumnName("total_vocabulary_count");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.User).WithMany(p => p.Documents)
@@ -269,6 +278,67 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Document).WithMany(p => p.DocumentPages)
                 .HasForeignKey(d => d.DocumentId)
                 .HasConstraintName("document_pages_document_id_fkey");
+        });
+
+        modelBuilder.Entity<DocumentReadingProgress>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("document_reading_progress_pkey");
+
+            entity.ToTable("document_reading_progress");
+
+            entity.HasIndex(e => new { e.UserId, e.DocumentId }, "document_reading_progress_user_id_document_id_key").IsUnique();
+
+            entity.HasIndex(e => new { e.UserId, e.LastReadAt }, "idx_doc_read_progress_user");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.DocumentId).HasColumnName("document_id");
+            entity.Property(e => e.LastPage)
+                .HasDefaultValue(1)
+                .HasColumnName("last_page");
+            entity.Property(e => e.ProgressPercent)
+                .HasPrecision(5, 2)
+                .HasDefaultValueSql("0")
+                .HasColumnName("progress_percent");
+            entity.Property(e => e.ReadingMinutes)
+                .HasDefaultValue(0)
+                .HasColumnName("reading_minutes");
+            entity.Property(e => e.LastReadAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("last_read_at");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("document_reading_progress_user_id_fkey");
+
+            entity.HasOne(d => d.Document).WithMany()
+                .HasForeignKey(d => d.DocumentId)
+                .HasConstraintName("document_reading_progress_document_id_fkey");
+        });
+
+        modelBuilder.Entity<UserLearningGoal>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("user_learning_goals_pkey");
+
+            entity.ToTable("user_learning_goals");
+
+            entity.HasIndex(e => e.UserId, "user_learning_goals_user_id_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.DailyMinutesGoal)
+                .HasDefaultValue(20)
+                .HasColumnName("daily_minutes_goal");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("user_learning_goals_user_id_fkey");
         });
 
         modelBuilder.Entity<ExampleSentence>(entity =>
@@ -617,6 +687,10 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UserAnswer).HasColumnName("user_answer");
             entity.Property(e => e.VocabularyId).HasColumnName("vocabulary_id");
             entity.Property(e => e.QuestionType).HasColumnName("question_type");
+            entity.Property(e => e.Explanation).HasColumnName("explanation");
+            entity.Property(e => e.AiExplanation).HasColumnName("ai_explanation");
+            entity.Property(e => e.QuestionOrder).HasColumnName("question_order");
+            entity.Property(e => e.Flagged).HasColumnName("flagged");
 
             entity.HasOne(d => d.Session).WithMany(p => p.QuizQuestions)
                 .HasForeignKey(d => d.SessionId)
@@ -626,6 +700,35 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.VocabularyId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("quiz_questions_vocabulary_id_fkey");
+        });
+
+        modelBuilder.Entity<QuizReview>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("quiz_reviews_pkey");
+
+            entity.ToTable("quiz_reviews");
+
+            entity.HasIndex(e => e.SessionId, "idx_quiz_reviews_session");
+            entity.HasIndex(e => e.VocabularyId, "idx_quiz_reviews_vocab");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SessionId).HasColumnName("session_id");
+            entity.Property(e => e.VocabularyId).HasColumnName("vocabulary_id");
+            entity.Property(e => e.ReviewReason)
+                .HasMaxLength(50)
+                .HasColumnName("review_reason");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.Session).WithMany(p => p.QuizReviews)
+                .HasForeignKey(d => d.SessionId)
+                .HasConstraintName("quiz_reviews_session_id_fkey");
+
+            entity.HasOne(d => d.Vocabulary).WithMany()
+                .HasForeignKey(d => d.VocabularyId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("quiz_reviews_vocabulary_id_fkey");
         });
 
         modelBuilder.Entity<QuizSession>(entity =>
@@ -662,6 +765,11 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Xp).HasColumnName("xp");
             entity.Property(e => e.XpEarned).HasColumnName("xp_earned");
             entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Difficulty).HasColumnName("difficulty");
+            entity.Property(e => e.QuestionTypes)
+                .HasColumnType("jsonb")
+                .HasColumnName("question_types");
+            entity.Property(e => e.Generator).HasColumnName("generator");
 
             entity.HasOne(d => d.User).WithMany(p => p.QuizSessions)
                 .HasForeignKey(d => d.UserId)
