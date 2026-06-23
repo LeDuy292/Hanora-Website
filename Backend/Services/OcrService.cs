@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
-using Tesseract;
 using UglyToad.PdfPig;
 
 namespace Services;
@@ -43,16 +42,16 @@ public class OcrService : IOcrService
             }
             else if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                var (text, pdfBytes, tesseractError) = ExtractWithTesseractAndPdf(memoryStream, fileName);
+                var (text, pdfBytes, paddleError) = ExtractWithPaddleOcrAndPdf(memoryStream, fileName);
                 
-                if (!string.IsNullOrEmpty(tesseractError))
+                if (!string.IsNullOrEmpty(paddleError))
                 {
-                    return (null, null, $"Tesseract Error: {tesseractError}");
+                    return (null, null, $"PaddleOCR Error: {paddleError}");
                 }
 
                 if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 5)
                 {
-                    _logger.LogInformation("Tesseract extraction failed or yielded little text. Rejecting image.");
+                    _logger.LogInformation("PaddleOCR extraction failed or yielded little text. Rejecting image.");
                     return (null, null, "Ảnh quá mờ không thể dịch thuật được.");
                 }
 
@@ -86,7 +85,7 @@ public class OcrService : IOcrService
         return text.ToString();
     }
 
-    private (string? text, byte[]? pdfBytes, string? errorMessage) ExtractWithTesseractAndPdf(Stream fileStream, string fileName)
+    private (string? text, byte[]? pdfBytes, string? errorMessage) ExtractWithPaddleOcrAndPdf(Stream fileStream, string fileName)
     {
         try
         {
@@ -94,41 +93,80 @@ public class OcrService : IOcrService
             fileStream.CopyTo(ms);
             var bytes = ms.ToArray();
 
-            var tessDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdata");
-            if (!Directory.Exists(tessDataPath)) 
-            {
-                tessDataPath = Path.Combine(Directory.GetCurrentDirectory(), "tessdata");
-            }
-
             string text = "";
-            var tempPdfPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            byte[]? pdfBytes = null;
+
+            // Run PaddleOCR
+            using var img = OpenCvSharp.Cv2.ImDecode(bytes, OpenCvSharp.ImreadModes.Color);
+            var model = Sdcb.PaddleOCR.Models.Local.LocalFullModels.ChineseV5;
+            using var all = new Sdcb.PaddleOCR.PaddleOcrAll(model, Sdcb.PaddleInference.PaddleDevice.Mkldnn());
             
-            using (var renderer = ResultRenderer.CreatePdfRenderer(tempPdfPath, tessDataPath, false))
+            var result = all.Run(img);
+            text = result.Text;
+
+            // Generate Searchable PDF using iText7
+            using var outMs = new MemoryStream();
+            using (var writer = new iText.Kernel.Pdf.PdfWriter(outMs))
             {
-                using (renderer.BeginDocument(fileName))
+                using var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
+                var imageData = iText.IO.Image.ImageDataFactory.Create(bytes);
+                float imgWidth = imageData.GetWidth();
+                float imgHeight = imageData.GetHeight();
+
+                var page = pdf.AddNewPage(new iText.Kernel.Geom.PageSize(imgWidth, imgHeight));
+                var canvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+                
+                // Draw image at (0, 0)
+                canvas.AddImageAt(imageData, 0, 0, false);
+
+                // Setup font (CID font for Asian languages)
+                var font = iText.Kernel.Font.PdfFontFactory.CreateFont("STSong-Light", "UniGB-UTF16-H", iText.Kernel.Font.PdfFontFactory.EmbeddingStrategy.PREFER_NOT_EMBEDDED);
+
+                foreach (var region in result.Regions)
                 {
-                    using var engine = new TesseractEngine(tessDataPath, "chi_sim", EngineMode.Default);
-                    using var img = Pix.LoadFromMemory(bytes);
-                    using var page = engine.Process(img);
+                    // PDF origin (0,0) is bottom-left. OCR origin is top-left.
+                    var bounds = region.Rect.BoundingRect();
+                    float rectX = bounds.X;
+                    float rectY = imgHeight - bounds.Y - bounds.Height;
+                    float rectWidth = bounds.Width;
+                    float rectHeight = bounds.Height;
+
+                    if (rectHeight <= 0) continue;
+
+                    canvas.SaveState();
+                    canvas.BeginText();
                     
-                    renderer.AddPage(page);
-                    text = page.GetText();
+                    // Set invisible text mode (TextRenderingMode.INVISIBLE)
+                    canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
+                    
+                    // Set font and size to match bounding box height
+                    canvas.SetFontAndSize(font, rectHeight);
+                    
+                    // Calculate horizontal scaling to fit the width
+                    float textWidth = font.GetWidth(region.Text, rectHeight);
+                    if (textWidth > 0)
+                    {
+                        float scale = (rectWidth / textWidth) * 100f;
+                        canvas.SetHorizontalScaling(scale);
+                    }
+
+                    // Move text cursor
+                    canvas.MoveText(rectX, rectY);
+                    canvas.ShowText(region.Text);
+                    
+                    canvas.EndText();
+                    canvas.RestoreState();
                 }
             }
-
-            byte[]? pdfBytes = null;
-            if (File.Exists(tempPdfPath + ".pdf"))
-            {
-                pdfBytes = File.ReadAllBytes(tempPdfPath + ".pdf");
-                File.Delete(tempPdfPath + ".pdf");
-            }
+            
+            pdfBytes = outMs.ToArray();
 
             return (text, pdfBytes, null);
         }
         catch (Exception ex)
         {
             var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
-            _logger.LogWarning(ex, "Tesseract failed to extract text and pdf.");
+            _logger.LogWarning(ex, "PaddleOCR failed to extract text and generate PDF.");
             return (null, null, fullError);
         }
     }

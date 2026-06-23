@@ -21,25 +21,14 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Install Tesseract OCR native libraries for Linux
+# Install native dependencies for OpenCV and PaddleOCR
 RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    tesseract-ocr-chi-sim \
-    libtesseract-dev \
-    libleptonica-dev \
-    libgomp1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libgl1 \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
-
-RUN ln -s /usr/lib/x86_64-linux-gnu/libtesseract.so.5 /usr/lib/x86_64-linux-gnu/libtesseract50.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libtesseract.so.5 /usr/lib/x86_64-linux-gnu/libtesseract5.0.0.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libleptonica.so.5 /usr/lib/x86_64-linux-gnu/liblept153.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libleptonica.so.5 /usr/lib/x86_64-linux-gnu/libleptonica-1.82.0.so || true
-
-RUN mkdir -p /app/x64 && \
-    ln -s /usr/lib/x86_64-linux-gnu/libtesseract.so.5 /app/x64/libtesseract50.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libtesseract.so.5 /app/x64/libtesseract5.0.0.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libleptonica.so.5 /app/x64/liblept153.so || true && \
-    ln -s /usr/lib/x86_64-linux-gnu/libleptonica.so.5 /app/x64/libleptonica-1.82.0.so || true
 
 COPY --from=build /app/publish .
 
