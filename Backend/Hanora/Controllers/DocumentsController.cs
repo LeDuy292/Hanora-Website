@@ -32,6 +32,12 @@ public class DocumentsController : ControllerBase
             return BadRequest("No file uploaded.");
         }
 
+        const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
+        if (file.Length > MaxFileSize)
+        {
+            return BadRequest("File size exceeds the 5MB limit.");
+        }
+
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!long.TryParse(userIdString, out long userId))
         {

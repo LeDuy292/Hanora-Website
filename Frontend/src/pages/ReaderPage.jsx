@@ -5,6 +5,7 @@ import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { useNavigate } from 'react-router-dom';
+import { pinyin } from 'pinyin-pro';
 
 const ReaderPage = () => {
   const { id } = useParams();
@@ -179,9 +180,14 @@ const ReaderPage = () => {
                   <span
                     key={index}
                     onClick={() => handleWordClick(word)}
-                    className={`cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-200 ${selectedWord === word ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300' : 'hover:bg-blue-50 hover:text-blue-700'}`}
+                    className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-200 ${selectedWord === word ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300' : 'hover:bg-blue-50 hover:text-blue-700'} align-bottom`}
                   >
-                    {word}
+                    <span className="leading-none">{word}</span>
+                    {showPinyin && (
+                      <span className="text-[0.4em] text-gray-500 font-normal leading-none mt-1.5 select-none text-center">
+                        {pinyin(word, { type: 'string' })}
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>
