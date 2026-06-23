@@ -35,6 +35,7 @@ public class FlashcardService : IFlashcardService
                 srsLevel = uv.MasteryLevel,
                 nextReviewDate = uv.LastReviewed?.AddDays(uv.MasteryLevel > 0 ? uv.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
                 isFavorite = false,
+                documentTitle = uv.SourceDocument?.Title,
                 examples = uv.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                     zhText = e.ZhText,
                     viText = e.ViText,
