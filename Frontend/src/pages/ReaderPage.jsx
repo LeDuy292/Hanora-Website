@@ -132,7 +132,7 @@ const ReaderPage = () => {
   const isPdfDocument = document?.fileUrl?.toLowerCase().includes('.pdf') || document?.title?.toLowerCase().endsWith('.pdf');
 
   return (
-    <div className="min-h-screen bg-[#f4f7fc] flex flex-col font-sans">
+    <div className="h-screen overflow-hidden bg-[#f4f7fc] flex flex-col font-sans">
       <UploadModal 
         isOpen={isUploadModalOpen} 
         onClose={() => setIsUploadModalOpen(false)} 
@@ -177,7 +177,7 @@ const ReaderPage = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 p-8 gap-8 overflow-hidden h-[calc(100vh-90px)]">
+      <div className="flex flex-1 px-8 pb-8 pt-4 gap-8 overflow-hidden">
         
         {/* Left: Document Reader */}
         <div 
