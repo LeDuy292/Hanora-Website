@@ -16,6 +16,7 @@ import { PronunciationPracticePage } from '../pages/PronunciationPracticePage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { QuizPage } from '../pages/QuizPage';
 import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
+import { LeaderboardPage } from '../pages/LeaderboardPage';
 
 
 export function AppRoutes() {
@@ -146,6 +147,17 @@ export function AppRoutes() {
             </MainLayout>
           </ProtectedRoute>
         }
+      />
+
+      <Route 
+        path="/leaderboard" 
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <LeaderboardPage />
+            </MainLayout>
+          </ProtectedRoute>
+        } 
       />
 
       {/* Fallback Redirect */}

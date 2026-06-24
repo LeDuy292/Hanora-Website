@@ -56,6 +56,7 @@ namespace Hanora
             builder.Services.AddScoped<IStatsService, StatsService>();
             builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
             builder.Services.AddScoped<IProgressService, ProgressService>();
+            builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -125,6 +126,23 @@ namespace Hanora
             });
 
             var app = builder.Build();
+
+            // Run database updates at startup
+            using (var scope = app.Services.CreateScope())
+            {
+                try
+                {
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    context.Database.ExecuteSqlRaw(@"
+                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
+                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
+                    ");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error running database migrations: {ex.Message}");
+                }
+            }
 
             if (app.Environment.IsDevelopment())
             {

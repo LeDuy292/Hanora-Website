@@ -56,16 +56,32 @@ namespace Hanora.Controllers
 
         [Authorize]
         [HttpGet("me")]
-        public IActionResult Me()
+        public async Task<IActionResult> Me()
         {
-            var sub = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                      ?? User.FindFirst("sub")?.Value;
-            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-                        ?? User.FindFirst("email")?.Value;
-            var name = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
-                       ?? User.FindFirst("name")?.Value;
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
 
-            return Ok(new { id = sub, email, name });
+            var user = await _authService.GetUserByIdAsync(userId);
+            if (user == null)
+                return NotFound(new { error = "User not found." });
+
+            return Ok(user);
+        }
+
+        [Authorize]
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest req)
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
+
+            var result = await _authService.UpdateProfileAsync(userId, req);
+            if (!result.Success)
+                return BadRequest(new { error = result.Error });
+
+            return Ok(new { user = result.User, token = result.Token });
         }
     }
 

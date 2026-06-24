@@ -14,7 +14,17 @@ namespace Services
         Task<AuthResult> GoogleLoginAsync(string idToken);
         Task<AuthResult> LoginAsync(string email, string password);
         Task<AuthResult> RegisterAsync(string username, string email, string password);
+        Task<UserDto?> GetUserByIdAsync(long id);
+        Task<AuthResult> UpdateProfileAsync(long userId, UpdateProfileRequest req);
     }
+
+    public record UpdateProfileRequest(
+        string? DisplayName,
+        string? Email,
+        string? CurrentPassword,
+        string? NewPassword,
+        int? DailyMinutesGoal
+    );
 
     public record AuthResult(bool Success, string? Token, UserDto? User, string? Error);
 
@@ -24,11 +34,13 @@ namespace Services
     {
         private readonly IUserRepository _userRepo;
         private readonly IConfiguration _config;
+        private readonly IStatsRepository _statsRepo;
 
-        public AuthService(IUserRepository userRepo, IConfiguration config)
+        public AuthService(IUserRepository userRepo, IConfiguration config, IStatsRepository statsRepo)
         {
             _userRepo = userRepo;
             _config = config;
+            _statsRepo = statsRepo;
         }
 
         public async Task<AuthResult> GoogleLoginAsync(string idToken)
@@ -132,6 +144,64 @@ namespace Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<UserDto?> GetUserByIdAsync(long id)
+        {
+            var user = await _userRepo.GetByIdAsync(id);
+            return user == null ? null : ToDto(user);
+        }
+
+        public async Task<AuthResult> UpdateProfileAsync(long userId, UpdateProfileRequest req)
+        {
+            var user = await _userRepo.GetByIdAsync(userId);
+            if (user == null)
+                return new AuthResult(false, null, null, "User not found.");
+
+            // 1. Update Display Name if provided
+            if (req.DisplayName != null)
+            {
+                user.DisplayName = req.DisplayName;
+            }
+
+            // 2. Update Email if provided
+            if (!string.IsNullOrWhiteSpace(req.Email) && !req.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                var existingUser = await _userRepo.GetByEmailAsync(req.Email);
+                if (existingUser != null && existingUser.Id != userId)
+                {
+                    return new AuthResult(false, null, null, "Email đã được sử dụng bởi tài khoản khác.");
+                }
+                user.Email = req.Email.ToLower();
+            }
+
+            // 3. Update Password if requested
+            if (!string.IsNullOrWhiteSpace(req.NewPassword))
+            {
+                if (string.IsNullOrWhiteSpace(req.CurrentPassword))
+                {
+                    return new AuthResult(false, null, null, "Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới.");
+                }
+                if (user.PasswordHash != null && user.PasswordHash != "google_auth")
+                {
+                    if (!BCrypt.Net.BCrypt.Verify(req.CurrentPassword, user.PasswordHash))
+                    {
+                        return new AuthResult(false, null, null, "Mật khẩu hiện tại không đúng.");
+                    }
+                }
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userRepo.UpdateAsync(user);
+
+            // 4. Update Daily Learning Goal if provided
+            if (req.DailyMinutesGoal.HasValue)
+            {
+                await _statsRepo.SetDailyGoalMinutesAsync(userId, req.DailyMinutesGoal.Value);
+            }
+
+            return new AuthResult(true, GenerateJwt(user), ToDto(user), null);
         }
 
         private static UserDto ToDto(User u) =>

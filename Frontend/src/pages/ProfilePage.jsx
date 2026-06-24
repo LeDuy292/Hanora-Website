@@ -31,7 +31,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   
   // Stores
-  const { user, updateProfile, updatePreferences, logout } = useAuthStore();
+  const { user, updateProfile, updatePreferences, logout, refreshProfile, updateProfileOnServer } = useAuthStore();
   const { documents } = useDocumentStore();
   const { vocabList } = useVocabularyStore();
 
@@ -39,8 +39,10 @@ export function ProfilePage() {
   useEffect(() => {
     if (!user) {
       navigate('/login');
+    } else {
+      refreshProfile();
     }
-  }, [user, navigate]);
+  }, [user, navigate, refreshProfile]);
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -95,18 +97,23 @@ export function ProfilePage() {
   };
 
   // Save changes handler
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (!user) return;
     
     // Parse dailyGoalMinutes to number
     const dailyMins = parseInt(dailyGoalMinutes.replace(' minutes', '')) || 30;
 
-    // Update stores
-    updateProfile({
+    // Call server to update display name, email and goal minutes
+    const res = await updateProfileOnServer({
       name: fullName,
       email: emailAddress,
-      targetDailyMinutes: dailyMins // update top-level target if applicable
+      dailyMinutesGoal: dailyMins
     });
+
+    if (!res.success) {
+      showToast(res.error || 'Lỗi lưu cấu hình', 'warning');
+      return;
+    }
 
     updatePreferences({
       darkMode,
@@ -189,7 +196,7 @@ export function ProfilePage() {
   };
 
   // Edit fields inside modal submit handlers
-  const handleUpdateAccountField = (type) => {
+  const handleUpdateAccountField = async (type) => {
     const newErrors = {};
     if (type === 'edit_profile') {
       if (!editForm.name.trim()) newErrors.name = 'Họ và tên không được để trống';
@@ -197,8 +204,12 @@ export function ProfilePage() {
         setErrors(newErrors);
         return;
       }
+      const res = await updateProfileOnServer({ name: editForm.name });
+      if (!res.success) {
+        setErrors({ name: res.error });
+        return;
+      }
       setFullName(editForm.name);
-      updateProfile({ name: editForm.name });
       showToast('Cập nhật tên thành công!');
     } else if (type === 'email_address') {
       if (!editForm.email.trim()) {
@@ -210,8 +221,12 @@ export function ProfilePage() {
         setErrors(newErrors);
         return;
       }
+      const res = await updateProfileOnServer({ email: editForm.email });
+      if (!res.success) {
+        setErrors({ email: res.error });
+        return;
+      }
       setEmailAddress(editForm.email);
-      updateProfile({ email: editForm.email });
       showToast('Cập nhật địa chỉ email thành công!');
     } else if (type === 'change_password') {
       if (!editForm.currentPassword) newErrors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
@@ -220,6 +235,14 @@ export function ProfilePage() {
       
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
+        return;
+      }
+      const res = await updateProfileOnServer({ 
+        currentPassword: editForm.currentPassword, 
+        newPassword: editForm.newPassword 
+      });
+      if (!res.success) {
+        setErrors({ currentPassword: res.error });
         return;
       }
       showToast('Đã cập nhật mật khẩu mới thành công!');

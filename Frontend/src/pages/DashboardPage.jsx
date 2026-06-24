@@ -19,7 +19,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { progressApi } from '../services/progressService';
 import { Button } from '../components/common/Button';
-import StreakImage from '../assets/StreakImage.png';
+import streakBadgeImg from '../assets/Gemini_Generated_Image_idwcryidwcryidwc.png';
 
 // Maps the short weekday label used by the growth chart from an ISO date.
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -52,11 +52,14 @@ function formatVnDate(iso) {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, updateProfileOnServer } = useAuthStore();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [tempGoal, setTempGoal] = useState(20);
+  const [activePoint, setActivePoint] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,15 +139,32 @@ export function DashboardPage() {
   const graphPoints = growthChart.map((p) => {
     const d = new Date(p.date);
     const label = Number.isNaN(d.getTime()) ? '' : WEEKDAY_LABELS[d.getDay()];
-    return { day: label, count: p.count ?? 0 };
+    const dateStr = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    return { day: label, count: p.count ?? 0, date: dateStr };
   });
 
   const maxVal = Math.max(...graphPoints.map(p => p.count), 10);
-  const svgPoints = graphPoints.map((p, idx) => {
-    const x = 40 + idx * 70;
-    const y = 100 - (p.count / maxVal) * 80;
-    return `${x},${y}`;
-  }).join(' ');
+  const chartPoints = graphPoints.map((p, idx) => ({
+    x: 40 + idx * 70,
+    y: 100 - (p.count / maxVal) * 85, // Scale graph heights slightly better
+    ...p,
+    idx
+  }));
+
+  // Generate cubic bezier curve for a modern curved look
+  let bezierPath = '';
+  if (chartPoints.length > 0) {
+    bezierPath = `M ${chartPoints[0].x},${chartPoints[0].y}`;
+    for (let i = 0; i < chartPoints.length - 1; i++) {
+      const p0 = chartPoints[i];
+      const p1 = chartPoints[i + 1];
+      const cp1x = p0.x + (p1.x - p0.x) * 0.5;
+      const cp1y = p0.y;
+      const cp2x = p0.x + (p1.x - p0.x) * 0.5;
+      const cp2y = p1.y;
+      bezierPath += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p1.x},${p1.y}`;
+    }
+  }
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
@@ -284,7 +304,55 @@ export function DashboardPage() {
           <div className="w-full flex justify-between items-center border-b border-slate-50 pb-3 text-left">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
-              Mục Tiêu Mỗi Ngày
+              <span>Mục Tiêu Mỗi Ngày</span>
+              {isEditingGoal ? (
+                <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="180" 
+                    value={tempGoal} 
+                    onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
+                    className="w-12 px-1 py-0.5 text-xs border border-slate-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800"
+                  />
+                  <button 
+                    onClick={async () => {
+                      if (tempGoal > 0) {
+                        const res = await updateProfileOnServer({ name: user.name, email: user.email, dailyMinutesGoal: tempGoal });
+                        if (res.success) {
+                          setData(prev => ({
+                            ...prev,
+                            dailyGoal: {
+                              ...prev.dailyGoal,
+                              target: tempGoal
+                            }
+                          }));
+                          setIsEditingGoal(false);
+                        }
+                      }
+                    }}
+                    className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold hover:bg-blue-700 transition"
+                  >
+                    Lưu
+                  </button>
+                  <button 
+                    onClick={() => setIsEditingGoal(false)}
+                    className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold hover:bg-slate-200 transition"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setTempGoal(targetMinutes);
+                    setIsEditingGoal(true);
+                  }}
+                  className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
+                >
+                  (Sửa)
+                </button>
+              )}
             </h3>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
               HÔM NAY
@@ -329,13 +397,19 @@ export function DashboardPage() {
         </div>
 
         {/* Streak card with daily sequence */}
-        <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1E5BDB] to-[#3B82F6] p-7 shadow-lg text-white flex flex-col justify-between">
-          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
+        <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
+          <img 
+            src={streakBadgeImg} 
+            alt="Streak Badge" 
+            className="pointer-events-none absolute right-6 top-8 h-24 w-24 object-cover rounded-full" 
+          />
 
-          <div className="flex justify-between items-start relative z-10">
-            <div className="flex flex-col gap-4">
-              <span className="text-xs uppercase tracking-[0.2em] text-blue-100/90 font-bold">
-                CHUỖI NGÀY HỌC
+          <div className="flex flex-col xl:flex-row justify-between items-start gap-6">
+            <div className="max-w-xl">
+              <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-semibold">
+                Chuỗi ngày học
+
               </span>
               <div className="flex items-center gap-6">
                 <div className="flex flex-col">
@@ -492,69 +566,141 @@ export function DashboardPage() {
           </span>
         </div>
 
-        <div className="w-full bg-slate-50 rounded-2xl p-4 border border-slate-100">
+        <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-6 border border-slate-100/80 shadow-sm overflow-hidden select-none">
+          {/* Absolute HTML Floating Tooltip */}
+          {activePoint && (
+            <div 
+              className="absolute bg-slate-900 border border-slate-800/80 text-white px-3 py-2 rounded-2xl shadow-xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 text-center leading-none"
+              style={{ 
+                left: `${(activePoint.x / 500) * 100}%`, 
+                top: `${(activePoint.y / 130) * 100 - 15}%`,
+                transform: 'translate(-50%, -100%)'
+              }}
+            >
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest block">
+                {activePoint.day} ({activePoint.date})
+              </span>
+              <span className="text-xs text-yellow-300 font-black mt-1 block">
+                +{activePoint.count} từ mới
+              </span>
+            </div>
+          )}
+
           <svg
             viewBox="0 0 500 130"
             className="w-full overflow-visible"
           >
+            {/* Horizontal Grid lines */}
             <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
             <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
             <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
 
             <defs>
+              <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#3B82F6" />
+                <stop offset="100%" stopColor="#8B5CF6" />
+              </linearGradient>
               <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2563eb" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
               </linearGradient>
             </defs>
-            {graphPoints.length > 0 && (
+
+            {/* Hover Crosshair Vertical line */}
+            {activePoint && (
+              <line 
+                x1={activePoint.x} 
+                y1="10" 
+                x2={activePoint.x} 
+                y2="100" 
+                stroke="#3B82F6" 
+                strokeWidth="1.5" 
+                strokeDasharray="4,4" 
+                className="transition-all"
+                opacity="0.35"
+              />
+            )}
+
+            {/* Glow Area under smoothed Bézier path */}
+            {chartPoints.length > 0 && (
               <path
-                d={`M 40,100 L ${svgPoints} L ${40 + (graphPoints.length - 1) * 70},100 Z`}
+                d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`}
                 fill="url(#chartProgressGlow)"
               />
             )}
 
-            <polyline
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-              points={svgPoints}
-              className="drop-shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
-            />
+            {/* Smooth Bézier curve line */}
+            {chartPoints.length > 0 && (
+              <path
+                d={bezierPath}
+                fill="none"
+                stroke="url(#chartStrokeGradient)"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]"
+              />
+            )}
 
-            {graphPoints.map((p, idx) => {
-              const x = 40 + idx * 70;
-              const y = 100 - (p.count / maxVal) * 80;
+            {/* Pulsing glow ring on active dot */}
+            {activePoint && (
+              <circle
+                cx={activePoint.x}
+                cy={activePoint.y}
+                r="8"
+                fill="#3B82F6"
+                opacity="0.25"
+                className="animate-ping pointer-events-none"
+              />
+            )}
+
+            {/* Active and regular dots */}
+            {chartPoints.map((p, idx) => {
+              const isActive = activePoint?.idx === idx;
               return (
-                <g key={idx} className="group/dot cursor-pointer">
+                <g key={idx} className="pointer-events-none">
                   <circle
-                    cx={x}
-                    cy={y}
-                    r="4.5"
-                    className="fill-white stroke-blue-500 stroke-[2.5] hover:r-6 transition-all"
+                    cx={p.x}
+                    cy={p.y}
+                    r={isActive ? "5.5" : "4"}
+                    className={`fill-white stroke-[2.5] transition-all duration-200 ${
+                      isActive ? 'stroke-blue-600 shadow-lg scale-110' : 'stroke-blue-500/80'
+                    }`}
                   />
-                  <text
-                    x={x}
-                    y={y - 10}
-                    className="text-[9px] font-extrabold fill-blue-600 font-sans text-center opacity-0 group-hover/dot:opacity-100 transition-opacity"
-                    textAnchor="middle"
-                  >
-                    {p.count}
-                  </text>
                 </g>
               );
             })}
 
-            {graphPoints.map((p, idx) => (
-              <text
-                key={idx}
-                x={40 + idx * 70}
-                y="118"
-                className="text-[9px] font-bold fill-slate-400 font-sans"
-                textAnchor="middle"
-              >
-                {p.day}
-              </text>
+            {/* X-axis Weekday labels */}
+            {chartPoints.map((p, idx) => {
+              const isActive = activePoint?.idx === idx;
+              return (
+                <text
+                  key={idx}
+                  x={p.x}
+                  y="118"
+                  className={`text-[9px] font-bold font-sans transition-all duration-200 ${
+                    isActive ? 'fill-slate-800 scale-105' : 'fill-slate-400'
+                  }`}
+                  textAnchor="middle"
+                >
+                  {p.day}
+                </text>
+              );
+            })}
+
+            {/* Invisible vertical hover zones for easy hover interaction */}
+            {chartPoints.map((p, idx) => (
+              <rect
+                key={`hover-${idx}`}
+                x={p.x - 30}
+                y="0"
+                width="60"
+                height="125"
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })}
+                onMouseLeave={() => setActivePoint(null)}
+              />
             ))}
           </svg>
         </div>
