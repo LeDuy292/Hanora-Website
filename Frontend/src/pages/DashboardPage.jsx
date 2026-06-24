@@ -19,7 +19,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { progressApi } from '../services/progressService';
 import { Button } from '../components/common/Button';
-import streakBadgeImg from '../assets/Gemini_Generated_Image_idwcryidwcryidwc.png';
+import streakBadgeImg from '../assets/StreakImage.png';
 
 // Maps the short weekday label used by the growth chart from an ISO date.
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
