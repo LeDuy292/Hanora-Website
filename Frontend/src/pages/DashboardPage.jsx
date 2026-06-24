@@ -430,7 +430,7 @@ export function DashboardPage() {
 
             {/* Panda Image / Mascot */}
             <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
-              <img src={StreakImage} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
+              <img src={streakBadgeImg} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
             </div>
           </div>
 

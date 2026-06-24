@@ -37,8 +37,13 @@ const ReaderPage = () => {
         setDocument(doc);
         setCurrentPage(1);
         if (doc.extractedText) {
-          const parsed = JSON.parse(doc.extractedText);
-          setSegments(parsed);
+          try {
+            const parsed = JSON.parse(doc.extractedText);
+            setSegments(parsed);
+          } catch (e) {
+            console.warn("Extracted text is not valid JSON, splitting by spaces.", e);
+            setSegments(doc.extractedText.split(/\s+/).filter(Boolean));
+          }
         }
       } catch (error) {
         console.error(error);
@@ -150,7 +155,7 @@ const ReaderPage = () => {
       />
 
       {/* Top Navigation Bar */}
-      <div className="bg-white rounded-full mx-8 mt-6 px-6 py-3 flex items-center justify-start shadow-sm border border-gray-100">
+      <div className="bg-white rounded-full mx-4 mt-4 px-6 py-3 flex items-center justify-start shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
           <span className="text-gray-500 font-bold text-sm tracking-wider uppercase ml-2">VĂN BẢN ĐỌC:</span>
           <div className="relative">
@@ -177,7 +182,7 @@ const ReaderPage = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 px-8 pb-8 pt-4 gap-8 overflow-hidden">
+      <div className="flex flex-1 px-4 pb-4 pt-2 gap-4 overflow-hidden">
         
         {/* Left: Document Reader */}
         <div 
@@ -294,7 +299,7 @@ const ReaderPage = () => {
         </div>
 
         {/* Right: Side Panel */}
-        <div className="w-[300px] lg:w-[320px] h-fit max-h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-y-auto flex-shrink-0 relative">
+        <div className="w-[280px] h-fit max-h-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto flex-shrink-0 relative">
           {!selectedWord ? (
             <div className="flex flex-col items-center justify-center p-10 text-center min-h-[300px]">
               <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mb-6">

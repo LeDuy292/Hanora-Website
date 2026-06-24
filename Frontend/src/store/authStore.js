@@ -167,7 +167,8 @@ export const useAuthStore = create(
             email: updatedData.email,
             currentPassword: updatedData.currentPassword,
             newPassword: updatedData.newPassword,
-            dailyMinutesGoal: updatedData.dailyMinutesGoal
+            dailyMinutesGoal: updatedData.dailyMinutesGoal,
+            avatarUrl: updatedData.avatarUrl
           });
           if (res?.user) {
             set((state) => ({

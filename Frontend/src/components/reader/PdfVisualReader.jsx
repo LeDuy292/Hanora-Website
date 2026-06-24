@@ -6,7 +6,7 @@ const PdfVisualReader = ({ fileUrl, onWordClick }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
-  const [scale, setScale] = useState(2.0);
+  const [scale, setScale] = useState(1.2);
   
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
