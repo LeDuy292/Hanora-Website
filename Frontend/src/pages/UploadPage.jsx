@@ -7,6 +7,7 @@ const UploadPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [status, setStatus] = useState('');
+  const [isDragActive, setIsDragActive] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,6 +39,35 @@ const UploadPage = () => {
     }
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    
+    if (isUploading || processingId) return;
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFile(e.dataTransfer.files[0]);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setIsUploading(true);
@@ -59,7 +89,17 @@ const UploadPage = () => {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">Tải lên Tài liệu</h1>
         
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors">
+        <div 
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+            isDragActive 
+              ? 'border-blue-500 bg-blue-100' 
+              : 'border-gray-300 hover:bg-gray-50'
+          }`}
+        >
           <input
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.webp"
@@ -68,10 +108,12 @@ const UploadPage = () => {
             id="file-upload"
             disabled={isUploading || processingId}
           />
-          <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-            <svg className="w-12 h-12 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
+          <label htmlFor="file-upload" className={`flex flex-col items-center ${isUploading || processingId ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${isDragActive ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-500'}`}>
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
             <span className="text-sm text-gray-600">
               {file ? file.name : "Kéo thả hoặc nhấn để chọn file (PDF, JPG, PNG)"}
             </span>

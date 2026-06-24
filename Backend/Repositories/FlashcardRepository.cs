@@ -19,6 +19,7 @@ public class FlashcardRepository : IFlashcardRepository
             .Include(uv => uv.Vocabulary)
                 .ThenInclude(v => v.ExampleSentencesNavigation)
             .Include(uv => uv.Flashcard)
+            .Include(uv => uv.SourceDocument)
             .Where(uv => uv.UserId == userId)
             .ToListAsync();
     }

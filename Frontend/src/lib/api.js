@@ -3,23 +3,60 @@ import { getToken } from '../services/apiClient';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5187/api';
 
 export const uploadDocument = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-
   const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+
+  // 1. Get Presigned URL
+  const presignedResponse = await fetch(`${API_BASE_URL}/documents/presigned-url`, {
     method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: formData,
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream'
+    })
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to upload document');
+  if (!presignedResponse.ok) {
+    throw new Error('Failed to get presigned URL');
   }
 
-  return await response.json();
+  const { presignedUrl, fileUrl } = await presignedResponse.json();
+
+  // 2. Upload file directly to S3
+  const uploadResponse = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream'
+    },
+    body: file
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error('Failed to upload file to S3');
+  }
+
+  // 3. Register document in the backend
+  const registerResponse = await fetch(`${API_BASE_URL}/documents/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({
+      fileUrl: fileUrl,
+      originalFilename: file.name,
+      contentType: file.type || 'application/octet-stream',
+      fileSizeBytes: file.size
+    })
+  });
+
+  if (!registerResponse.ok) {
+    throw new Error('Failed to register document');
+  }
+
+  return await registerResponse.json();
 };
 
 export const getDocument = async (id) => {

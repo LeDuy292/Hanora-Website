@@ -11,6 +11,7 @@ namespace Services;
 public interface IDocumentProcessingService
 {
     Task<Document> ProcessUploadedFileAsync(long userId, IFormFile file);
+    Task<Document> RegisterDocumentAsync(long userId, string fileUrl, string originalFilename, string contentType, long fileSizeBytes);
 }
 
 public class DocumentProcessingService : IDocumentProcessingService
@@ -62,6 +63,32 @@ public class DocumentProcessingService : IDocumentProcessingService
         return document;
     }
 
+    public async Task<Document> RegisterDocumentAsync(long userId, string fileUrl, string originalFilename, string contentType, long fileSizeBytes)
+    {
+        var document = new Document
+        {
+            UserId = userId,
+            Title = Path.GetFileNameWithoutExtension(originalFilename),
+            OriginalFilename = originalFilename,
+            FileUrl = fileUrl,
+            FileSizeBytes = fileSizeBytes,
+            Status = DocumentStatus.Processing,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        document = await _documentRepository.CreateAsync(document);
+
+        var docId = document.Id;
+
+        await _taskQueue.QueueBackgroundWorkItemAsync(async (serviceProvider, token) =>
+        {
+            await ProcessDocumentBackgroundAsync(docId, fileUrl, originalFilename, contentType, serviceProvider, token);
+        });
+
+        return document;
+    }
+
     private async Task ProcessDocumentBackgroundAsync(
         long documentId, 
         string fileUrl, 
@@ -83,22 +110,46 @@ public class DocumentProcessingService : IDocumentProcessingService
         {
             using var fileStream = await s3Service.DownloadFileAsync(fileUrl);
             
-            var extractedText = await ocrService.ExtractTextAsync(fileStream, fileName, contentType);
+            var (extractedText, generatedPdfBytes, errorMessage) = await ocrService.ExtractTextAndPdfAsync(fileStream, fileName, contentType);
 
-            if (!string.IsNullOrWhiteSpace(extractedText))
+            if (!string.IsNullOrEmpty(errorMessage))
             {
-                var segmenter = new JiebaSegmenter();
-                var segments = segmenter.Cut(extractedText);
-                
-                doc.ExtractedText = JsonSerializer.Serialize(segments);
+                doc.Status = DocumentStatus.Failed;
+                doc.ExtractedText = errorMessage;
             }
+            else
+            {
+                if (generatedPdfBytes != null)
+                {
+                    var newPdfUrl = await s3Service.UploadBytesAsync(generatedPdfBytes, fileName, "application/pdf");
+                    doc.FileUrl = newPdfUrl;
+                    
+                    if (!doc.Title.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        doc.Title += ".pdf";
+                    }
+                    if (!doc.OriginalFilename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        doc.OriginalFilename += ".pdf";
+                    }
+                }
 
-            doc.Status = DocumentStatus.Ready;
+                if (!string.IsNullOrWhiteSpace(extractedText))
+                {
+                    var segmenter = new JiebaSegmenter();
+                    var segments = segmenter.Cut(extractedText);
+                    
+                    doc.ExtractedText = JsonSerializer.Serialize(segments);
+                }
+
+                doc.Status = DocumentStatus.Ready;
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process document {DocId}", documentId);
             doc.Status = DocumentStatus.Failed;
+            doc.ExtractedText = "Đã xảy ra lỗi không xác định khi xử lý tài liệu.";
         }
 
         doc.UpdatedAt = DateTime.UtcNow;
