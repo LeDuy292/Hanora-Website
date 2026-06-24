@@ -11,6 +11,7 @@ import {
   Trophy,
   TrendingUp,
   Check,
+  X,
   Lock,
   Award,
   BookOpen,
@@ -133,6 +134,7 @@ export function DashboardPage() {
     ...day,
     completed: isDayCompleted(idx),
     today: idx === todayIdx,
+    isPast: idx < todayIdx,
   }));
 
   // Growth chart points derived from the backend's 7-day series.
@@ -453,10 +455,14 @@ export function DashboardPage() {
                   <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
                     day.completed 
                       ? 'bg-white text-[#1E5BDB]' 
-                      : 'border border-white/20 bg-white/5 text-blue-100'
+                      : day.isPast
+                        ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                        : 'border border-white/20 bg-white/5 text-blue-100'
                   }`}>
                     {day.completed ? (
                       <Check className="h-5 w-5" strokeWidth={3} />
+                    ) : day.isPast ? (
+                      <X className="h-5 w-5" strokeWidth={3} />
                     ) : (
                       <span className="font-bold">{day.name}</span>
                     )}
