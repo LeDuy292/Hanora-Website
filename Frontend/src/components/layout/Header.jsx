@@ -74,8 +74,9 @@ export function Header({ offsetTop }) {
       <div className="flex items-center gap-4 shrink-0">
         {user ? (
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
-              <div className="flex items-center gap-1.5 text-white">
+            <div className="hidden lg:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
+               <div className="flex items-center gap-1.5 text-white">
+
                 <Flame className="w-4 h-4 fill-white/20" />
                 <span>{user.streak ?? 0} NGÀY</span>
               </div>
@@ -131,6 +132,18 @@ export function Header({ offsetTop }) {
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
         <div className="absolute top-full left-0 w-full bg-[#32A0F4] border-t border-white/20 p-8 flex flex-col gap-5 z-50 lg:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
+          {user && (
+            <div className="flex items-center gap-6 pb-4 border-b border-white/20 text-xs font-black uppercase tracking-widest text-white/95">
+              <div className="flex items-center gap-1.5">
+                <Flame className="w-5 h-5 fill-white/20 text-orange-400" />
+                <span>{user.streak ?? 0} NGÀY</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4.5 h-4.5 fill-white/20 text-yellow-300" />
+                <span>{user.xp ?? 0} XP</span>
+              </div>
+            </div>
+          )}
           {navItems.map((item) => (
             <NavLink
               key={item.to}

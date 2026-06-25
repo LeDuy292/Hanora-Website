@@ -112,7 +112,7 @@ export function MainLayout({ children }) {
       <Header offsetTop={displayBanner} />
 
       {/* Main Content Pane */}
-      <main className={`flex-grow ${displayBanner ? 'pt-36' : 'pt-28'} pb-16 max-w-7xl mx-auto w-full px-6 relative z-10 transition-all duration-300`}>
+      <main className={`flex-grow ${displayBanner ? 'pt-36' : 'pt-28'} pb-16 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-[95%] px-6 relative z-10 transition-all duration-300`}>
         <div key={location.pathname} className="page-transition">
           {children}
         </div>

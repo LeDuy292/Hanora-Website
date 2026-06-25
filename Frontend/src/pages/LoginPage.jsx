@@ -186,7 +186,7 @@ export function LoginPage() {
             text: "continue_with",
             shape: "rectangular",
             logo_alignment: "center",
-            width: 340,
+            width: Math.max(200, Math.min(340, window.innerWidth - 80)),
           });
         }
         setGoogleReady(true);

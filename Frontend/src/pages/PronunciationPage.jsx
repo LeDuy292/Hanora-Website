@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Search, Plus, Clock, Star, Info, PlayCircle, PlusCircle } from 'lucide-react';
+import { Mic, Search, Plus, Clock, Star, Info, PlayCircle, PlusCircle, Award, TrendingUp } from 'lucide-react';
 import { PRONUNCIATION_SAMPLES } from '../utils/constants';
+import { useAuthStore } from '../store/authStore';
 
 // Image assets
 import heroTabletImg from '../assets/pronunciation_hero_tablet_1780674163687.png';
@@ -9,6 +10,7 @@ import calligraphyImg from '../assets/calligraphy_challenge_1780674185129.png';
 
 export function PronunciationPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredSamples = PRONUNCIATION_SAMPLES.filter(s => 
@@ -21,38 +23,87 @@ export function PronunciationPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-10 page-transition bg-[#F8FAFC] min-h-screen">
+    <div className="py-6 space-y-10 page-transition bg-[#F8FAFC] min-h-screen">
       
       {/* Hero Section */}
-      <div className="relative bg-[#2088E2] rounded-[2rem] overflow-hidden p-8 md:p-12 flex flex-col md:flex-row items-center gap-10 shadow-lg group">
-        <div className="flex-1 space-y-6 relative z-10 text-white">
-          <div className="space-y-2">
+      <div className="relative bg-[#2088E2] rounded-[2rem] overflow-hidden p-6 md:p-8 flex flex-col md:flex-row items-center gap-10 shadow-lg group">
+        <div className="flex-1 space-y-4 relative z-10 text-white">
+          <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100 opacity-80">
               LUYỆN NÓI TIẾNG TRUNG AI
             </span>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight leading-tight">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
               Luyện Phát Âm Chuẩn AI
             </h1>
-            <p className="text-base text-blue-50 font-medium max-w-md leading-relaxed opacity-90 pt-2">
+            <p className="text-sm text-blue-50 font-medium max-w-md leading-relaxed opacity-90 pt-1">
               Cải thiện ngữ điệu và độ chính xác của bạn với hệ thống phân tích giọng nói thông minh. 
               Chọn từ thư viện mẫu hoặc tự thêm nội dung của riêng bạn.
             </p>
           </div>
           
-          <button className="flex items-center gap-3 px-6 py-3.5 bg-[#011C3A] text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-[#002B5B] transition-all shadow-md active:scale-95">
+          <button className="flex items-center gap-3 px-5 py-3 bg-[#011C3A] text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-[#002B5B] transition-all shadow-md active:scale-95">
             <PlusCircle className="w-5 h-5 text-blue-400" />
             Tự thêm bài luyện tập
           </button>
         </div>
 
-        <div className="flex-1 max-w-md">
-           <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl skew-y-1 transform transition-transform duration-700 group-hover:skew-y-0 group-hover:scale-105">
+        <div className="flex-1 max-w-[280px] md:max-w-xs">
+           <div className="relative z-10 rounded-2xl overflow-hidden shadow-xl skew-y-1 transform transition-transform duration-700 group-hover:skew-y-0 group-hover:scale-105">
               <img 
                 src={heroTabletImg} 
                 alt="AI Practice" 
                 className="w-full h-auto object-cover"
               />
            </div>
+        </div>
+      </div>
+
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Card 1: Avg Score */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Award className="w-5.5 h-5.5 text-blue-600" />
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Điểm TB phát âm</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.averagePronunciationScore ?? 0} / 100</h4>
+          </div>
+        </div>
+
+        {/* Card 2: Total Attempts */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <Mic className="w-5.5 h-5.5 text-indigo-600" />
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Lượt ghi âm</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.totalPronunciationAttempts ?? 0} lượt</h4>
+          </div>
+        </div>
+
+        {/* Card 3: Today Study Time */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Clock className="w-5.5 h-5.5 text-emerald-600" />
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Thời gian học today</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.todayMinutes ?? 0} phút</h4>
+          </div>
+        </div>
+
+        {/* Card 4: Trend */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5.5 h-5.5 text-amber-500" />
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block">Xu hướng tuần</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5 font-display">
+              {(user?.averagePronunciationScore ?? 0) >= 80 ? 'Rất Tốt' : (user?.averagePronunciationScore ?? 0) >= 60 ? 'Tiến Bộ' : 'Cần cố gắng'}
+            </h4>
+          </div>
         </div>
       </div>
 
