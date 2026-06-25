@@ -157,7 +157,7 @@ export function PronunciationPracticePage() {
   if (!activeLesson) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10 page-transition bg-[#FBFDFF] min-h-screen">
+    <div className="w-full pb-24 lg:pb-10 py-10 page-transition bg-[#FBFDFF] min-h-screen">
       
       {/* Header Info Bar */}
       <div className="flex justify-between items-center mb-10">
@@ -333,6 +333,63 @@ export function PronunciationPracticePage() {
 
         </div>
       </div>
+
+      {/* Mobile Sticky Control Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-3 shadow-[0_-10px_25px_rgba(0,0,0,0.05)] z-50 flex items-center justify-between lg:hidden transition-all duration-300 animate-slide-up">
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">ĐIỂM</span>
+            <span className="text-base font-black text-slate-800 leading-none">{score !== null ? score : '--'}</span>
+          </div>
+          <div className="h-6 w-[1px] bg-slate-200" />
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">TIẾN TRÌNH</span>
+            <span className="text-xs font-bold text-slate-650 leading-none">{currentSentenceIdx + 1}/{activeLesson.sentences.length}</span>
+          </div>
+        </div>
+
+        {/* Center: Record button & Play Sample & Reset */}
+        <div className="flex items-center gap-3.5">
+          <button 
+            onClick={handlePlaySample}
+            className={`p-2.5 rounded-full ${isSynthesizing ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'} transition-all`}
+            title="Nghe mẫu"
+          >
+            <PlayCircle className="w-5 h-5 opacity-80" />
+          </button>
+
+          <button 
+            onClick={handleMicToggle}
+            className={`p-3.5 rounded-full text-white shadow-lg transition-all ${
+              isRecording 
+                ? 'bg-rose-500 animate-pulse shadow-rose-500/20' 
+                : 'bg-[#005BAC] shadow-blue-500/20'
+            }`}
+            title="Ghi âm"
+          >
+            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+
+          <button 
+            onClick={() => { setScore(null); setTranscript(''); }}
+            className="p-2.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"
+            title="Thử lại"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Right: Next button */}
+        <button 
+          onClick={handleNext}
+          disabled={currentSentenceIdx >= activeLesson.sentences.length - 1}
+          className="flex items-center gap-1 px-3 py-2 rounded-full bg-[#32A0F4] text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        >
+          Tiếp
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
     </div>
   );
 }

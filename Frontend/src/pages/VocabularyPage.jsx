@@ -356,15 +356,15 @@ export function VocabularyPage() {
   }, [fullVocabularyDataset]);
 
   return (
-    <div className="space-y-6 page-transition max-w-7xl mx-auto py-4 text-slate-700 font-sans">
+    <div className="space-y-6 page-transition py-4 text-slate-700 font-sans">
       
 
 
       {/* Main Two-Column Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         
         {/* Left Area: Vocabulary Table & Filters */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-3 space-y-5">
           
           {/* Filters Row Component */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between font-sans">

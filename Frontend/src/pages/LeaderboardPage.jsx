@@ -80,57 +80,25 @@ export function LeaderboardPage() {
   if (top3[2]) podiumOrder.push({ ...top3[2], podiumRank: 3, height: 'h-32 md:h-40', color: 'from-amber-600 to-amber-700 border-amber-600 text-amber-900', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' });
 
   return (
-    <div className="py-6 px-4 md:px-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
+    <div className="py-6 space-y-8 animate-fadeIn">
       
       {/* HEADER BANNER */}
-      <div className="relative rounded-[2rem] overflow-hidden bg-gradient-to-r from-blue-600 via-[#32A0F4] to-cyan-500 p-8 md:p-12 text-white shadow-xl shadow-blue-500/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/20 rounded-full blur-2xl -ml-16 -mb-16 pointer-events-none" />
+      <div className="relative rounded-[2rem] overflow-hidden bg-gradient-to-r from-blue-600 via-[#32A0F4] to-cyan-500 p-6 md:p-8 text-white shadow-xl shadow-blue-500/10">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider mb-2">
               <Trophy className="w-4 h-4 text-yellow-300 fill-yellow-300/30" />
               <span>Leaderboard System</span>
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
               Bảng Xếp Hạng Người Học
             </h1>
-            <p className="text-white/80 font-medium text-sm md:text-base max-w-xl mt-3">
+            <p className="text-white/80 font-medium text-xs md:text-sm max-w-xl mt-1.5">
               Cạnh tranh lành mạnh, tích lũy điểm thưởng và nâng cao trình độ tiếng Trung mỗi ngày.
             </p>
           </div>
-
-          {/* DYNAMIC USER RANKING CARD */}
-          {currentUserCard && (
-            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 shadow-2xl min-w-[280px] shrink-0 transform hover:scale-[1.02] transition-transform duration-300">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-widest block">Thứ hạng của bạn</span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-4xl font-black">#{currentUserCard.rank}</span>
-                    <span className="text-xs font-bold text-white/80">
-                      (Cấp {currentUserCard.level})
-                    </span>
-                  </div>
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/20 shadow-inner">
-                  <Award className="w-5 h-5 text-yellow-300" />
-                </div>
-              </div>
-
-              <div className="space-y-2 border-t border-white/10 pt-3">
-                <div className="flex justify-between text-xs font-bold">
-                  <span className="text-white/65">ĐIỂM HIỆN TẠI</span>
-                  <span>{currentUserCard.score.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-yellow-200 mt-2 bg-yellow-450/20 px-3 py-1.5 rounded-xl border border-yellow-300/25">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>{currentUserCard.secondaryValue}</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -323,8 +291,40 @@ export function LeaderboardPage() {
             </div>
           </div>
 
-          {/* RIGHT: HALL OF FAME & REWARDS PANEL */}
+          {/* RIGHT: PERSONAL STATS, HALL OF FAME & REWARDS PANEL */}
           <div className="lg:col-span-4 space-y-8">
+            
+            {/* PERSONAL STATS CARD */}
+            {currentUserCard && (
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-650 rounded-[2rem] p-6 shadow-md text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">Thứ hạng của bạn</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-4xl font-black">#{currentUserCard.rank}</span>
+                      <span className="text-xs font-bold text-white/80">
+                        (Cấp {currentUserCard.level})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/20 shadow-inner">
+                    <Award className="w-5 h-5 text-yellow-300" />
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-white/75 uppercase tracking-wide">Điểm hiện tại</span>
+                    <span>{currentUserCard.score.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-yellow-250 mt-2 bg-yellow-450/20 px-3 py-1.5 rounded-xl border border-yellow-300/25">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>{currentUserCard.secondaryValue}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* HALL OF FAME BENTO GRID */}
             {hallOfFame && (
