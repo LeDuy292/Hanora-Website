@@ -2,5 +2,5 @@ namespace Services;
 
 public interface IOcrService
 {
-    Task<string> ExtractTextAsync(Stream fileStream, string fileName, string contentType);
+    Task<(string? ExtractedText, byte[]? GeneratedPdfBytes, string? ErrorMessage)> ExtractTextAndPdfAsync(Stream fileStream, string fileName, string contentType);
 }

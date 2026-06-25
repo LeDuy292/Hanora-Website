@@ -20,7 +20,21 @@ RUN dotnet publish -c Release -o /app/publish
 # Use the official .NET runtime image to run the app
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
+
+# Install native dependencies for OpenCV and PaddleOCR
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libgl1 \
+    libgomp1 \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
+
+# Set library path for PaddleOCR native libraries
+ENV LD_LIBRARY_PATH=/app/runtimes/linux-x64/native:$LD_LIBRARY_PATH
 
 # Expose the port your application will run on (Railway uses PORT environment variable, which ASP.NET Core respects, but we can set 8080 as a fallback)
 EXPOSE 8080
