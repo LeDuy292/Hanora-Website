@@ -89,7 +89,8 @@ namespace Hanora
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        .AllowCredentials();
+                        .AllowCredentials()
+                        .WithExposedHeaders("Content-Disposition");
                 });
             });
 
@@ -136,6 +137,10 @@ namespace Hanora
                     context.Database.ExecuteSqlRaw(@"
                         ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
                         ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
+                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
                     ");
                 }
                 catch (Exception ex)

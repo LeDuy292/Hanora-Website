@@ -113,3 +113,134 @@ export const saveToNotebook = async (word, documentId) => {
   }
   return await response.json();
 };
+
+export const getDocumentAnnotations = async (id) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/${id}/annotations`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch document annotations');
+  }
+  return await response.json();
+};
+
+export const saveDocumentAnnotations = async (id, annotationsJson) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/${id}/annotations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ annotationsJson })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to save annotations');
+  }
+  return await response.json();
+};
+
+export const translateSentence = async (text) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/vocabulary/translate-sentence`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ text })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to translate sentence');
+  }
+  return await response.json();
+};
+
+export const compareSentences = async (originalText, modifiedText) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/vocabulary/interactive-compare`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ originalText, modifiedText })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to compare sentences');
+  }
+  return await response.json();
+};
+
+export const getAllHighlights = async () => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/all-highlights`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch highlights');
+  }
+  return await response.json();
+};
+
+export const askAiAssistant = async (word, question, contextSentence) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/vocabulary/ai-chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ word, question, contextSentence })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch AI assistant reply');
+  }
+  return await response.json();
+};
+
+export const exportDocx = async (id, title) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/${id}/export-docx`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to export document to Word');
+  }
+  
+  const contentDisposition = response.headers.get('content-disposition');
+  let filename = '';
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?([^;\n]+)/i);
+    if (filenameMatch && filenameMatch[1]) {
+      filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+    }
+  }
+  
+  if (!filename) {
+    const cleanTitle = (title || 'Hanora_Document').replace(/[\\/:*?"<>|]/g, '_');
+    filename = `${cleanTitle}.docx`;
+  }
+  
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = window.document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  window.document.body.appendChild(link);
+  link.click();
+  
+  // Delay revoking the Object URL to let the browser download it with the metadata intact
+  setTimeout(() => {
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 250);
+};

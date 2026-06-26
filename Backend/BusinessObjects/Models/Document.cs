@@ -26,6 +26,8 @@ public partial class Document
     public DocumentStatus? Status { get; set; }
 
     public int? TotalVocabularyCount { get; set; }
+    
+    public string? AnnotationsJson { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
