@@ -79,38 +79,39 @@ public class VocabularyService : IVocabularyService
 
             if (vocab == null)
             {
-                Word = aiResponse.Word,
-                Pinyin = aiResponse.Pinyin,
-                Definitions = newDefinitionsJson,
-                UsageNotes = aiResponse.UsageNotes,
-                WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null,
-                HanViet = aiResponse.HanViet,
-                Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null,
-                GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                ExampleSentencesNavigation = aiResponse.Examples.Select(e => new ExampleSentence
+                vocab = new BusinessObjects.Models.Vocabulary
                 {
-                    ZhText = e.ZhText,
-                    ViText = e.ViText,
-                    Source = "AI Generated",
-                    CreatedAt = DateTime.UtcNow
-                }).ToList()
-            };
+                    Word = aiResponse.Word,
+                    Pinyin = aiResponse.Pinyin,
+                    Definitions = newDefinitionsJson,
+                    UsageNotes = aiResponse.UsageNotes,
+                    WordType = Enum.TryParse<BusinessObjects.Models.WordType>(aiResponse.WordType, true, out var type) ? type : null,
+                    HanViet = aiResponse.HanViet,
+                    Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null,
+                    GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    ExampleSentencesNavigation = aiResponse.Examples.Select(e => new BusinessObjects.Models.ExampleSentence
+                    {
+                        ZhText = e.ZhText,
+                        ViText = e.ViText,
+                        Source = "AI Generated",
+                        CreatedAt = DateTime.UtcNow
+                    }).ToList()
+                };
 
-            await _vocabularyRepo.CreateAsync(vocab);
-        }
-        else
-        {
-            vocab.Pinyin = aiResponse.Pinyin;
-            vocab.Definitions = newDefinitionsJson;
-            vocab.UsageNotes = aiResponse.UsageNotes;
-            vocab.WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null;
-            vocab.HanViet = aiResponse.HanViet;
-            vocab.Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null;
-            vocab.GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null;
-            vocab.UpdatedAt = DateTime.UtcNow;
-
+                await _vocabularyRepo.CreateAsync(vocab);
+            }
+            else
+            {
+                vocab.Pinyin = aiResponse.Pinyin;
+                vocab.Definitions = newDefinitionsJson;
+                vocab.UsageNotes = aiResponse.UsageNotes;
+                vocab.WordType = Enum.TryParse<BusinessObjects.Models.WordType>(aiResponse.WordType, true, out var t) ? t : null;
+                vocab.HanViet = aiResponse.HanViet;
+                vocab.Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null;
+                vocab.GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null;
+                vocab.UpdatedAt = DateTime.UtcNow;
 
                 await _vocabularyRepo.UpdateAsync(vocab);
             }
