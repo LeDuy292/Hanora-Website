@@ -94,4 +94,300 @@ public class DocumentsController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpGet("{id}/annotations")]
+    public async Task<IActionResult> GetAnnotations(long id)
+    {
+        var document = await _documentRepository.GetByIdAsync(id);
+        if (document == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new { AnnotationsJson = document.AnnotationsJson });
+    }
+
+    [HttpPost("{id}/annotations")]
+    public async Task<IActionResult> SaveAnnotations(long id, [FromBody] SaveAnnotationsRequest request)
+    {
+        var document = await _documentRepository.GetByIdAsync(id);
+        if (document == null)
+        {
+            return NotFound();
+        }
+
+        document.AnnotationsJson = request.AnnotationsJson;
+        await _documentRepository.UpdateAsync(document);
+
+        return Ok(new { Message = "Annotations saved successfully." });
+    }
+
+    [HttpGet("all-highlights")]
+    public async Task<IActionResult> GetAllHighlights()
+    {
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId))
+        {
+            userId = 1; 
+        }
+
+        var documents = await _documentRepository.GetByUserIdAsync(userId);
+        var resultList = new System.Collections.Generic.List<object>();
+
+        var options = new System.Text.Json.JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true 
+        };
+
+        foreach (var doc in documents)
+        {
+            if (string.IsNullOrEmpty(doc.AnnotationsJson)) continue;
+
+            try
+            {
+                var annotations = System.Text.Json.JsonSerializer.Deserialize<AnnotationsDto>(doc.AnnotationsJson, options);
+                if (annotations == null) continue;
+
+                var segments = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(doc.ExtractedText))
+                {
+                    segments = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(doc.ExtractedText, options) 
+                               ?? new System.Collections.Generic.List<string>();
+                }
+
+                var allIndices = new System.Collections.Generic.HashSet<string>();
+                if (annotations.Highlights != null) 
+                    foreach (var k in annotations.Highlights.Keys) allIndices.Add(k);
+                if (annotations.TextNotes != null) 
+                    foreach (var k in annotations.TextNotes.Keys) allIndices.Add(k);
+                if (annotations.StickyNotes != null) 
+                    foreach (var k in annotations.StickyNotes.Keys) allIndices.Add(k);
+
+                foreach (var key in allIndices)
+                {
+                    if (int.TryParse(key, out int index) && index >= 0 && index < segments.Count)
+                    {
+                        var word = segments[index];
+                        
+                        string? color = null;
+                        if (annotations.Highlights != null)
+                            annotations.Highlights.TryGetValue(key, out color);
+
+                        string? textNote = null;
+                        if (annotations.TextNotes != null)
+                            annotations.TextNotes.TryGetValue(key, out textNote);
+
+                        string? stickyNote = null;
+                        if (annotations.StickyNotes != null)
+                            annotations.StickyNotes.TryGetValue(key, out stickyNote);
+
+                        resultList.Add(new
+                        {
+                            DocumentId = doc.Id,
+                            DocumentTitle = doc.Title,
+                            Index = index,
+                            Word = word,
+                            Color = color,
+                            TextNote = textNote,
+                            StickyNote = stickyNote,
+                            CreatedAt = doc.CreatedAt
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // Skip parse errors
+            }
+        }
+
+        return Ok(resultList);
+    }
+
+    [HttpGet("{id}/export-docx")]
+    public async Task<IActionResult> ExportDocx(long id)
+    {
+        var documentEntity = await _documentRepository.GetByIdAsync(id);
+        if (documentEntity == null)
+        {
+            return NotFound();
+        }
+
+        var docTitle = documentEntity.Title ?? "Hanora_Document";
+        
+        using (var memoryStream = new System.IO.MemoryStream())
+        {
+            using (var doc = Xceed.Words.NET.DocX.Create(memoryStream))
+            {
+                // Title
+                var titleParagraph = doc.InsertParagraph();
+                titleParagraph.Append(docTitle)
+                    .Font(new Xceed.Document.NET.Font("Arial"))
+                    .FontSize(20D)
+                    .Bold()
+                    .Alignment = Xceed.Document.NET.Alignment.center;
+                titleParagraph.SpacingAfter(20D);
+
+                // Section 1: Original text
+                var textHeading = doc.InsertParagraph();
+                textHeading.Append("I. NỘI DUNG TÀI LIỆU GỐC")
+                    .Font(new Xceed.Document.NET.Font("Arial"))
+                    .FontSize(14D)
+                    .Bold()
+                    .Color(Xceed.Drawing.Color.Blue);
+                textHeading.SpacingAfter(10D);
+
+                var segments = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(documentEntity.ExtractedText))
+                {
+                    try
+                    {
+                        segments = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(documentEntity.ExtractedText)
+                                   ?? new System.Collections.Generic.List<string>();
+                    }
+                    catch { }
+                }
+
+                if (segments.Count > 0)
+                {
+                    var textParagraph = doc.InsertParagraph();
+                    textParagraph.Append(string.Join(" ", segments))
+                        .Font(new Xceed.Document.NET.Font("Arial"))
+                        .FontSize(12D);
+                    textParagraph.SpacingAfter(20D);
+                }
+                else
+                {
+                    doc.InsertParagraph("Không có nội dung văn bản.")
+                        .Font(new Xceed.Document.NET.Font("Arial"))
+                        .FontSize(11D)
+                        .Italic()
+                        .SpacingAfter(20D);
+                }
+
+                // Section 2: Highlights and notes
+                var annotationsHeading = doc.InsertParagraph();
+                annotationsHeading.Append("II. TỪ VỰNG HIGHLIGHT & GHI CHÚ HỌC TẬP")
+                    .Font(new Xceed.Document.NET.Font("Arial"))
+                    .FontSize(14D)
+                    .Bold()
+                    .Color(Xceed.Drawing.Color.Blue);
+                annotationsHeading.SpacingAfter(10D);
+
+                if (!string.IsNullOrEmpty(documentEntity.AnnotationsJson))
+                {
+                    try
+                    {
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        var annotations = System.Text.Json.JsonSerializer.Deserialize<AnnotationsDto>(documentEntity.AnnotationsJson, options);
+                        
+                        var allIndices = new System.Collections.Generic.HashSet<string>();
+                        if (annotations?.Highlights != null) 
+                            foreach (var k in annotations.Highlights.Keys) allIndices.Add(k);
+                        if (annotations?.TextNotes != null) 
+                            foreach (var k in annotations.TextNotes.Keys) allIndices.Add(k);
+                        if (annotations?.StickyNotes != null) 
+                            foreach (var k in annotations.StickyNotes.Keys) allIndices.Add(k);
+
+                        if (allIndices.Count > 0)
+                        {
+                            var table = doc.AddTable(allIndices.Count + 1, 4);
+                            table.Alignment = Xceed.Document.NET.Alignment.center;
+                            
+                            table.Rows[0].Cells[0].Paragraphs[0].Append("STT").Bold();
+                            table.Rows[0].Cells[1].Paragraphs[0].Append("Từ vựng / Cụm từ").Bold();
+                            table.Rows[0].Cells[2].Paragraphs[0].Append("Phân loại màu").Bold();
+                            table.Rows[0].Cells[3].Paragraphs[0].Append("Ghi chú cá nhân").Bold();
+
+                            int rowIdx = 1;
+                            foreach (var key in allIndices)
+                            {
+                                if (int.TryParse(key, out int index) && index >= 0 && index < segments.Count)
+                                {
+                                    var word = segments[index];
+                                    
+                                    string? color = null;
+                                    if (annotations != null && annotations.Highlights != null)
+                                        annotations.Highlights.TryGetValue(key, out color);
+
+                                    string? textNote = null;
+                                    if (annotations != null && annotations.TextNotes != null)
+                                        annotations.TextNotes.TryGetValue(key, out textNote);
+
+                                    string? stickyNote = null;
+                                    if (annotations != null && annotations.StickyNotes != null)
+                                        annotations.StickyNotes.TryGetValue(key, out stickyNote);
+
+                                    string colorName = "Không màu";
+                                    if (color == "#fef08a") colorName = "Vàng (HSK mới)";
+                                    else if (color == "#bbf7d0") colorName = "Xanh lá (Đã hiểu)";
+                                    else if (color == "#bfdbfe") colorName = "Xanh dương (Quan trọng)";
+                                    else if (color == "#e9d5ff") colorName = "Tím (Ngữ pháp)";
+                                    else if (color == "#fbcfe8") colorName = "Hồng (Thành ngữ)";
+                                    else if (color == "#fecaca") colorName = "Đỏ (Xem lại)";
+                                    else if (!string.IsNullOrEmpty(color)) colorName = $"Tự chọn ({color})";
+
+                                    var noteSummary = new System.Collections.Generic.List<string>();
+                                    if (!string.IsNullOrEmpty(textNote)) noteSummary.Add($"Ghi chú: {textNote}");
+                                    if (!string.IsNullOrEmpty(stickyNote)) noteSummary.Add($"Ghi chú nổi: {stickyNote}");
+                                    var notesText = string.Join("; ", noteSummary);
+
+                                    table.Rows[rowIdx].Cells[0].Paragraphs[0].Append(rowIdx.ToString());
+                                    table.Rows[rowIdx].Cells[1].Paragraphs[0].Append(word).Bold();
+                                    table.Rows[rowIdx].Cells[2].Paragraphs[0].Append(colorName);
+                                    table.Rows[rowIdx].Cells[3].Paragraphs[0].Append(string.IsNullOrEmpty(notesText) ? "_" : notesText);
+                                    
+                                    rowIdx++;
+                                }
+                            }
+                            doc.InsertTable(table);
+                            doc.InsertParagraph().SpacingAfter(20D);
+                        }
+                        else
+                        {
+                            doc.InsertParagraph("Không có highlights hoặc ghi chú nào.")
+                                .Font(new Xceed.Document.NET.Font("Arial"))
+                                .FontSize(11D)
+                                .Italic()
+                                .SpacingAfter(20D);
+                        }
+                    }
+                    catch
+                    {
+                        doc.InsertParagraph("Lỗi giải nén dữ liệu ghi chú.")
+                            .Font(new Xceed.Document.NET.Font("Arial"))
+                            .FontSize(11D)
+                            .Italic()
+                            .SpacingAfter(20D);
+                    }
+                }
+                else
+                {
+                    doc.InsertParagraph("Không có ghi chú nào được tạo.")
+                        .Font(new Xceed.Document.NET.Font("Arial"))
+                        .FontSize(11D)
+                        .Italic()
+                        .SpacingAfter(20D);
+                }
+
+                doc.Save();
+            }
+
+            var bytes = memoryStream.ToArray();
+            return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"{docTitle}.docx");
+        }
+    }
+}
+
+public class SaveAnnotationsRequest
+{
+    public string? AnnotationsJson { get; set; }
+}
+
+public class AnnotationsDto
+{
+    public System.Text.Json.Nodes.JsonNode? PencilStrokes { get; set; }
+    public Dictionary<string, string>? Highlights { get; set; }
+    public Dictionary<string, string>? TextNotes { get; set; }
+    public Dictionary<string, string>? StickyNotes { get; set; }
 }

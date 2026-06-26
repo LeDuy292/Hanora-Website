@@ -253,6 +253,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.TotalVocabularyCount)
                 .HasDefaultValue(0)
                 .HasColumnName("total_vocabulary_count");
+            entity.Property(e => e.AnnotationsJson).HasColumnName("annotations_json");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.User).WithMany(p => p.Documents)
@@ -1023,6 +1024,11 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("word");
             entity.Property(e => e.WordType).HasColumnName("word_type");
+            entity.Property(e => e.HanViet)
+                .HasMaxLength(100)
+                .HasColumnName("han_viet");
+            entity.Property(e => e.Collocations).HasColumnName("collocations");
+            entity.Property(e => e.GrammarPatterns).HasColumnName("grammar_patterns");
         });
 
         modelBuilder.Entity<VwLeaderboardAllTime>(entity =>
