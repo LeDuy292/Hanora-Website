@@ -59,6 +59,7 @@ const parseNoteContent = (noteStr) => {
   return { text: noteStr, category: 'text', icon: '📝', label: 'Ghi chú văn bản' };
 };
 
+
 const ReaderPage = () => {
   const { id } = useParams();
   const [document, setDocument] = useState(null);
@@ -478,6 +479,7 @@ const ReaderPage = () => {
     }
 
     // Default Pointer (Lookup)
+
     if (!word || word.trim() === '') return;
     
     setSelectedWord(word);
@@ -755,6 +757,7 @@ const ReaderPage = () => {
     kaiti: 'font-kaiti'
   };
 
+
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${activeTheme.bg} ${activeTheme.text}`}>
       <UploadModal 
@@ -786,6 +789,7 @@ const ReaderPage = () => {
           <button
             onClick={handleBubbleSaveToFlashcard}
             className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+
           >
             + Flashcard
           </button>
@@ -1006,6 +1010,7 @@ const ReaderPage = () => {
                       ))
                     ) : (
                       <span className="text-xs text-gray-400 italic block px-2 py-4 text-center">Không tìm thấy tài liệu</span>
+
                     )}
                   </div>
 
@@ -1028,11 +1033,46 @@ const ReaderPage = () => {
                     >
                       + Tải file mới
                     </button>
+
                   </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
+                      <div className="flex items-center gap-6">
+                        <button 
+                          onClick={() => {
+                            setCurrentPage(p => Math.max(1, p - 1));
+                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          disabled={validCurrentPage === 1}
+                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          title="Trang trước"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        
+                        <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
+                          Trang {validCurrentPage} / {totalPages}
+                        </span>
+                        
+                        <button 
+                          onClick={() => {
+                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          disabled={validCurrentPage === totalPages}
+                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          title="Trang tiếp theo"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
             <button 
               onClick={() => setIsUploadModalOpen(true)}
               className="flex items-center justify-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border border-blue-100 w-full sm:w-auto"
@@ -1087,6 +1127,7 @@ const ReaderPage = () => {
               >
                 楷体
               </button>
+
             </div>
 
             {/* Font size adjustments */}

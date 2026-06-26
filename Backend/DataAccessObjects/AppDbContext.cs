@@ -1137,7 +1137,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.RelatedId).HasColumnName("related_id");
             entity.Property(e => e.Source)
                 .HasMaxLength(20)
-                .HasDefaultValueSql("'gemini'::character varying")
+                .HasDefaultValueSql("'deepseek'::character varying")
                 .HasColumnName("source");
             entity.Property(e => e.VocabId).HasColumnName("vocab_id");
             entity.Property(e => e.RelationType).HasColumnName("relation_type");

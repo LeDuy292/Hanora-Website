@@ -24,33 +24,60 @@ public class VocabularyService : IVocabularyService
     public async Task<Vocabulary?> LookupWordAsync(string word)
     {
         var vocab = await _vocabularyRepo.GetByWordAsync(word);
+        bool needsAiUpdate = false;
+        
         if (vocab != null)
         {
             bool isOldEnglishFormat = vocab.Definitions.Contains("\"lang\":\"en\"") || vocab.Definitions.Contains("\"lang\": \"en\"");
-            if (!isOldEnglishFormat)
+            bool isPlaceholder = string.IsNullOrWhiteSpace(vocab.Definitions) || vocab.Definitions == "[]";
+            bool missingExamples = !vocab.ExampleSentencesNavigation.Any();
+            
+            if (isOldEnglishFormat || isPlaceholder || missingExamples)
             {
-                _logger.LogInformation("Cache hit for word: {Word}", word);
-                _ = ProcessRelationsAndExamplesBackgroundAsync(vocab.Word);
-                return vocab;
+                needsAiUpdate = true;
+                _logger.LogInformation("Word {Word} requires AI enrichment (isPlaceholder: {Placeholder}, missingExamples: {MissingExamples}, isOldEnglish: {OldEn})", 
+                    word, isPlaceholder, missingExamples, isOldEnglishFormat);
             }
             else
             {
-                _logger.LogInformation("Found word {Word} but it is in English format. Translating via AI...", word);
+                _logger.LogInformation("Cache hit for word: {Word}", word);
+                
+                // Synchronously translate Tatoeba English examples if necessary before returning
+                var pendingTranslations = vocab.ExampleSentencesNavigation.Where(e => e.ViText == null && e.EnText != null).ToList();
+                if (pendingTranslations.Any())
+                {
+                    _logger.LogInformation("Synchronously translating {Count} examples for word {Word}", pendingTranslations.Count, word);
+                    var englishSentences = pendingTranslations.Select(e => e.EnText!).ToList();
+                    var translations = await _aiService.TranslateSentencesAsync(englishSentences);
+                    
+                    if (translations != null && translations.Count == englishSentences.Count)
+                    {
+                        for (int i = 0; i < pendingTranslations.Count; i++)
+                        {
+                            pendingTranslations[i].ViText = translations[i];
+                        }
+                        await _vocabularyRepo.UpdateAsync(vocab);
+                    }
+                }
+                
+                _ = ProcessRelationsAndExamplesBackgroundAsync(vocab.Word);
+                return vocab;
             }
         }
         else
         {
+            needsAiUpdate = true;
             _logger.LogInformation("Cache miss for word: {Word}. Falling back to AI.", word);
         }
 
-        var aiResponse = await _aiService.GetVocabularyInfoAsync(word);
-        if (aiResponse == null) return vocab;
-
-        var newDefinitionsJson = JsonSerializer.Serialize(new[] { new { lang = "vn", meaning = aiResponse.Definitions } });
-
-        if (vocab == null)
+        if (needsAiUpdate)
         {
-            vocab = new Vocabulary
+            var aiResponse = await _aiService.GetVocabularyInfoAsync(word);
+            if (aiResponse == null) return vocab;
+
+            var newDefinitionsJson = JsonSerializer.Serialize(new[] { new { lang = "vn", meaning = aiResponse.Definitions } });
+
+            if (vocab == null)
             {
                 Word = aiResponse.Word,
                 Pinyin = aiResponse.Pinyin,
@@ -84,9 +111,12 @@ public class VocabularyService : IVocabularyService
             vocab.GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null;
             vocab.UpdatedAt = DateTime.UtcNow;
 
-            await _vocabularyRepo.UpdateAsync(vocab);
+
+                await _vocabularyRepo.UpdateAsync(vocab);
+            }
         }
 
+        // Still process relations in background
         _ = ProcessRelationsAndExamplesBackgroundAsync(vocab.Word);
         return vocab;
     }
