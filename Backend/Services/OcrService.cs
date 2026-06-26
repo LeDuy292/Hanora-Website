@@ -1,8 +1,8 @@
-using Azure;
-using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using UglyToad.PdfPig;
 
 namespace Services;
@@ -94,34 +94,60 @@ public class OcrService : IOcrService
             fileStream.CopyTo(ms);
             var bytes = ms.ToArray();
 
-            // --- Azure Computer Vision Read API ---
-            var endpoint = _config["AzureComputerVision:Endpoint"] 
+            // --- Azure Computer Vision Read API (REST) ---
+            var endpoint = _config["AzureComputerVision:Endpoint"]?.TrimEnd('/')
                 ?? throw new InvalidOperationException("AzureComputerVision:Endpoint is not configured.");
             var key = _config["AzureComputerVision:Key"] 
                 ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
-            var credential = new AzureKeyCredential(key);
-            var client = new ImageAnalysisClient(new Uri(endpoint), credential);
+            var requestUrl = $"{endpoint}/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read";
 
-            var imageData = BinaryData.FromBytes(bytes);
-            var analysisResult = await client.AnalyzeAsync(
-                imageData,
-                VisualFeatures.Read);
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", key);
+            request.Content = new ByteArrayContent(bytes);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-            if (analysisResult?.Value?.Read == null)
+            var response = await _httpClient.SendAsync(request);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
             {
-                return (null, null, "Azure Computer Vision returned no result.");
+                _logger.LogWarning("Azure Computer Vision API error: {StatusCode} {Body}", response.StatusCode, responseBody);
+                return (null, null, $"Azure API Error ({(int)response.StatusCode}): {responseBody}");
             }
 
-            var readResult = analysisResult.Value.Read;
+            // Parse the JSON response
+            using var doc = JsonDocument.Parse(responseBody);
+            var readResult = doc.RootElement.GetProperty("readResult");
+            var blocks = readResult.GetProperty("blocks");
 
             // Build full text from all blocks/lines
             var textBuilder = new StringBuilder();
-            foreach (var block in readResult.Blocks)
+            var lineInfos = new List<(string Text, float X, float Y, float Width, float Height)>();
+
+            foreach (var block in blocks.EnumerateArray())
             {
-                foreach (var line in block.Lines)
+                foreach (var line in block.GetProperty("lines").EnumerateArray())
                 {
-                    textBuilder.AppendLine(line.Text);
+                    var lineText = line.GetProperty("text").GetString() ?? "";
+                    textBuilder.AppendLine(lineText);
+
+                    // Parse bounding polygon [x0,y0, x1,y1, x2,y2, x3,y3]
+                    var polygon = line.GetProperty("boundingPolygon").EnumerateArray().ToList();
+                    if (polygon.Count >= 4)
+                    {
+                        float x0 = polygon[0].GetProperty("x").GetSingle();
+                        float y0 = polygon[0].GetProperty("y").GetSingle();
+                        float x1 = polygon[1].GetProperty("x").GetSingle();
+                        float y3 = polygon[3].GetProperty("y").GetSingle();
+
+                        float rectWidth = Math.Abs(x1 - x0);
+                        float rectHeight = Math.Abs(y3 - y0);
+                        if (rectWidth > 0 && rectHeight > 0)
+                        {
+                            lineInfos.Add((lineText, x0, y0, rectWidth, rectHeight));
+                        }
+                    }
                 }
             }
             var text = textBuilder.ToString().Trim();
@@ -145,58 +171,43 @@ public class OcrService : IOcrService
                 // Setup font (use standard font for cross-platform compatibility)
                 var font = iText.Kernel.Font.PdfFontFactory.CreateFont("STSong-Light", "UniGB-UTF16-H", iText.Kernel.Font.PdfFontFactory.EmbeddingStrategy.PREFER_NOT_EMBEDDED);
 
-                foreach (var block in readResult.Blocks)
+                foreach (var lineInfo in lineInfos)
                 {
-                    foreach (var line in block.Lines)
+                    if (string.IsNullOrEmpty(lineInfo.Text)) continue;
+
+                    // PDF origin (0,0) is bottom-left. Azure OCR origin is top-left.
+                    float pdfY = imgHeight - lineInfo.Y - lineInfo.Height;
+
+                    // Calculate width per character
+                    float charWidth = lineInfo.Width / lineInfo.Text.Length;
+
+                    for (int i = 0; i < lineInfo.Text.Length; i++)
                     {
-                        if (string.IsNullOrEmpty(line.Text) || line.BoundingPolygon == null || line.BoundingPolygon.Count < 4)
-                            continue;
-
-                        // Azure returns bounding polygon as 4 points (top-left, top-right, bottom-right, bottom-left)
-                        // Coordinates are in pixels from top-left origin
-                        var points = line.BoundingPolygon;
-                        float rectX = points[0].X;
-                        float rectTopY = points[0].Y;
-                        float rectWidth = points[1].X - points[0].X;
-                        float rectHeight = points[3].Y - points[0].Y;
-
-                        if (rectHeight <= 0) rectHeight = Math.Abs(points[2].Y - points[0].Y);
-                        if (rectWidth <= 0) rectWidth = Math.Abs(points[2].X - points[0].X);
-
-                        // PDF origin (0,0) is bottom-left. Azure OCR origin is top-left.
-                        float pdfY = imgHeight - rectTopY - rectHeight;
-
-                        // Calculate width per character
-                        float charWidth = rectWidth / line.Text.Length;
-
-                        for (int i = 0; i < line.Text.Length; i++)
+                        canvas.SaveState();
+                        canvas.BeginText();
+                        
+                        // Set invisible text mode (TextRenderingMode.INVISIBLE)
+                        canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
+                        
+                        // Set font and size to match bounding box height
+                        canvas.SetFontAndSize(font, lineInfo.Height);
+                        
+                        string singleChar = lineInfo.Text[i].ToString();
+                        float singleCharWidth = font.GetWidth(singleChar, lineInfo.Height);
+                        
+                        // Calculate horizontal scaling to fit the character width
+                        if (singleCharWidth > 0)
                         {
-                            canvas.SaveState();
-                            canvas.BeginText();
-                            
-                            // Set invisible text mode (TextRenderingMode.INVISIBLE)
-                            canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
-                            
-                            // Set font and size to match bounding box height
-                            canvas.SetFontAndSize(font, rectHeight);
-                            
-                            string singleChar = line.Text[i].ToString();
-                            float singleCharWidth = font.GetWidth(singleChar, rectHeight);
-                            
-                            // Calculate horizontal scaling to fit the character width
-                            if (singleCharWidth > 0)
-                            {
-                                float scale = (charWidth / singleCharWidth) * 100f;
-                                canvas.SetHorizontalScaling(scale);
-                            }
-
-                            // Move text cursor to the character's specific position
-                            canvas.MoveText(rectX + (i * charWidth), pdfY);
-                            canvas.ShowText(singleChar);
-                            
-                            canvas.EndText();
-                            canvas.RestoreState();
+                            float scale = (charWidth / singleCharWidth) * 100f;
+                            canvas.SetHorizontalScaling(scale);
                         }
+
+                        // Move text cursor to the character's specific position
+                        canvas.MoveText(lineInfo.X + (i * charWidth), pdfY);
+                        canvas.ShowText(singleChar);
+                        
+                        canvas.EndText();
+                        canvas.RestoreState();
                     }
                 }
             }
@@ -205,10 +216,10 @@ public class OcrService : IOcrService
 
             return (text, pdfBytes, null);
         }
-        catch (RequestFailedException ex)
+        catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Azure Computer Vision API request failed. Status: {Status}", ex.Status);
-            return (null, null, $"Azure API Error ({ex.Status}): {ex.Message}");
+            _logger.LogWarning(ex, "Azure Computer Vision API request failed.");
+            return (null, null, $"Azure API Error: {ex.Message}");
         }
         catch (Exception ex)
         {
