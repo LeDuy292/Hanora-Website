@@ -133,6 +133,30 @@ export function ProfilePage() {
     showToast('Lưu cấu hình thiết lập thành công!');
   };
 
+  // Avatar upload handler
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Convert to Base64
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result;
+      
+      // Update locally immediately
+      updateProfile({ avatar: base64String });
+      
+      // Call server
+      const res = await updateProfileOnServer({ avatarUrl: base64String });
+      if (!res.success) {
+        showToast('Lỗi khi tải ảnh lên!', 'warning');
+      } else {
+        showToast('Đã cập nhật ảnh đại diện thành công!');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Reset form / Cancel handler
   const handleCancel = () => {
     navigate('/dashboard');
@@ -304,18 +328,12 @@ export function ProfilePage() {
               </div>
             </div>
 
-            {/* Email Address Row */}
-            <div 
-              onClick={() => {
-                setEditForm(prev => ({ ...prev, email: emailAddress }));
-                setActiveModal('email_address');
-              }}
-              className="py-4 flex items-center justify-between hover:bg-slate-50/50 px-2 rounded-xl transition-all cursor-pointer group"
-            >
+            {/* Email Address Row (Non-editable) */}
+            <div className="py-4 flex items-center justify-between px-2 rounded-xl transition-all">
               <span className="text-xs font-bold text-slate-500">Email Address</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-800 font-sans">{emailAddress}</span>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                <Lock className="w-3.5 h-3.5 text-slate-300" />
               </div>
             </div>
 
@@ -346,14 +364,26 @@ export function ProfilePage() {
         <div className="lg:col-span-4 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-md flex flex-col items-center justify-between text-center gap-6">
           <div className="flex flex-col items-center gap-3.5">
             {/* Avatar Circle Container */}
-            <div className="relative">
-              <img 
-                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80" 
-                alt={fullName}
-                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
+            <div className="relative group">
+              <input 
+                type="file" 
+                accept="image/*" 
+                id="avatar-upload"
+                className="hidden"
+                onChange={handleAvatarChange}
               />
+              <label htmlFor="avatar-upload" className="cursor-pointer block relative">
+                <img 
+                  src={user.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"} 
+                  alt={fullName}
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md group-hover:opacity-80 transition-opacity"
+                />
+                <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </div>
+              </label>
               {user.isPro && (
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 border border-white flex items-center justify-center text-white" title="Pro Account">
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 border border-white flex items-center justify-center text-white pointer-events-none" title="Pro Account">
                   <Crown className="w-3.5 h-3.5 fill-white" />
                 </div>
               )}
@@ -394,277 +424,9 @@ export function ProfilePage() {
               <Lock className="w-4 h-4 text-slate-400" />
               <span>Change Password</span>
             </button>
-
-            <button 
-              onClick={() => {
-                setEditForm(prev => ({ ...prev, email: emailAddress }));
-                setActiveModal('email_address');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-650 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-all select-none active:scale-[0.98]"
-            >
-              <Mail className="w-4 h-4 text-slate-400" />
-              <span>Email Address</span>
-            </button>
-
-            <button 
-              onClick={() => setActiveModal('manage_plan')}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-650 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-all select-none active:scale-[0.98]"
-            >
-              <Crown className="w-4 h-4 text-amber-500 fill-amber-500/10" />
-              <span>Subscription Plan</span>
-            </button>
           </div>
         </div>
 
-      </div>
-
-      {/* Middle Section Grid (Subscription vs Preferences) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Subscription Info Widget Card */}
-        <div className="lg:col-span-4 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-md flex flex-col justify-between gap-6">
-          <div className="border-b border-slate-200 pb-3">
-            <h3 className="text-sm font-bold text-slate-800">Subscription</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Trạng thái gói dịch vụ của bạn</p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4 bg-gradient-to-br from-amber-50 to-orange-50/20 border border-amber-100/50 p-4 rounded-2xl relative overflow-hidden">
-              <div className="absolute right-0 bottom-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
-              
-              <div className="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
-                <Crown className="w-6 h-6 fill-amber-500/10" />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-800">Hanora Pro</h4>
-                <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">Access to all premium learning features.</p>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setActiveModal('manage_plan')}
-              className="w-full py-2.5 px-4 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 active:scale-95"
-            >
-              Manage Plan
-            </button>
-          </div>
-        </div>
-
-        {/* Preferences / Options Card */}
-        <div className="lg:col-span-8 bg-white border-2 border-slate-200 rounded-3xl p-8 shadow-md flex flex-col gap-6">
-          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 fill-blue-500/10" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Preferences</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Cá nhân hóa trải nghiệm học tập của bạn</p>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            
-            {/* Dark Mode Toggle Option */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 shrink-0">
-                  <Moon className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-850">Dark Mode</h4>
-                  <p className="text-[10px] text-slate-450 font-medium mt-0.5">Reduce eye strain in low light environments</p>
-                </div>
-              </div>
-              
-              {/* Toggle Switch */}
-              <button 
-                onClick={() => setDarkMode(!darkMode)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  darkMode ? 'bg-blue-600' : 'bg-slate-200'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    darkMode ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Interface Language Select Dropdown Option */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 shrink-0">
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-850">Interface Language</h4>
-                  <p className="text-[10px] text-slate-450 font-medium mt-0.5">Choose your preferred language</p>
-                </div>
-              </div>
-              
-              <select 
-                value={interfaceLanguage}
-                onChange={(e) => setInterfaceLanguage(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none shadow-sm cursor-pointer min-w-[130px] font-sans"
-              >
-                <option value="English">English</option>
-                <option value="Vietnamese">Vietnamese</option>
-                <option value="Chinese">Chinese</option>
-              </select>
-            </div>
-
-            {/* Pronunciation Speed Select Option */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 shrink-0">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-850">Pronunciation Audio Speed</h4>
-                  <p className="text-[10px] text-slate-450 font-medium mt-0.5">Adjust the playback speed for pronunciation</p>
-                </div>
-              </div>
-              
-              <select 
-                value={pronunciationSpeed}
-                onChange={(e) => setPronunciationSpeed(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none shadow-sm cursor-pointer min-w-[130px] font-sans"
-              >
-                <option value="Slow">Slow</option>
-                <option value="Normal">Normal</option>
-                <option value="Fast">Fast</option>
-              </select>
-            </div>
-
-            {/* Daily Learning Goal Select Option */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 shrink-0">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-850">Daily Learning Goal</h4>
-                  <p className="text-[10px] text-slate-450 font-medium mt-0.5">Set your daily study goal</p>
-                </div>
-              </div>
-              
-              <select 
-                value={dailyGoalMinutes}
-                onChange={(e) => setDailyGoalMinutes(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none shadow-sm cursor-pointer min-w-[130px] font-sans"
-              >
-                <option value="15 minutes">15 minutes</option>
-                <option value="30 minutes">30 minutes</option>
-                <option value="45 minutes">45 minutes</option>
-                <option value="60 minutes">60 minutes</option>
-              </select>
-            </div>
-
-            {/* Default Flashcard Mode Select Option */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-slate-50 text-slate-500 border border-slate-100 shrink-0">
-                  <Layers className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-850">Default Flashcard Mode</h4>
-                  <p className="text-[10px] text-slate-450 font-medium mt-0.5">Choose default side to start reviewing</p>
-                </div>
-              </div>
-              
-              <select 
-                value={defaultFlashcardMode}
-                onChange={(e) => setDefaultFlashcardMode(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none shadow-sm cursor-pointer min-w-[130px] font-sans"
-              >
-                <option value="Flashcard (Q -> A)">Flashcard (Q &rarr; A)</option>
-                <option value="Flashcard (A -> Q)">Flashcard (A &rarr; Q)</option>
-              </select>
-            </div>
-
-          </div>
-        </div>
-
-      </div>
-
-      {/* Bottom Section: Privacy & Security Card */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 shadow-md flex flex-col gap-6">
-        <div className="border-b border-slate-200 pb-4">
-          <h3 className="text-sm font-bold text-slate-855">Privacy & Security</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Quản lý bảo mật thông tin và quyền riêng tư</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Download My Data widget */}
-          <div 
-            onClick={handleDownloadData}
-            className="group flex items-center justify-between p-5 bg-white hover:bg-blue-50/20 border-2 border-slate-200 hover:border-blue-500/50 rounded-2xl transition-all cursor-pointer relative overflow-hidden shadow-sm active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-450 flex items-center justify-center shrink-0 group-hover:text-blue-600 group-hover:border-blue-100 shadow-sm transition-all duration-300">
-                <Download className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-blue-650 transition-colors">Download My Data</h4>
-                <p className="text-[9.5px] text-slate-450 font-medium leading-relaxed mt-0.5">Export your learning data and progress</p>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-
-          {/* Delete Learning History widget */}
-          <div 
-            onClick={() => setActiveModal('delete_history')}
-            className="group flex items-center justify-between p-5 bg-white hover:bg-amber-50/20 border-2 border-slate-200 hover:border-amber-500/50 rounded-2xl transition-all cursor-pointer relative overflow-hidden shadow-sm active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-455 flex items-center justify-center shrink-0 group-hover:text-amber-600 group-hover:border-amber-100 shadow-sm transition-all duration-300">
-                <Clock className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-655 transition-colors">Delete Learning History</h4>
-                <p className="text-[9.5px] text-slate-455 font-medium leading-relaxed mt-0.5">Remove all your learning history</p>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-
-          {/* Delete Account widget */}
-          <div 
-            onClick={() => setActiveModal('delete_account')}
-            className="group flex items-center justify-between p-5 bg-white hover:bg-red-50/20 border-2 border-slate-200 hover:border-red-500/50 rounded-2xl transition-all cursor-pointer relative overflow-hidden shadow-sm active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 text-red-500/70 flex items-center justify-center shrink-0 group-hover:bg-red-50/30 group-hover:text-red-650 group-hover:border-red-150 shadow-sm transition-all duration-300">
-                <Trash2 className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-red-600">Delete Account</h4>
-                <p className="text-[9.5px] text-slate-450 font-medium leading-relaxed mt-0.5">Permanently delete your account and all data</p>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-      </div>
-
-      {/* Footer Changes Confirmation Buttons */}
-      <div className="flex items-center gap-3">
-        <Button 
-          variant="primary" 
-          onClick={handleSaveChanges}
-          className="shadow-md hover:shadow-blue-500/10 active:scale-95 font-bold font-sans bg-blue-600 border border-transparent"
-        >
-          Save Changes
-        </Button>
-        
-        <button 
-          onClick={handleCancel}
-          className="px-5 py-2.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm active:scale-95 select-none font-sans"
-        >
-          Cancel
-        </button>
       </div>
 
       {/* ========================================================================= */}

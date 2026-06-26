@@ -11,6 +11,7 @@ import {
   Trophy,
   TrendingUp,
   Check,
+  X,
   Lock,
   Award,
   BookOpen,
@@ -19,7 +20,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { progressApi } from '../services/progressService';
 import { Button } from '../components/common/Button';
-import streakBadgeImg from '../assets/Gemini_Generated_Image_idwcryidwcryidwc.png';
+import streakBadgeImg from '../assets/StreakImage.png';
 
 // Maps the short weekday label used by the growth chart from an ISO date.
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -133,6 +134,7 @@ export function DashboardPage() {
     ...day,
     completed: isDayCompleted(idx),
     today: idx === todayIdx,
+    isPast: idx < todayIdx,
   }));
 
   // Growth chart points derived from the backend's 7-day series.
@@ -430,7 +432,7 @@ export function DashboardPage() {
 
             {/* Panda Image / Mascot */}
             <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
-              <img src={StreakImage} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
+              <img src={streakBadgeImg} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
             </div>
           </div>
 
@@ -453,10 +455,14 @@ export function DashboardPage() {
                   <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
                     day.completed 
                       ? 'bg-white text-[#1E5BDB]' 
-                      : 'border border-white/20 bg-white/5 text-blue-100'
+                      : day.isPast
+                        ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                        : 'border border-white/20 bg-white/5 text-blue-100'
                   }`}>
                     {day.completed ? (
                       <Check className="h-5 w-5" strokeWidth={3} />
+                    ) : day.isPast ? (
+                      <X className="h-5 w-5" strokeWidth={3} />
                     ) : (
                       <span className="font-bold">{day.name}</span>
                     )}

@@ -96,6 +96,23 @@ export function Sidebar() {
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
+          
+          if (item.to === '/pronunciation') {
+            return (
+              <div
+                key={item.to}
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('Tính năng hiện đang được phát triển!');
+                }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 cursor-pointer"
+              >
+                <Icon className="w-4.5 h-4.5" />
+                {item.label}
+              </div>
+            );
+          }
+
           return (
             <NavLink
               key={item.to}

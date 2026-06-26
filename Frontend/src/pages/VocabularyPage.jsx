@@ -367,47 +367,48 @@ export function VocabularyPage() {
         <div className="lg:col-span-3 space-y-5">
           
           {/* Filters Row Component */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between font-sans">
+          {/* Filters Row Component */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between font-sans">
+            
+            {/* Left: Filters */}
             <div className="flex flex-wrap items-center gap-3">
-              
               {/* Nguồn tài liệu */}
               <div className="relative">
                 <select
                   value={sourceFilter}
                   onChange={(e) => setSourceFilter(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none transition-colors cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[160px]"
                 >
                   <option value="">Nguồn tài liệu</option>
                   {documentsList.map(doc => (
                     <option key={doc.id} value={doc.title}>{doc.title}</option>
                   ))}
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-
 
               {/* Đã học */}
               <div className="relative">
                 <select
                   value={learningFilter}
                   onChange={(e) => setLearningFilter(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none transition-colors cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[150px]"
                 >
-                  <option value="">Tất cả</option>
+                  <option value="">Tất cả trạng thái</option>
                   <option value="known">Đã biết ({learningStats.known})</option>
                   <option value="learning">Đang học ({learningStats.learning})</option>
                   <option value="not_started">Chưa học ({learningStats.notStarted})</option>
                   <option value="unreviewed">Chưa ôn tập ({learningStats.unreviewed})</option>
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
               {/* Yêu thích (Starred) Toggle Button */}
               <button
                 onClick={() => setStarredFilter(!starredFilter)}
-                className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${
                   starredFilter
-                    ? 'bg-amber-50 border-amber-300 text-amber-700 font-bold'
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'
                 }`}
               >
@@ -416,15 +417,15 @@ export function VocabularyPage() {
               </button>
             </div>
 
-            {/* Search Input and Filter Icon Group */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-grow">
+            {/* Right: Search Input and Actions */}
+            <div className="flex items-center gap-2 w-full lg:w-auto">
+              <div className="relative flex-grow lg:w-64">
                 <input
                   type="text"
                   placeholder="Tìm từ vựng..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl pl-8.5 pr-4 py-2 text-xs text-slate-800 focus:outline-none transition-all placeholder-slate-400"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-slate-400"
                 />
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               </div>
@@ -438,15 +439,15 @@ export function VocabularyPage() {
                     setStarredFilter(false);
                     setSearchQuery('');
                   }}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-650 hover:text-slate-800 rounded-xl border border-slate-200 flex items-center justify-center transition-colors"
+                  className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-100 flex items-center justify-center transition-colors shrink-0"
                   title="Xóa bộ lọc"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
 
-              <button className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shadow-sm">
-                <Filter className="w-3.5 h-3.5" />
+              <button className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shadow-sm shrink-0">
+                <Filter className="w-4 h-4" />
               </button>
             </div>
           </div>

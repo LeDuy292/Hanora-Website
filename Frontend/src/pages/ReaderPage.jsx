@@ -147,8 +147,13 @@ const ReaderPage = () => {
         setReadingSeconds(0);
         setLookupCount(0);
         if (doc.extractedText) {
-          const parsed = JSON.parse(doc.extractedText);
-          setSegments(parsed);
+          try {
+            const parsed = JSON.parse(doc.extractedText);
+            setSegments(parsed);
+          } catch (e) {
+            console.warn("Extracted text is not valid JSON, splitting by spaces.", e);
+            setSegments(doc.extractedText.split(/\s+/).filter(Boolean));
+          }
         }
       } catch (error) {
         console.error(error);
@@ -760,6 +765,7 @@ const ReaderPage = () => {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${activeTheme.bg} ${activeTheme.text}`}>
+
       <UploadModal 
         isOpen={isUploadModalOpen} 
         onClose={() => setIsUploadModalOpen(false)} 
@@ -789,6 +795,7 @@ const ReaderPage = () => {
           <button
             onClick={handleBubbleSaveToFlashcard}
             className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+
 
           >
             + Flashcard
@@ -837,6 +844,7 @@ const ReaderPage = () => {
 
       {/* Hover Notes Tooltip */}
       {hoveredNote && (
+
         <div 
           className="fixed z-50 bg-gray-900 text-white text-[11px] rounded-xl p-3 shadow-2xl max-w-xs animate-in fade-in duration-100 border border-gray-800 pointer-events-none select-none font-sans"
           style={{
