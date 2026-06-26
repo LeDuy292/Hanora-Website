@@ -79,48 +79,38 @@ public class VocabularyService : IVocabularyService
 
             if (vocab == null)
             {
-                vocab = new Vocabulary
+                Word = aiResponse.Word,
+                Pinyin = aiResponse.Pinyin,
+                Definitions = newDefinitionsJson,
+                UsageNotes = aiResponse.UsageNotes,
+                WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null,
+                HanViet = aiResponse.HanViet,
+                Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null,
+                GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                ExampleSentencesNavigation = aiResponse.Examples.Select(e => new ExampleSentence
                 {
-                    Word = aiResponse.Word,
-                    Pinyin = aiResponse.Pinyin,
-                    Definitions = newDefinitionsJson,
-                    UsageNotes = aiResponse.UsageNotes,
-                    WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    ExampleSentencesNavigation = aiResponse.Examples.Select(e => new ExampleSentence
-                    {
-                        ZhText = e.ZhText,
-                        ViText = e.ViText,
-                        Source = "AI Generated",
-                        CreatedAt = DateTime.UtcNow
-                    }).ToList()
-                };
+                    ZhText = e.ZhText,
+                    ViText = e.ViText,
+                    Source = "AI Generated",
+                    CreatedAt = DateTime.UtcNow
+                }).ToList()
+            };
 
-                await _vocabularyRepo.CreateAsync(vocab);
-            }
-            else
-            {
-                vocab.Pinyin = aiResponse.Pinyin;
-                vocab.Definitions = newDefinitionsJson;
-                vocab.UsageNotes = aiResponse.UsageNotes;
-                vocab.WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null;
-                vocab.UpdatedAt = DateTime.UtcNow;
-                
-                // Process examples synchronously if they were missing
-                if (!vocab.ExampleSentencesNavigation.Any() && aiResponse.Examples.Any())
-                {
-                    foreach (var ex in aiResponse.Examples)
-                    {
-                        vocab.ExampleSentencesNavigation.Add(new ExampleSentence
-                        {
-                            ZhText = ex.ZhText,
-                            ViText = ex.ViText,
-                            Source = "AI Generated",
-                            CreatedAt = DateTime.UtcNow
-                        });
-                    }
-                }
+            await _vocabularyRepo.CreateAsync(vocab);
+        }
+        else
+        {
+            vocab.Pinyin = aiResponse.Pinyin;
+            vocab.Definitions = newDefinitionsJson;
+            vocab.UsageNotes = aiResponse.UsageNotes;
+            vocab.WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null;
+            vocab.HanViet = aiResponse.HanViet;
+            vocab.Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null;
+            vocab.GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null;
+            vocab.UpdatedAt = DateTime.UtcNow;
+
 
                 await _vocabularyRepo.UpdateAsync(vocab);
             }
@@ -232,5 +222,20 @@ public class VocabularyService : IVocabularyService
     public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
     {
         return await _vocabularyRepo.GetUserVocabularyAsync(userId);
+    }
+
+    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence)
+    {
+        return await _aiService.AnalyzeSentenceAsync(sentence);
+    }
+
+    public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText)
+    {
+        return await _aiService.CompareSentencesAsync(originalText, modifiedText);
+    }
+
+    public async Task<string> AskAiAssistantAsync(string word, string question, string contextSentence)
+    {
+        return await _aiService.AskAiAssistantAsync(word, question, contextSentence);
     }
 }

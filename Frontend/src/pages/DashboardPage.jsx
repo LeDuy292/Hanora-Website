@@ -560,229 +560,236 @@ export function DashboardPage() {
 
       </div>
 
-      {/* Vocabulary Growth SVG Line Chart */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-4 shadow-sm">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-blue-600" />
-            Biểu Đồ Tăng Trưởng Từ Vựng
-          </h3>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">
-            7 Ngày Qua
-          </span>
-        </div>
+      {/* Grid: Vocabulary Growth SVG Line Chart vs Recent Documents */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-6 border border-slate-100/80 shadow-sm overflow-hidden select-none">
-          {/* Absolute HTML Floating Tooltip */}
-          {activePoint && (
-            <div 
-              className="absolute bg-slate-900 border border-slate-800/80 text-white px-3 py-2 rounded-2xl shadow-xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 text-center leading-none"
-              style={{ 
-                left: `${(activePoint.x / 500) * 100}%`, 
-                top: `${(activePoint.y / 130) * 100 - 15}%`,
-                transform: 'translate(-50%, -100%)'
-              }}
-            >
-              <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest block">
-                {activePoint.day} ({activePoint.date})
-              </span>
-              <span className="text-xs text-yellow-300 font-black mt-1 block">
-                +{activePoint.count} từ mới
-              </span>
-            </div>
-          )}
+        {/* Vocabulary Growth SVG Line Chart */}
+        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              Biểu Đồ Tăng Trưởng Từ Vựng
+            </h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">
+              7 Ngày Qua
+            </span>
+          </div>
 
-          <svg
-            viewBox="0 0 500 130"
-            className="w-full overflow-visible"
-          >
-            {/* Horizontal Grid lines */}
-            <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-            <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-            <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-
-            <defs>
-              <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#3B82F6" />
-                <stop offset="100%" stopColor="#8B5CF6" />
-              </linearGradient>
-              <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            {/* Hover Crosshair Vertical line */}
+          <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-6 border border-slate-100/80 shadow-sm overflow-hidden select-none flex-grow flex items-center">
+            {/* Absolute HTML Floating Tooltip */}
             {activePoint && (
-              <line 
-                x1={activePoint.x} 
-                y1="10" 
-                x2={activePoint.x} 
-                y2="100" 
-                stroke="#3B82F6" 
-                strokeWidth="1.5" 
-                strokeDasharray="4,4" 
-                className="transition-all"
-                opacity="0.35"
-              />
-            )}
-
-            {/* Glow Area under smoothed Bézier path */}
-            {chartPoints.length > 0 && (
-              <path
-                d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`}
-                fill="url(#chartProgressGlow)"
-              />
-            )}
-
-            {/* Smooth Bézier curve line */}
-            {chartPoints.length > 0 && (
-              <path
-                d={bezierPath}
-                fill="none"
-                stroke="url(#chartStrokeGradient)"
-                strokeWidth="3.2"
-                strokeLinecap="round"
-                className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]"
-              />
-            )}
-
-            {/* Pulsing glow ring on active dot */}
-            {activePoint && (
-              <circle
-                cx={activePoint.x}
-                cy={activePoint.y}
-                r="8"
-                fill="#3B82F6"
-                opacity="0.25"
-                className="animate-ping pointer-events-none"
-              />
-            )}
-
-            {/* Active and regular dots */}
-            {chartPoints.map((p, idx) => {
-              const isActive = activePoint?.idx === idx;
-              return (
-                <g key={idx} className="pointer-events-none">
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={isActive ? "5.5" : "4"}
-                    className={`fill-white stroke-[2.5] transition-all duration-200 ${
-                      isActive ? 'stroke-blue-600 shadow-lg scale-110' : 'stroke-blue-500/80'
-                    }`}
-                  />
-                </g>
-              );
-            })}
-
-            {/* X-axis Weekday labels */}
-            {chartPoints.map((p, idx) => {
-              const isActive = activePoint?.idx === idx;
-              return (
-                <text
-                  key={idx}
-                  x={p.x}
-                  y="118"
-                  className={`text-[9px] font-bold font-sans transition-all duration-200 ${
-                    isActive ? 'fill-slate-800 scale-105' : 'fill-slate-400'
-                  }`}
-                  textAnchor="middle"
-                >
-                  {p.day}
-                </text>
-              );
-            })}
-
-            {/* Invisible vertical hover zones for easy hover interaction */}
-            {chartPoints.map((p, idx) => (
-              <rect
-                key={`hover-${idx}`}
-                x={p.x - 30}
-                y="0"
-                width="60"
-                height="125"
-                fill="transparent"
-                className="cursor-pointer"
-                onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })}
-                onMouseLeave={() => setActivePoint(null)}
-              />
-            ))}
-          </svg>
-        </div>
-      </div>
-
-      {/* Recent Documents Grid List */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-5 shadow-sm">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-blue-500" />
-            Tài liệu đọc gần đây
-          </h3>
-          <span className="text-xs text-slate-400 font-semibold">{recentDocuments.length} Tài liệu</span>
-        </div>
-
-        {recentDocuments.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {recentDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="group flex flex-col justify-between p-5 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm transition-all duration-200 gap-4"
+              <div 
+                className="absolute bg-slate-900 border border-slate-800/80 text-white px-3 py-2 rounded-2xl shadow-xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 text-center leading-none"
+                style={{ 
+                  left: `${(activePoint.x / 500) * 100}%`, 
+                  top: `${(activePoint.y / 130) * 100 - 15}%`,
+                  transform: 'translate(-50%, -100%)'
+                }}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-inner group-hover:text-blue-500 group-hover:border-blue-100 transition-colors">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4
-                        onClick={() => handleOpenDoc(doc.id)}
-                        className="text-xs font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
-                      >
-                        {doc.title}
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                        Đọc gần nhất: {formatVnDate(doc.lastReadAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                    <span>Tiến trình đọc</span>
-                    <span>{Math.round(doc.progressPercent || 0)}%</span>
-                  </div>
-                  <div className="h-1 bg-slate-100 border border-slate-200/55 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"
-                      style={{ width: `${doc.progressPercent || 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100 pt-3">
-                  <div className="flex items-center gap-3 font-semibold">
-                    <span>{doc.charCount} ký tự</span>
-                    <span>&bull;</span>
-                    <span>{doc.readingMinutes} phút đọc</span>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenDoc(doc.id)}
-                    className="flex items-center gap-1.5 text-xs text-blue-600 font-bold hover:text-blue-500"
-                  >
-                    Đọc tiếp <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                  </button>
-                </div>
+                <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest block">
+                  {activePoint.day} ({activePoint.date})
+                </span>
+                <span className="text-xs text-yellow-300 font-black mt-1 block">
+                  +{activePoint.count} từ mới
+                </span>
               </div>
-            ))}
+            )}
+
+            <svg
+              viewBox="0 0 500 130"
+              className="w-full overflow-visible"
+            >
+              {/* Horizontal Grid lines */}
+              <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
+
+              <defs>
+                <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#3B82F6" />
+                  <stop offset="100%" stopColor="#8B5CF6" />
+                </linearGradient>
+                <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Hover Crosshair Vertical line */}
+              {activePoint && (
+                <line 
+                  x1={activePoint.x} 
+                  y1="10" 
+                  x2={activePoint.x} 
+                  y2="100" 
+                  stroke="#3B82F6" 
+                  strokeWidth="1.5" 
+                  strokeDasharray="4,4" 
+                  className="transition-all"
+                  opacity="0.35"
+                />
+              )}
+
+              {/* Glow Area under smoothed Bézier path */}
+              {chartPoints.length > 0 && (
+                <path
+                  d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`}
+                  fill="url(#chartProgressGlow)"
+                />
+              )}
+
+              {/* Smooth Bézier curve line */}
+              {chartPoints.length > 0 && (
+                <path
+                  d={bezierPath}
+                  fill="none"
+                  stroke="url(#chartStrokeGradient)"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]"
+                />
+              )}
+
+              {/* Pulsing glow ring on active dot */}
+              {activePoint && (
+                <circle
+                  cx={activePoint.x}
+                  cy={activePoint.y}
+                  r="8"
+                  fill="#3B82F6"
+                  opacity="0.25"
+                  className="animate-ping pointer-events-none"
+                />
+              )}
+
+              {/* Active and regular dots */}
+              {chartPoints.map((p, idx) => {
+                const isActive = activePoint?.idx === idx;
+                return (
+                  <g key={idx} className="pointer-events-none">
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isActive ? "5.5" : "4"}
+                      className={`fill-white stroke-[2.5] transition-all duration-200 ${
+                        isActive ? 'stroke-blue-600 shadow-lg scale-110' : 'stroke-blue-500/80'
+                      }`}
+                    />
+                  </g>
+                );
+              })}
+
+              {/* X-axis Weekday labels */}
+              {chartPoints.map((p, idx) => {
+                const isActive = activePoint?.idx === idx;
+                return (
+                  <text
+                    key={idx}
+                    x={p.x}
+                    y="118"
+                    className={`text-[9px] font-bold font-sans transition-all duration-200 ${
+                      isActive ? 'fill-slate-800 scale-105' : 'fill-slate-400'
+                    }`}
+                    textAnchor="middle"
+                  >
+                    {p.day}
+                  </text>
+                );
+              })}
+
+              {/* Invisible vertical hover zones for easy hover interaction */}
+              {chartPoints.map((p, idx) => (
+                <rect
+                  key={`hover-${idx}`}
+                  x={p.x - 30}
+                  y="0"
+                  width="60"
+                  height="125"
+                  fill="transparent"
+                  className="cursor-pointer"
+                  onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })}
+                  onMouseLeave={() => setActivePoint(null)}
+                />
+              ))}
+            </svg>
           </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400 text-xs font-semibold">
-            Không có tài liệu nào gần đây. Hãy nhập một file văn bản hoặc thêm mẫu có sẵn.
+        </div>
+
+        {/* Recent Documents Grid List */}
+        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 space-y-5 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-blue-500" />
+              Tài liệu đọc gần đây
+            </h3>
+            <span className="text-xs text-slate-400 font-semibold">{recentDocuments.length} Tài liệu</span>
           </div>
-        )}
+
+          <div className="flex-grow flex flex-col justify-center">
+            {recentDocuments.length > 0 ? (
+              <div className="space-y-4">
+                {recentDocuments.slice(0, 2).map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="group flex flex-col justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm transition-all duration-200 gap-3"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-inner group-hover:text-blue-500 group-hover:border-blue-100 transition-colors">
+                          <FileText className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4
+                            onClick={() => handleOpenDoc(doc.id)}
+                            className="text-xs font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition-colors truncate max-w-[200px]"
+                          >
+                            {doc.title}
+                          </h4>
+                          <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                            Đọc gần nhất: {formatVnDate(doc.lastReadAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
+                        <span>Tiến trình</span>
+                        <span>{Math.round(doc.progressPercent || 0)}%</span>
+                      </div>
+                      <div className="h-1 bg-slate-100 border border-slate-200/55 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"
+                          style={{ width: `${doc.progressPercent || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 border-t border-slate-100 pt-2">
+                      <div className="flex items-center gap-2 font-semibold">
+                        <span>{doc.charCount} ký tự</span>
+                        <span>&bull;</span>
+                        <span>{doc.readingMinutes} phút</span>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenDoc(doc.id)}
+                        className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-500"
+                      >
+                        Đọc tiếp <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-xs font-semibold">
+                Không có tài liệu nào gần đây. Hãy nhập một file văn bản hoặc thêm mẫu có sẵn.
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* Expanded Trophy Room / Achievements block */}

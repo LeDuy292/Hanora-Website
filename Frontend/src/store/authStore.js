@@ -40,6 +40,8 @@ function mapStats(stats) {
     totalWordsMastered: stats.totalWordsMastered ?? 0,
     totalDocumentsRead: stats.totalDocumentsRead ?? 0,
     totalQuizzesDone: stats.totalQuizzesDone ?? 0,
+    averagePronunciationScore: stats.averagePronunciationScore ?? 0,
+    totalPronunciationAttempts: stats.totalPronunciationAttempts ?? 0,
     lastActiveDate: stats.lastActiveDate ?? null,
   };
 }

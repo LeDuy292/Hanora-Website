@@ -279,7 +279,7 @@ export function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-8 max-w-7xl w-full mx-auto page-transition text-slate-700">
+    <div className="space-y-8 w-full page-transition text-slate-700">
       
       {/* Toast Alert */}
       {toast && (

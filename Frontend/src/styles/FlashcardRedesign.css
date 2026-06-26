@@ -13,9 +13,9 @@
 
 .flashcard-container {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 7fr 3fr;
   gap: 2.5rem;
-  max-width: 1500px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 2rem;
   min-height: calc(100vh - 80px);
@@ -144,7 +144,7 @@
 /* Flashcard Area */
 .flashcard-main {
   width: 100%;
-  max-width: 800px;
+  max-width: 1050px;
   margin: 0 auto;
   perspective: 2500px;
 }

@@ -17,6 +17,12 @@ public partial class Vocabulary
 
     public string? UsageNotes { get; set; }
 
+    public string? HanViet { get; set; }
+
+    public string? Collocations { get; set; }
+
+    public string? GrammarPatterns { get; set; }
+
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
