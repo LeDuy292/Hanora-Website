@@ -95,9 +95,9 @@ public class OcrService : IOcrService
             var bytes = ms.ToArray();
 
             // --- Azure Computer Vision Read API (REST) ---
-            var endpoint = _config["AzureComputerVision:Endpoint"]?.TrimEnd('/')
+            var endpoint = _config["AzureComputerVision:Endpoint"]?.Trim().TrimEnd('/')
                 ?? throw new InvalidOperationException("AzureComputerVision:Endpoint is not configured.");
-            var key = _config["AzureComputerVision:Key"] 
+            var key = _config["AzureComputerVision:Key"]?.Trim()
                 ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
             var requestUrl = $"{endpoint}/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read";
