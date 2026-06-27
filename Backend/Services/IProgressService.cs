@@ -20,6 +20,9 @@ public record DashboardDto
     public int Streak { get; init; }
     public int Xp { get; init; }
     public int Level { get; init; }
+    public int CurrentLevelXp { get; init; }
+    public int NextLevelXp { get; init; }
+    public double LevelProgressPercent { get; init; }
     public int WordsSaved { get; init; }
     public int WordsMastered { get; init; }
     public DailyGoalDto DailyGoal { get; init; } = new();
@@ -114,7 +117,16 @@ public class ProgressService : IProgressService
         int streak = stats.CurrentStreakDays ?? 0;
 
         int totalXp = await _repo.GetTotalXpAsync(userId);
-        int level = LevelForXp(totalXp);
+        int level = StatsService.CalculateLevel(totalXp);
+        int currentLevelXp = StatsService.GetLevelThreshold(level);
+        int nextLevelXp = StatsService.GetLevelThreshold(level + 1);
+        double levelProgressPercent = 0.0;
+        if (nextLevelXp > currentLevelXp)
+        {
+            levelProgressPercent = Math.Round((double)(totalXp - currentLevelXp) / (nextLevelXp - currentLevelXp) * 100.0, 2);
+            if (levelProgressPercent < 0) levelProgressPercent = 0;
+            if (levelProgressPercent > 100) levelProgressPercent = 100;
+        }
 
         var savedWords = await _repo.GetSavedWordsAsync(userId);
         int reviewToday = CountDue(savedWords);
@@ -168,6 +180,9 @@ public class ProgressService : IProgressService
             Streak = streak,
             Xp = totalXp,
             Level = level,
+            CurrentLevelXp = currentLevelXp,
+            NextLevelXp = nextLevelXp,
+            LevelProgressPercent = levelProgressPercent,
             WordsSaved = savedWords.Count,
             WordsMastered = savedWords.Count(w => w.IsMastered),
             DailyGoal = new DailyGoalDto { Target = goalTarget, Current = goalCurrent },
@@ -260,14 +275,8 @@ public class ProgressService : IProgressService
         return result;
     }
 
-    // XP→level thresholds from the spec: L1=0, L2=100, L3=300, L4=600, L5=1000,
-    // then +1 level per additional 1000 XP.
     private static int LevelForXp(int xp)
     {
-        if (xp >= 1000) return 5 + (xp - 1000) / 1000;
-        if (xp >= 600) return 4;
-        if (xp >= 300) return 3;
-        if (xp >= 100) return 2;
-        return 1;
+        return StatsService.CalculateLevel(xp);
     }
 }

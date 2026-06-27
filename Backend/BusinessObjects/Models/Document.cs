@@ -38,4 +38,6 @@ public partial class Document
     public virtual User User { get; set; } = null!;
 
     public virtual ICollection<UserVocabulary> UserVocabularies { get; set; } = new List<UserVocabulary>();
+
+    public virtual ICollection<FlashcardDeck> FlashcardDecks { get; set; } = new List<FlashcardDeck>();
 }

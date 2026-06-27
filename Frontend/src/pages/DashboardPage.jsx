@@ -170,14 +170,9 @@ export function DashboardPage() {
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
-  // XP milestone progress: distance to the next 1000-XP level band (spec thresholds).
-  const xpBandSize = xp < 100 ? 100 : xp < 300 ? 300 : xp < 600 ? 600 : 1000;
-  const xpBandStart = xp < 100 ? 0 : xp < 300 ? 100 : xp < 600 ? 300 : Math.floor(xp / 1000) * 1000;
-  const xpBandEnd = xp < 100 ? 100 : xp < 300 ? 300 : xp < 600 ? 600 : xpBandStart + 1000;
-  const xpPercent = Math.min(
-    Math.round(((xp - xpBandStart) / (xpBandEnd - xpBandStart)) * 100),
-    100
-  );
+  const currentLevelXp = data?.currentLevelXp ?? 0;
+  const nextLevelXp = data?.nextLevelXp ?? 300;
+  const levelProgressPercent = data?.levelProgressPercent ?? 0;
 
   const handleOpenDoc = (id) => {
     navigate(`/reader/${id}`);
@@ -225,12 +220,12 @@ export function DashboardPage() {
             <div className="space-y-2 pt-1 max-w-md">
               <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
                 <span>Tiến trình lên Level {level + 1}</span>
-                <span>{xp} / {xpBandEnd} XP</span>
+                <span>{xp} / {nextLevelXp} XP</span>
               </div>
               <div className="h-2 bg-slate-100 border border-slate-200/50 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
-                  style={{ width: `${xpPercent}%` }}
+                  style={{ width: `${levelProgressPercent}%` }}
                 ></div>
               </div>
             </div>
