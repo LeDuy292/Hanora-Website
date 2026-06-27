@@ -86,21 +86,49 @@ public class OcrService : IOcrService
 
     private string ExtractFromPdf(Stream fileStream)
     {
-        var text = new StringBuilder();
+        var pages = new List<string>();
         try
         {
             using var document = PdfDocument.Open(fileStream);
             foreach (var page in document.GetPages())
             {
-                text.AppendLine(page.Text);
+                var rawText = page.Text ?? "";
+                // Normalize line endings within a page: single \n per line, \n\n between paragraphs
+                // PdfPig returns text as one block; we detect paragraph boundaries by blank lines or
+                // short lines (headings/titles) that are not sentence continuations.
+                var lines = rawText
+                    .Replace("\r\n", "\n")
+                    .Replace('\r', '\n')
+                    .Split('\n');
+
+                var sb = new StringBuilder();
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var line = lines[i].Trim();
+                    if (string.IsNullOrEmpty(line))
+                    {
+                        // blank line → paragraph break
+                        if (sb.Length > 0 && !sb.ToString().EndsWith("\n\n"))
+                            sb.Append("\n\n");
+                    }
+                    else
+                    {
+                        sb.AppendLine(line);
+                    }
+                }
+                var pageText = sb.ToString().Trim();
+                if (!string.IsNullOrEmpty(pageText))
+                    pages.Add(pageText);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PdfPig failed to extract text.");
         }
-        return text.ToString();
+        // Join pages with double newline to mark page breaks as paragraph breaks
+        return string.Join("\n\n", pages);
     }
+
 
     private async Task<(string? text, string? errorMessage)> ExtractWithAzureOcrAsync(byte[] bytes)
     {

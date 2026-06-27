@@ -392,30 +392,7 @@ export function FlashcardPage() {
           </div>
         </header>
 
-        {/* 2. Stats Bar */}
-        <div className="stats-grid">
-          <div 
-            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'new' ? 'ring-2 ring-teal-500 border-teal-200' : ''}`}
-            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'new')); setCurrentIndex(0); }}
-          >
-            <span className="stat-label">Học mới</span>
-            <span className="stat-value text-teal-600">{counts.newCount}</span>
-          </div>
-          <div 
-            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'learning' ? 'ring-2 ring-blue-500 border-blue-200' : ''}`}
-            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'learning')); setCurrentIndex(0); }}
-          >
-            <span className="stat-label">Đang học</span>
-            <span className="stat-value text-blue-600">{counts.learningCount}</span>
-          </div>
-          <div 
-            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'known' ? 'ring-2 ring-emerald-500 border-emerald-200' : ''}`}
-            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'known')); setCurrentIndex(0); }}
-          >
-            <span className="stat-label text-emerald-500 font-bold">Đã thuộc</span>
-            <span className="stat-value text-emerald-600">{counts.knownCount}</span>
-          </div>
-        </div>
+
 
         {/* Custom Decks Section */}
         <div className="mt-5 mb-5 px-1">
