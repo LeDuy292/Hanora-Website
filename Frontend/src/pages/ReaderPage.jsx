@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { 
-  getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations, 
-  saveDocumentAnnotations, exportDocx, askAiAssistant 
+import {
+  getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
+  saveDocumentAnnotations, exportDocx, askAiAssistant
 } from '../lib/api';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
@@ -11,10 +11,13 @@ import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
-import { 
-  MousePointer, Highlighter, Pencil, Eraser, 
+import {
+  isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
+} from '../utils/documentTextUtils';
+import {
+  MousePointer, Highlighter, Pencil, Eraser,
   FileText, Pin, Save, Download, X, Upload, ChevronLeft, ChevronRight,
-  Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare, 
+  Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare,
   Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send
 } from 'lucide-react';
 
@@ -316,7 +319,7 @@ const ReaderPage = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
+
     if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
@@ -433,7 +436,7 @@ const ReaderPage = () => {
     if (!canvas) return;
     const width = canvas.width;
     const height = canvas.height;
-    
+
     const clickX = xPercent * width;
     const clickY = yPercent * height;
     const pixelThreshold = 20;
@@ -530,14 +533,14 @@ const ReaderPage = () => {
 
     // Default Pointer (Lookup)
 
-    if (!word || word.trim() === '') return;
-    
+    if (!word || word.trim() === '' || isStructureMarker(word)) return;
+
     setSelectedWord(word);
-    setVococabData: setVocabData(null);
+    setVocabData(null);
     setIsLoadingVocab(true);
     setLookupCount(prev => prev + 1);
     setSidebarTab('dict');
-    
+
     if (!isSidebarOpen) {
       setIsSidebarOpen(true);
     }
@@ -630,7 +633,7 @@ const ReaderPage = () => {
       const rect = e.currentTarget.getBoundingClientRect();
       const parsedText = textNote ? parseNoteContent(textNote) : null;
       const parsedSticky = stickyNote ? parseNoteContent(stickyNote) : null;
-      
+
       setHoveredNote({
         text: [
           parsedText ? `${parsedText.icon} ${parsedText.label}: ${parsedText.text}` : null,
@@ -702,14 +705,14 @@ const ReaderPage = () => {
       sender: 'user',
       text: queryText.trim()
     };
-    
+
     setDocChatMessages(prev => [...prev, userMessage]);
     if (!textToSend) setDocChatInput('');
     setIsSendingDocChat(true);
 
     try {
       const titleContext = document?.title || "Tài liệu tiếng Trung";
-      const snippetContext = segments.slice(0, 30).join(' ');
+      const snippetContext = joinDocumentSegments(segments.slice(0, 30));
       const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -752,14 +755,14 @@ const ReaderPage = () => {
   const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
 
   // Document selectors filtered list
-  const filteredDropdownDocs = documentsList.filter(d => 
+  const filteredDropdownDocs = documentsList.filter(d =>
     d.title.toLowerCase().includes(docSearchQuery.toLowerCase())
   );
   const recentDropdownDocs = documentsList.slice(0, 4);
 
   // Count saved words in current document
   const savedWordsInDoc = vocabList.filter(w => String(w.documentId) === String(id)).length;
-  const totalDocChars = segments.reduce((sum, s) => sum + s.length, 0);
+  const totalDocChars = segments.reduce((sum, s) => sum + (isStructureMarker(s) ? 0 : s.length), 0);
 
   // Theme styling configurations
   const themeStyles = {
@@ -810,9 +813,9 @@ const ReaderPage = () => {
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${activeTheme.bg} ${activeTheme.text}`}>
 
-      <UploadModal 
-        isOpen={isUploadModalOpen} 
-        onClose={() => setIsUploadModalOpen(false)} 
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
       />
 
       <DocumentSelectModal
@@ -828,7 +831,7 @@ const ReaderPage = () => {
 
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (
-        <div 
+        <div
           className="fixed z-50 bg-gray-900/95 backdrop-blur-sm text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
           style={{
             left: `${bubbleMenu.x}px`,
@@ -889,7 +892,7 @@ const ReaderPage = () => {
       {/* Hover Notes Tooltip */}
       {hoveredNote && (
 
-        <div 
+        <div
           className="fixed z-50 bg-gray-900 text-white text-[11px] rounded-xl p-3 shadow-2xl max-w-xs animate-in fade-in duration-100 border border-gray-800 pointer-events-none select-none font-sans"
           style={{
             left: `${hoveredNote.x}px`,
@@ -921,10 +924,10 @@ const ReaderPage = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <p className="text-xs text-gray-500">Đoạn bôi đen: <span className="font-bold text-gray-800">"{segments[editingNote.absIndex]}"</span></p>
-              
+
               {/* Category selector */}
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 tracking-wider block mb-2">Phân loại ghi chú</label>
@@ -934,11 +937,10 @@ const ReaderPage = () => {
                       key={cat.id}
                       type="button"
                       onClick={() => setEditingNote(prev => ({ ...prev, category: cat.id }))}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                        editingNote.category === cat.id
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${editingNote.category === cat.id
                           ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                           : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
-                      }`}
+                        }`}
                     >
                       <span>{cat.icon}</span>
                       <span>{cat.name}</span>
@@ -946,7 +948,7 @@ const ReaderPage = () => {
                   ))}
                 </div>
               </div>
- 
+
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 tracking-wider block mb-2">Nội dung</label>
                 <textarea
@@ -957,7 +959,7 @@ const ReaderPage = () => {
                 />
               </div>
             </div>
- 
+
             <div className="flex items-center justify-end gap-2 border-t pt-3 border-gray-100 mt-2">
               <button
                 onClick={() => {
@@ -1014,10 +1016,10 @@ const ReaderPage = () => {
           {/* Document selection section */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <span className={`font-bold text-xs tracking-wider uppercase ml-1 shrink-0 ${activeTheme.textMuted}`}>Tài liệu đang học:</span>
-            
+
             {/* Custom Dropdown Selector */}
             <div className="relative" ref={docDropdownRef}>
-              <button 
+              <button
                 onClick={() => setIsDocDropdownOpen(!isDocDropdownOpen)}
                 className={`flex items-center justify-between w-full sm:w-64 bg-slate-50/50 border hover:bg-slate-100/50 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none transition-colors ${activeTheme.card} ${activeTheme.text}`}
               >
@@ -1031,7 +1033,7 @@ const ReaderPage = () => {
                 <div className={`absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl border shadow-xl p-3 z-50 flex flex-col gap-3 animate-in fade-in slide-in-from-top-3 duration-200 ${activeTheme.card} ${activeTheme.bg}`}>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Tìm tài liệu nhanh..."
                       className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${activeTheme.input}`}
@@ -1050,11 +1052,10 @@ const ReaderPage = () => {
                             setIsDocDropdownOpen(false);
                             navigate(`/reader/${doc.id}`);
                           }}
-                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${
-                            id == doc.id 
-                              ? 'bg-blue-600 text-white' 
+                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${id == doc.id
+                              ? 'bg-blue-600 text-white'
                               : 'hover:bg-slate-150/40 hover:text-blue-600'
-                          }`}
+                            }`}
                         >
                           <span className="truncate flex-grow">{doc.title}</span>
                           {id == doc.id && <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded ml-2 shrink-0">Đọc</span>}
@@ -1092,7 +1093,7 @@ const ReaderPage = () => {
                   {totalPages > 1 && (
                     <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
                       <div className="flex items-center gap-6">
-                        <button 
+                        <button
                           onClick={() => {
                             setCurrentPage(p => Math.max(1, p - 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1103,12 +1104,12 @@ const ReaderPage = () => {
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
                         </button>
-                        
+
                         <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
                           Trang {validCurrentPage} / {totalPages}
                         </span>
-                        
-                        <button 
+
+                        <button
                           onClick={() => {
                             setCurrentPage(p => Math.min(totalPages, p + 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1125,7 +1126,7 @@ const ReaderPage = () => {
                 </div>
               )}
             </div>
-            <button 
+            <button
               onClick={() => setIsUploadModalOpen(true)}
               className="flex items-center justify-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border border-blue-100 w-full sm:w-auto"
             >
@@ -1133,17 +1134,16 @@ const ReaderPage = () => {
               Tải lên tài liệu
             </button>
           </div>
-          
+
           {/* Settings & display controls */}
           <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 mt-2 xl:mt-0">
             {/* Show/Hide Pinyin toggle */}
-            <button 
+            <button
               onClick={() => setShowPinyin(!showPinyin)}
-              className={`flex-grow sm:flex-grow-0 justify-center flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${
-                showPinyin 
-                  ? 'bg-blue-50 text-blue-600 border-blue-200' 
+              className={`flex-grow sm:flex-grow-0 justify-center flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${showPinyin
+                  ? 'bg-blue-50 text-blue-600 border-blue-200'
                   : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <span>Pinyin</span>
               <span className={`w-2 h-2 rounded-full ${showPinyin ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -1151,29 +1151,26 @@ const ReaderPage = () => {
 
             {/* Font family switcher */}
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5">
-              <button 
+              <button
                 onClick={() => setFontMode('sans')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  fontMode === 'sans' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${fontMode === 'sans' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
+                  }`}
                 title="Font Không chân (Sans-Serif)"
               >
                 Sans
               </button>
-              <button 
+              <button
                 onClick={() => setFontMode('serif')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all font-serif ${
-                  fontMode === 'serif' ? 'bg-slate-100 text-slate-800 animate-in' : 'text-slate-505 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all font-serif ${fontMode === 'serif' ? 'bg-slate-100 text-slate-800 animate-in' : 'text-slate-505 hover:text-slate-800'
+                  }`}
                 title="Font Có chân (Serif)"
               >
                 Serif
               </button>
-              <button 
+              <button
                 onClick={() => setFontMode('kaiti')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  fontMode === 'kaiti' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${fontMode === 'kaiti' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
+                  }`}
                 style={{ fontFamily: '"KaiTi", "STKaiti", "楷体", serif' }}
                 title="Font Thư pháp (Kaiti 楷体)"
               >
@@ -1184,16 +1181,16 @@ const ReaderPage = () => {
 
             {/* Font size adjustments */}
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5">
-              <button 
-                onClick={() => setFontSize(Math.max(16, fontSize - 2))} 
+              <button
+                onClick={() => setFontSize(Math.max(16, fontSize - 2))}
                 className="px-3 py-1.5 hover:bg-slate-50 rounded-lg text-slate-600 font-bold transition-colors"
                 title="Giảm kích thước chữ"
               >
                 A-
               </button>
               <span className="px-2.5 text-xs font-black text-slate-850">{fontSize}px</span>
-              <button 
-                onClick={() => setFontSize(Math.min(48, fontSize + 2))} 
+              <button
+                onClick={() => setFontSize(Math.min(48, fontSize + 2))}
                 className="px-3 py-1.5 hover:bg-slate-50 rounded-lg text-slate-600 font-bold transition-colors"
                 title="Tăng kích thước chữ"
               >
@@ -1226,14 +1223,13 @@ const ReaderPage = () => {
 
       {/* Main Workspace Workspace Layout Grid */}
       <div className="flex flex-col lg:flex-row flex-1 p-4 md:p-6 gap-6 overflow-hidden h-auto lg:h-[calc(100vh-175px)]">
-        
+
         {/* Left pane: A4 Smart Reader Area */}
-        <div 
-          className={`h-full flex flex-col transition-all duration-300 ease-in-out ${
-            !isSidebarOpen
+        <div
+          className={`h-full flex flex-col transition-all duration-300 ease-in-out ${!isSidebarOpen
               ? 'w-full'
               : 'w-full lg:w-[65%]'
-          }`}
+            }`}
         >
           <div className={`flex flex-col flex-1 rounded-3xl overflow-hidden relative border transition-colors duration-250 ${activeTheme.sheet} bg-white`}>
             {!document && (
@@ -1243,7 +1239,7 @@ const ReaderPage = () => {
                 </div>
                 <h2 className="text-2xl font-black text-slate-855 mb-2">Chưa chọn tài liệu học tập</h2>
                 <p className="text-slate-505 mb-8 max-w-sm text-sm">Vui lòng tải lên một file tiếng Trung hoặc chọn một tài liệu từ danh sách để bắt đầu tra cứu và học.</p>
-                <button 
+                <button
                   onClick={() => setIsUploadModalOpen(true)}
                   className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-blue-650/20 hover:bg-blue-700 transition-colors"
                 >
@@ -1274,7 +1270,7 @@ const ReaderPage = () => {
                         title="Bôi màu Highlight văn bản (H)"
                       >
                         <Highlighter className="w-3.5 h-3.5" />
-                        <span 
+                        <span
                           className="w-3 h-3 rounded-full border border-slate-350 inline-block shadow-sm"
                           style={{ backgroundColor: activeColor }}
                         />
@@ -1290,7 +1286,7 @@ const ReaderPage = () => {
                             className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors"
                           >
                             <div className="flex items-center gap-2">
-                              <span 
+                              <span
                                 className="w-2.5 h-2.5 rounded-full border border-slate-200 inline-block shadow-sm"
                                 style={{ backgroundColor: c.value }}
                               />
@@ -1359,8 +1355,8 @@ const ReaderPage = () => {
                 {/* A4 sheet page content */}
                 <div className={`flex-grow flex flex-col max-w-4xl mx-auto w-full pt-8 pb-4 px-4 sm:px-16 overflow-hidden ${activeTheme.sheet}`}>
                   <h1 className="text-xl sm:text-2xl font-black mb-5 text-center leading-snug shrink-0 break-all border-b pb-4 border-slate-100/55">{document.title}</h1>
-                  
-                  <div 
+
+                  <div
                     ref={readerContainerRef}
                     className={`flex-1 tracking-wide break-words text-justify overflow-y-auto pr-3 select-text scrollbar-thin ${fontStyles[fontMode]}`}
                     style={{ fontSize: `${fontSize}px`, lineHeight: '2.4' }}
@@ -1370,9 +1366,8 @@ const ReaderPage = () => {
                       {/* Drawing canvas layer */}
                       <canvas
                         ref={canvasRef}
-                        className={`absolute inset-0 z-10 w-full h-full ${
-                          (activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'
-                        }`}
+                        className={`absolute inset-0 z-10 w-full h-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'
+                          }`}
                         onPointerDown={handlePointerDown}
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
@@ -1383,11 +1378,19 @@ const ReaderPage = () => {
                       <div className="relative z-0 pb-12 pr-2">
                         {currentSegments.map((word, relIndex) => {
                           const absIndex = (validCurrentPage - 1) * WORDS_PER_PAGE + relIndex;
+
+                          if (word === PARAGRAPH_BREAK) {
+                            return <span key={relIndex} data-abs-index={absIndex} className="block h-6 w-full" aria-hidden="true" />;
+                          }
+                          if (word === LINE_BREAK) {
+                            return <br key={relIndex} data-abs-index={absIndex} />;
+                          }
+
                           const highlightColor = annotations.highlights[absIndex];
                           const hasTextNote = annotations.textNotes[absIndex];
                           const hasStickyNote = annotations.stickyNotes[absIndex];
                           const isWordSelected = selectedWord === word;
-                          
+
                           const noteInfo = hasTextNote ? parseNoteContent(hasTextNote) : null;
                           const stickyInfo = hasStickyNote ? parseNoteContent(hasStickyNote) : null;
 
@@ -1399,14 +1402,13 @@ const ReaderPage = () => {
                               onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
                               onMouseLeave={handleWordMouseLeave}
                               style={highlightColor ? { backgroundColor: highlightColor } : undefined}
-                              className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-150 relative align-bottom ${
-                                isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
-                              } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
+                              className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
+                                } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
                             >
                               <span className="leading-none flex items-center">
                                 {word}
                                 {hasTextNote && (
-                                  <span 
+                                  <span
                                     className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none"
                                     title={noteInfo.text}
                                     onClick={(e) => {
@@ -1418,7 +1420,7 @@ const ReaderPage = () => {
                                   </span>
                                 )}
                                 {hasStickyNote && (
-                                  <span 
+                                  <span
                                     className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none animate-bounce"
                                     title={stickyInfo.text}
                                     onClick={(e) => {
@@ -1446,7 +1448,7 @@ const ReaderPage = () => {
                   {totalPages > 1 && (
                     <div className="mt-2 shrink-0 flex flex-col items-center justify-center border-t border-slate-100/60 pt-3 pb-1">
                       <div className="flex items-center gap-6">
-                        <button 
+                        <button
                           onClick={() => {
                             setCurrentPage(p => Math.max(1, p - 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1457,12 +1459,12 @@ const ReaderPage = () => {
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
-                        
+
                         <span className="text-xs font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80 shadow-sm">
                           Trang {validCurrentPage} / {totalPages}
                         </span>
-                        
-                        <button 
+
+                        <button
                           onClick={() => {
                             setCurrentPage(p => Math.min(totalPages, p + 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1484,7 +1486,7 @@ const ReaderPage = () => {
 
         {/* Backdrop for tablet/mobile sidebar drawer overlay */}
         {isSidebarOpen && (
-          <div 
+          <div
             onClick={() => setIsSidebarOpen(false)}
             className="fixed inset-0 bg-slate-900/35 z-40 lg:hidden"
           />
@@ -1492,44 +1494,40 @@ const ReaderPage = () => {
 
         {/* Right pane: Collapsible Responsive Sidebar */}
         {document && (
-          <div 
-            className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-50 ${
-              isSidebarOpen 
+          <div
+            className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-50 ${isSidebarOpen
                 ? 'fixed inset-y-0 right-0 w-[85vw] sm:w-[380px] lg:static lg:w-[35%] lg:h-full translate-x-0'
                 : 'fixed inset-y-0 right-0 w-[85vw] sm:w-[380px] lg:hidden translate-x-full lg:translate-x-0'
-            }`}
+              }`}
           >
             {/* Sidebar Tab Header */}
             <div className="flex border-b border-slate-150 bg-slate-50/50 shrink-0">
               <button
                 onClick={() => setSidebarTab('dict')}
-                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                  sidebarTab === 'dict'
+                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'dict'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                }`}
+                  }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Từ điển</span>
               </button>
               <button
                 onClick={() => setSidebarTab('chat')}
-                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                  sidebarTab === 'chat'
+                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'chat'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                }`}
+                  }`}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Trợ lý AI</span>
               </button>
               <button
                 onClick={() => setSidebarTab('stats')}
-                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                  sidebarTab === 'stats'
+                className={`flex-1 py-3.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'stats'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                }`}
+                  }`}
               >
                 <Activity className="w-3.5 h-3.5" />
                 <span>Tiến trình</span>
@@ -1538,7 +1536,7 @@ const ReaderPage = () => {
 
             {/* Sidebar Tab Content panels */}
             <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
-              
+
               {/* Tab 1: Dictionary lookup detail view */}
               {sidebarTab === 'dict' && (
                 <div className="h-full">
@@ -1554,16 +1552,16 @@ const ReaderPage = () => {
                     </div>
                   ) : (
                     <div className="relative">
-                      <button 
+                      <button
                         onClick={closeWordCard}
                         className="absolute -top-1 right-0 p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-655 rounded-full transition-colors z-10"
                         title="Đóng bảng tra từ"
                       >
                         <X className="w-4 h-4" />
                       </button>
-                      <WordCard 
-                        word={selectedWord} 
-                        data={vocabData} 
+                      <WordCard
+                        word={selectedWord}
+                        data={vocabData}
                         isLoading={isLoadingVocab}
                         onWordClick={(w) => {
                           setSelectedWord(w);
@@ -1574,7 +1572,6 @@ const ReaderPage = () => {
                         documentId={id}
                         documentTitle={document?.title}
                         documentText={segments.join('')}
-                        pageNumber={validCurrentPage}
                       />
                     </div>
                   )}
@@ -1589,11 +1586,10 @@ const ReaderPage = () => {
                     {docChatMessages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
-                          msg.sender === 'user'
+                        className={`flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${msg.sender === 'user'
                             ? 'bg-blue-600 text-white self-end ml-auto rounded-tr-none'
                             : 'bg-slate-50 text-slate-800 border border-slate-100 mr-auto rounded-tl-none font-medium'
-                        }`}
+                          }`}
                       >
                         <div className="whitespace-pre-line">{msg.text}</div>
                       </div>
@@ -1699,7 +1695,7 @@ const ReaderPage = () => {
                         <Trophy className="w-3.5 h-3.5 text-amber-500" />
                         <span>Học viên Hanora</span>
                       </h4>
-                      
+
                       {/* Streak & XP Display */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
@@ -1727,10 +1723,10 @@ const ReaderPage = () => {
                           </span>
                         </div>
                         <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${Math.min(100, ((user.todayMinutes || 0) / (user.targetDailyMinutes || 20)) * 100)}%` 
+                            style={{
+                              width: `${Math.min(100, ((user.todayMinutes || 0) / (user.targetDailyMinutes || 20)) * 100)}%`
                             }}
                           />
                         </div>

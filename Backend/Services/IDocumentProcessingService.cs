@@ -1,5 +1,4 @@
 using BusinessObjects.Models;
-using JiebaNet.Segmenter;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,17 +18,20 @@ public class DocumentProcessingService : IDocumentProcessingService
     private readonly IBackgroundTaskQueue _taskQueue;
     private readonly IS3StorageService _s3StorageService;
     private readonly IDocumentRepository _documentRepository;
+    private readonly IChineseSegmenterService _segmenterService;
     private readonly ILogger<DocumentProcessingService> _logger;
 
     public DocumentProcessingService(
         IBackgroundTaskQueue taskQueue,
         IS3StorageService s3StorageService,
         IDocumentRepository documentRepository,
+        IChineseSegmenterService segmenterService,
         ILogger<DocumentProcessingService> logger)
     {
         _taskQueue = taskQueue;
         _s3StorageService = s3StorageService;
         _documentRepository = documentRepository;
+        _segmenterService = segmenterService;
         _logger = logger;
     }
 
@@ -136,9 +138,7 @@ public class DocumentProcessingService : IDocumentProcessingService
 
                 if (!string.IsNullOrWhiteSpace(extractedText))
                 {
-                    var segmenter = new JiebaSegmenter();
-                    var segments = segmenter.Cut(extractedText);
-                    
+                    var segments = _segmenterService.SegmentPreservingStructure(extractedText);
                     doc.ExtractedText = JsonSerializer.Serialize(segments);
                 }
 

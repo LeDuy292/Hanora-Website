@@ -31,7 +31,7 @@ const UploadModal = ({ isOpen, onClose }) => {
         } catch (error) {
           console.error(error);
         }
-      }, 2000);
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [processingId, isFailed, navigate, onClose]);
@@ -136,7 +136,7 @@ const UploadModal = ({ isOpen, onClose }) => {
         >
           <input
             type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.webp"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.txt"
             onChange={handleFileChange}
             className="hidden"
             id="file-upload"
@@ -152,7 +152,7 @@ const UploadModal = ({ isOpen, onClose }) => {
               {file ? file.name : "Kéo thả hoặc nhấn để chọn file"}
             </span>
             <span className="text-xs text-gray-500">
-              Hỗ trợ PDF, JPG, PNG
+              Hỗ trợ PDF, JPG, PNG, TXT
             </span>
           </label>
         </div>

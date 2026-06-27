@@ -37,13 +37,23 @@ namespace Hanora
             builder.Services.AddScoped<IAuthService, AuthService>();
 
             // Document Processing & OCR
-            builder.Services.AddHttpClient();
+            builder.Services.AddHttpClient<IOcrService, OcrService>();
             builder.Services.AddSingleton<IBackgroundTaskQueue, DefaultBackgroundTaskQueue>();
-            builder.Services.AddHostedService<DocumentProcessingWorker>();
+            builder.Services.AddSingleton<IChineseSegmenterService, ChineseSegmenterService>();
+
+            var documentWorkerCount = Math.Clamp(
+                builder.Configuration.GetValue("DocumentProcessing:WorkerCount", 2),
+                1,
+                8);
+            for (var i = 0; i < documentWorkerCount; i++)
+            {
+                builder.Services.AddHostedService<DocumentProcessingWorker>();
+            }
+
             builder.Services.AddHostedService<LeaderboardWeeklyRewardWorker>();
+
             builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
             builder.Services.AddScoped<IS3StorageService, S3StorageService>();
-            builder.Services.AddScoped<IOcrService, OcrService>();
             builder.Services.AddScoped<IDocumentProcessingService, DocumentProcessingService>();
             builder.Services.AddScoped<IVocabularyRepository, VocabularyRepository>();
             builder.Services.AddScoped<IDictionaryAiService, DictionaryAiService>();
