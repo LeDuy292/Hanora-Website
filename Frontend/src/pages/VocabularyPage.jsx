@@ -545,13 +545,7 @@ export function VocabularyPage() {
                   <GraduationCap className="w-3.5 h-3.5" />
                   <span>Ôn tập ngay</span>
                 </button>
-                <button
-                  onClick={handleOpenCreateDeckModal}
-                  className="bg-[#005BAC] hover:bg-[#004b90] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Tạo Flashcard</span>
-                </button>
+
               </div>
             )}
           </div>
