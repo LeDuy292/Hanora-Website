@@ -121,8 +121,71 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
-  const { vocabList, removeWord } = useVocabularyStore();
+  const { vocabList, removeWord, bulkAddCards } = useVocabularyStore();
   const { addXp } = useAuthStore();
+
+  const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
+  const [newDeckName, setNewDeckName] = useState('');
+  const [deckSource, setDeckSource] = useState('Tổng hợp');
+  const [deckDocumentId, setDeckDocumentId] = useState(null);
+  const [isSavingDeck, setIsSavingDeck] = useState(false);
+
+  const handleOpenCreateDeckModal = () => {
+    const selectedWordsList = fullVocabularyDataset.filter(w => selectedRows.includes(w.text));
+    if (selectedWordsList.length === 0) return;
+
+    const firstWord = selectedWordsList[0];
+    const allSameSource = selectedWordsList.every(w => w.source === firstWord.source && w.documentId === firstWord.documentId);
+    
+    let sourceStr = 'Tổng hợp';
+    let docId = null;
+    let defaultDeckName = 'Bộ học tập tự tạo';
+
+    if (allSameSource && firstWord.documentId) {
+      sourceStr = firstWord.source;
+      docId = firstWord.documentId;
+      const cleanDocTitle = firstWord.source.replace(/\.[^/.]+$/, "");
+      defaultDeckName = `${cleanDocTitle} - Lesson ${new Date().toLocaleDateString('vi-VN')}`;
+    } else {
+      defaultDeckName = `Bộ từ vựng tổng hợp - ${new Date().toLocaleDateString('vi-VN')}`;
+    }
+
+    setNewDeckName(defaultDeckName);
+    setDeckSource(sourceStr);
+    setDeckDocumentId(docId);
+    setShowCreateDeckModal(true);
+  };
+
+  const handleCreateDeckSubmit = async (e) => {
+    e.preventDefault();
+    if (!newDeckName.trim()) {
+      alert('Vui lòng nhập tên bộ Flashcard.');
+      return;
+    }
+    setIsSavingDeck(true);
+    try {
+      const selectedWordsList = fullVocabularyDataset
+        .filter(w => selectedRows.includes(w.text))
+        .map(w => w.text.split('_')[0]);
+
+      await bulkAddCards({
+        deckId: null,
+        newDeckName: newDeckName,
+        source: deckSource,
+        documentId: deckDocumentId,
+        words: selectedWordsList
+      });
+
+      alert('Đã tạo bộ Flashcard thành công!');
+      setShowCreateDeckModal(false);
+      setSelectedRows([]);
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi tạo bộ Flashcard.');
+    } finally {
+      setIsSavingDeck(false);
+    }
+  };
 
   const [documentsList, setDocumentsList] = useState([]);
 
@@ -175,6 +238,7 @@ export function VocabularyPage() {
         pinyin: w.pinyin || "pīnyīn",
         translation: w.translation || "nghĩa",
         source: w.documentTitle || "Chưa xác định",
+        documentId: w.documentId,
         dateAdded: w.dateAdded || new Date().toISOString().split('T')[0],
         difficulty: w.difficulty || "medium",
         state: state,
@@ -480,6 +544,13 @@ export function VocabularyPage() {
                 >
                   <GraduationCap className="w-3.5 h-3.5" />
                   <span>Ôn tập ngay</span>
+                </button>
+                <button
+                  onClick={handleOpenCreateDeckModal}
+                  className="bg-[#005BAC] hover:bg-[#004b90] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Tạo Flashcard</span>
                 </button>
               </div>
             )}
@@ -1016,6 +1087,69 @@ export function VocabularyPage() {
           </div>
         );
       })()}
+
+      {/* Create Custom Flashcard Deck Modal */}
+      {showCreateDeckModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col space-y-4 text-slate-700">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-800">Tạo bộ Flashcard mới</h3>
+              <button 
+                onClick={() => setShowCreateDeckModal(false)}
+                className="text-slate-400 hover:text-slate-650 transition-colors font-bold text-sm"
+              >
+                Đóng
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateDeckSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Tên bộ Flashcard</label>
+                <input
+                  type="text"
+                  value={newDeckName}
+                  onChange={(e) => setNewDeckName(e.target.value)}
+                  placeholder="Ví dụ: HSK4 Reading Lesson 19"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Nguồn tài liệu</label>
+                <input
+                  type="text"
+                  value={deckSource}
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-500 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-700">Số từ:</span>
+                <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-extrabold">{selectedRows.length}</span>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateDeckModal(false)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-500 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDeck}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
+                >
+                  {isSavingDeck ? 'Đang tạo...' : 'Tạo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

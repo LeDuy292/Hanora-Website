@@ -22,7 +22,15 @@ export const useVocabularyStore = create(
         try {
           await apiRequest(`/vocabulary/${encodeURIComponent(word.text)}/save`, {
             method: 'POST',
-            body: { documentId: word.documentId },
+            body: { 
+              documentId: word.documentId,
+              customDefinition: word.translation,
+              pinyin: word.pinyin,
+              hanViet: word.hanViet,
+              wordType: word.wordType,
+              pageNumber: word.pageNumber,
+              personalNote: word.personalNote
+            },
             auth: true
           });
         } catch (error) {
@@ -224,10 +232,11 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchUserFlashcards: async () => {
+      fetchUserFlashcards: async (deckId = null) => {
         set({ quizLoading: true });
         try {
-          const data = await apiRequest('/flashcard', { auth: true });
+          const path = deckId ? `/flashcard?deckId=${deckId}` : '/flashcard';
+          const data = await apiRequest(path, { auth: true });
           if (data) {
             set({ 
               vocabList: data,
@@ -238,6 +247,78 @@ export const useVocabularyStore = create(
         } catch (error) {
           console.error("Error fetching flashcards:", error);
           set({ isLoading: false, quizLoading: false });
+        }
+      },
+
+      fetchDecks: async () => {
+        try {
+          return await apiRequest('/flashcard/decks', { auth: true });
+        } catch (error) {
+          console.error("Error fetching decks:", error);
+          return [];
+        }
+      },
+
+      createDeck: async (name, source = null, documentId = null) => {
+        try {
+          return await apiRequest('/flashcard/decks', {
+            method: 'POST',
+            body: { name, source, documentId },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error creating deck:", error);
+          throw error;
+        }
+      },
+
+      bulkAddCards: async ({ deckId, newDeckName, source, documentId, words }) => {
+        try {
+          return await apiRequest('/flashcard/decks/bulk-add', {
+            method: 'POST',
+            body: { deckId, newDeckName, source, documentId, words },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error bulk adding cards:", error);
+          throw error;
+        }
+      },
+
+      completeFlashcardSession: async ({ deckId, cardsStudied, knowCount, completedDeck, completedWithoutInterruption }) => {
+        try {
+          return await apiRequest('/flashcard/session/complete', {
+            method: 'POST',
+            body: { deckId, cardsStudied, knowCount, completedDeck, completedWithoutInterruption },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error completing flashcard session:", error);
+        }
+      },
+
+      fetchNotifications: async () => {
+        try {
+          return await apiRequest('/notifications', { auth: true });
+        } catch (error) {
+          console.error("Error fetching notifications:", error);
+          return [];
+        }
+      },
+
+      markNotificationAsRead: async (id) => {
+        try {
+          await apiRequest(`/notifications/${id}/read`, { method: 'POST', auth: true });
+        } catch (error) {
+          console.error("Error marking notification as read:", error);
+        }
+      },
+
+      markAllNotificationsAsRead: async () => {
+        try {
+          await apiRequest('/notifications/read-all', { method: 'POST', auth: true });
+        } catch (error) {
+          console.error("Error marking all notifications as read:", error);
         }
       }
     }),

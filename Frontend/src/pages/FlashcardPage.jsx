@@ -34,13 +34,36 @@ export function FlashcardPage() {
   // Safe access to methods that might be missing in some store versions
   const userId = user?.id || 2; 
 
+  const [customDecks, setCustomDecks] = useState([]);
+  const [isLoadingDecks, setIsLoadingDecks] = useState(false);
+  const [selectedDeck, setSelectedDeck] = useState(null);
+
   // Fetch from backend on mount
   useEffect(() => {
     fetchUserFlashcards();
+    const loadCustomDecks = async () => {
+      setIsLoadingDecks(true);
+      try {
+        const res = await store.fetchDecks();
+        setCustomDecks(res || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoadingDecks(false);
+      }
+    };
+    loadCustomDecks();
   }, []);
 
-  // Selected deck state
-  const [selectedDeck, setSelectedDeck] = useState(null);
+  // Fetch deck cards when selectedDeck changes
+  useEffect(() => {
+    if (!selectedDeck) return;
+    if (selectedDeck.isCustom) {
+      fetchUserFlashcards(selectedDeck.id);
+    } else {
+      fetchUserFlashcards();
+    }
+  }, [selectedDeck?.id]);
 
   // Weak words handed off from the Practice Test ("Ôn lại từ yếu").
   const reviewWords = location.state?.reviewWords || null;
@@ -97,6 +120,29 @@ export function FlashcardPage() {
     retentionRate: `${retentionPercent}%`,
     studyTime: user?.todayMinutes ? `${Math.floor(user.todayMinutes / 60)}h ${user.todayMinutes % 60}m` : "0h 0m"
   };
+
+  const levelInfo = useMemo(() => {
+    const xp = user?.xp || 0;
+    const thresholds = [0, 300, 700, 1200, 1800, 2600, 3600, 5000, 7000, 10000];
+    let lvl = 1;
+    for (let i = 0; i < thresholds.length; i++) {
+      if (xp >= thresholds[i]) {
+        lvl = i + 1;
+      }
+    }
+    const currentThreshold = thresholds[lvl - 1];
+    const nextThreshold = lvl < 10 ? thresholds[lvl] : 10000;
+    const percent = nextThreshold > currentThreshold 
+      ? Math.min(100, Math.round(((xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100))
+      : 100;
+    
+    return {
+      level: lvl,
+      currentThreshold,
+      nextThreshold,
+      percent
+    };
+  }, [user?.xp]);
 
   // Initial Selection
   useEffect(() => {
@@ -274,6 +320,27 @@ export function FlashcardPage() {
     };
   }, [isSessionComplete, activeList, currentIndex, isFlipped, currentWord, isMarkedKnown]);
 
+  // Submit session stats when study is completed
+  useEffect(() => {
+    if (isSessionComplete) {
+      const submitSession = async () => {
+        try {
+          const deckId = selectedDeck?.isCustom ? selectedDeck.id : null;
+          await store.completeFlashcardSession({
+            deckId,
+            cardsStudied: sessionStats.cardsSeen,
+            knowCount: sessionStats.easyCount,
+            completedDeck: true,
+            completedWithoutInterruption: true
+          });
+        } catch (err) {
+          console.error("Error submitting session completion:", err);
+        }
+      };
+      submitSession();
+    }
+  }, [isSessionComplete]);
+
   if (!selectedDeck && vocabList.length > 0) return <div className="p-20 text-center">Đang tải dữ liệu...</div>;
 
   if (vocabList.length === 0) {
@@ -348,6 +415,52 @@ export function FlashcardPage() {
             <span className="stat-label text-emerald-500 font-bold">Đã thuộc</span>
             <span className="stat-value text-emerald-600">{counts.knownCount}</span>
           </div>
+        </div>
+
+        {/* Custom Decks Section */}
+        <div className="mt-5 mb-5 px-1">
+          <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-blue-600" />
+            Bộ thẻ tự chọn
+          </h3>
+          {isLoadingDecks ? (
+            <div className="text-xs text-slate-400 italic py-4 animate-pulse">Đang tải các bộ thẻ...</div>
+          ) : customDecks.length === 0 ? (
+            <p className="text-xs text-slate-450 italic py-2 bg-slate-50 rounded-xl px-4 border border-slate-100">Chưa có bộ thẻ tự chọn nào. Bạn có thể tạo từ Sổ tay hoặc trình đọc tài liệu.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {customDecks.map(deck => {
+                const isSelected = selectedDeck?.id === deck.id;
+                return (
+                  <div
+                    key={deck.id}
+                    onClick={() => {
+                      setSelectedDeck({
+                        id: deck.id,
+                        title: deck.name,
+                        count: deck.cardCount,
+                        isCustom: true,
+                        getWords: () => vocabList
+                      });
+                      setCurrentIndex(0);
+                    }}
+                    className={`p-4 bg-white border rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01] flex flex-col justify-between space-y-2.5 ${
+                      isSelected ? 'ring-2 ring-blue-600 border-blue-200 shadow-sm shadow-blue-50' : 'border-slate-200/80'
+                    }`}
+                  >
+                    <div>
+                      <h4 className="font-extrabold text-slate-800 text-sm line-clamp-1">{deck.name}</h4>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Nguồn: {deck.source || "Tự tạo"}</p>
+                    </div>
+                    <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100">
+                      <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Số từ</span>
+                      <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-black text-[10px]">{deck.cardCount} từ</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 3. Progress Bar */}
@@ -503,13 +616,13 @@ export function FlashcardPage() {
                     cx="50" cy="50" r="42" 
                     className="chart-ring ring-blue"
                     strokeDasharray="264"
-                    strokeDashoffset={264 * (1 - Math.min(1, (user?.xp || 0) / 1000))}
+                    strokeDashoffset={264 * (1 - levelInfo.percent / 100)}
                   />
                   <circle 
                     cx="50" cy="50" r="32" 
                     className="chart-ring ring-cyan"
                     strokeDasharray="201"
-                    strokeDashoffset={201 * (1 - Math.min(1, decks.find(d => d.id === 'known')?.count / (vocabList.length || 1)))}
+                    strokeDashoffset={201 * (1 - Math.min(1, (decks.find(d => d.id === 'known')?.count || 0) / (vocabList.length || 1)))}
                   />
                   <circle 
                     cx="50" cy="50" r="22" 
@@ -518,9 +631,10 @@ export function FlashcardPage() {
                     strokeDashoffset={138 * (1 - Math.min(1, (user?.todayMinutes || 0) / (user?.targetDailyMinutes || 20)))}
                   />
                 </svg>
-                <div className="chart-center-text">
-                  <span className="chart-value">{Math.round(((decks.find(d => d.id === 'known')?.count || 0) / (vocabList.length || 1)) * 100)}%</span>
-                  <span className="chart-label">Hoàn thành</span>
+                <div className="chart-center-text flex flex-col items-center justify-center">
+                  <span className="chart-value text-xl font-black leading-none">{levelInfo.percent}%</span>
+                  <span className="chart-label font-bold text-[9px] text-slate-500 mt-1">Level {levelInfo.level}</span>
+                  <span className="text-[8px] text-slate-400 font-bold mt-0.5 leading-none">{user?.xp || 0}/{levelInfo.nextThreshold} XP</span>
                 </div>
               </div>
             </div>
@@ -530,8 +644,8 @@ export function FlashcardPage() {
               <div className="stat-dot-item">
                 <span className="dot dot-blue"></span>
                 <div className="stat-text-group">
-                  <span className="stat-name">XP đã nhận</span>
-                  <span className="stat-figure">{user?.xp || 0} XP</span>
+                  <span className="stat-name">Cấp độ & XP</span>
+                  <span className="stat-figure">Lvl {levelInfo.level} ({user?.xp || 0}/{levelInfo.nextThreshold} XP)</span>
                 </div>
               </div>
               <div className="stat-dot-item">

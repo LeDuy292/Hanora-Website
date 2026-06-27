@@ -40,6 +40,7 @@ namespace Hanora
             builder.Services.AddHttpClient();
             builder.Services.AddSingleton<IBackgroundTaskQueue, DefaultBackgroundTaskQueue>();
             builder.Services.AddHostedService<DocumentProcessingWorker>();
+            builder.Services.AddHostedService<LeaderboardWeeklyRewardWorker>();
             builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
             builder.Services.AddScoped<IS3StorageService, S3StorageService>();
             builder.Services.AddScoped<IOcrService, OcrService>();
@@ -141,6 +142,40 @@ namespace Hanora
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
+
+                        -- New additions for XP, Leaderboard, Decks, and Notifications
+                        CREATE TABLE IF NOT EXISTS flashcard_decks (
+                            id            BIGSERIAL    PRIMARY KEY,
+                            user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            name          VARCHAR(255) NOT NULL,
+                            source        VARCHAR(255),
+                            document_id   BIGINT       REFERENCES documents(id) ON DELETE SET NULL,
+                            created_at    TIMESTAMPTZ  DEFAULT NOW(),
+                            updated_at    TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        ALTER TABLE flashcards DROP CONSTRAINT IF EXISTS flashcards_user_vocabulary_id_key;
+                        ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS deck_id BIGINT REFERENCES flashcard_decks(id) ON DELETE CASCADE;
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcards_user_vocab_deck ON flashcards(user_vocabulary_id, deck_id);
+
+                        CREATE TABLE IF NOT EXISTS user_notifications (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            title       VARCHAR(255) NOT NULL,
+                            message     TEXT         NOT NULL,
+                            is_read     BOOLEAN      DEFAULT FALSE,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE TABLE IF NOT EXISTS leaderboard_rewards (
+                            id            BIGSERIAL   PRIMARY KEY,
+                            user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            rank          INTEGER     NOT NULL,
+                            xp_rewarded   INTEGER     NOT NULL,
+                            week_start    DATE        NOT NULL,
+                            rewarded_at   TIMESTAMPTZ DEFAULT NOW(),
+                            UNIQUE (user_id, week_start)
+                        );
                     ");
                 }
                 catch (Exception ex)

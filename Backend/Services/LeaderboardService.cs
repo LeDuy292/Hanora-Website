@@ -39,150 +39,111 @@ namespace Services
             DateOnly startOfWeek = today.AddDays(-(7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7);
             DateOnly startOfMonth = new DateOnly(today.Year, today.Month, 1);
 
+            DateTime startOfWeekUtc = DateTime.SpecifyKind(startOfWeek.ToDateTime(TimeOnly.MinValue) - VietnamOffset, DateTimeKind.Utc);
+            DateTime startOfMonthUtc = DateTime.SpecifyKind(startOfMonth.ToDateTime(TimeOnly.MinValue) - VietnamOffset, DateTimeKind.Utc);
+
             // 1. Fetch active users and user stats
             var rawUsers = await _db.Users
                 .Where(u => u.IsActive == true)
                 .Include(u => u.UserStat)
                 .ToListAsync();
 
-            // 2. Fetch achievement bonuses
-            var achievementBonusDict = await _db.UserAchievements
-                .GroupBy(ua => ua.UserId)
-                .Select(g => new {
-                    UserId = g.Key,
-                    Bonus = g.Sum(ua => ua.Achievement.XpReward ?? 0)
-                })
-                .ToDictionaryAsync(x => x.UserId, x => x.Bonus);
+            // Filter users: only show users with at least one learning activity
+            rawUsers = rawUsers.Where(u => u.UserStat != null && 
+                ((u.UserStat.TotalXp ?? 0) > 0 ||
+                 (u.UserStat.TotalWordsSaved ?? 0) > 0 ||
+                 (u.UserStat.TotalFlashcardsDone ?? 0) > 0 ||
+                 (u.UserStat.TotalQuizzesDone ?? 0) > 0 ||
+                 (u.UserStat.TotalStudyMinutes ?? 0) > 0)).ToList();
 
-            // 3. Fetch period progress stats if needed
-            Dictionary<long, int> periodVocab = new();
-            Dictionary<long, int> periodPractice = new();
-            Dictionary<long, int> periodReading = new();
+            // 2. Fetch progress logs and reading progress to compute period stats
+            var progressLogs = await _db.LearningProgresses.ToListAsync();
+            var readingProgressList = await _db.DocumentReadingProgresses.Include(p => p.Document).ToListAsync();
 
-            if (period == "weekly" || period == "monthly")
-            {
-                DateOnly boundary = period == "weekly" ? startOfWeek : startOfMonth;
-
-                var progressAggr = await _db.LearningProgresses
-                    .Where(p => p.ActivityDate >= boundary)
-                    .GroupBy(p => p.UserId)
-                    .Select(g => new {
-                        UserId = g.Key,
-                        WordsMastered = g.Sum(p => p.WordsMastered ?? 0),
-                        QuizzesCompleted = g.Sum(p => p.QuizzesCompleted ?? 0),
-                        DocumentsRead = g.Sum(p => p.DocumentsRead ?? 0)
-                    })
-                    .ToListAsync();
-
-                periodVocab = progressAggr.ToDictionary(x => x.UserId, x => x.WordsMastered);
-                periodPractice = progressAggr.ToDictionary(x => x.UserId, x => x.QuizzesCompleted);
-                periodReading = progressAggr.ToDictionary(x => x.UserId, x => x.DocumentsRead);
-            }
-
-            // 4. Calculate score for each user
+            // 3. Calculate score for each user
             var list = new List<LeaderboardUserDto>();
             foreach (var u in rawUsers)
             {
-                var stats = u.UserStat;
-                if (stats == null) continue;
-
+                var stats = u.UserStat!;
                 int totalXp = stats.TotalXp ?? 0;
                 int currentStreak = stats.CurrentStreakDays ?? 0;
-                int totalWordsMastered = stats.TotalWordsMastered ?? 0;
-                int totalQuizzesDone = stats.TotalQuizzesDone ?? 0;
-                int totalDocsRead = stats.TotalDocumentsRead ?? 0;
-                double avgPronunciation = (double)(stats.AveragePronunciationScore ?? 0.00m);
 
-                // Calculate achievements bonus
-                achievementBonusDict.TryGetValue(u.Id, out int achievementBonus);
+                // All time values
+                int allTimeVocab = stats.TotalWordsSaved ?? 0;
+                int allTimePractice = (stats.TotalFlashcardsDone ?? 0) + (stats.TotalQuizzesDone ?? 0);
+                int allTimeReadingDocs = stats.TotalDocumentsRead ?? 0;
+                int allTimeReadingMins = stats.TotalStudyMinutes ?? 0;
+                double allTimeReadingChars = readingProgressList
+                    .Where(p => p.UserId == u.Id)
+                    .Sum(p => (p.Document != null && p.Document.ExtractedText != null)
+                        ? ((double)(p.ProgressPercent ?? 0) / 100.0 * p.Document.ExtractedText.Length)
+                        : 0.0);
 
-                // Calculate streak bonus
-                int streakBonus = currentStreak >= 365 ? 1000 :
-                                  currentStreak >= 180 ? 500 :
-                                  currentStreak >= 90  ? 300 :
-                                  currentStreak >= 30  ? 150 :
-                                  currentStreak >= 7   ? 50 : 0;
+                // Period values
+                int periodXp = totalXp;
+                int periodVocab = allTimeVocab;
+                int periodPractice = allTimePractice;
+                int periodReadingDocs = allTimeReadingDocs;
+                int periodReadingMins = allTimeReadingMins;
+                double periodReadingChars = allTimeReadingChars;
 
-                // Calculate vocabulary bonus
-                int vocabBonus = totalWordsMastered >= 3000 ? 1500 :
-                                 totalWordsMastered >= 1000 ? 500 :
-                                 totalWordsMastered >= 500  ? 200 :
-                                 totalWordsMastered >= 100  ? 50 : 0;
+                if (period == "weekly" || period == "monthly")
+                {
+                    DateOnly dateBoundary = period == "weekly" ? startOfWeek : startOfMonth;
+                    DateTime timeBoundaryUtc = period == "weekly" ? startOfWeekUtc : startOfMonthUtc;
 
-                int globalRankingScore = totalXp + achievementBonus + streakBonus + vocabBonus;
+                    periodXp = period == "weekly" ? (stats.XpThisWeek ?? 0) : (stats.XpThisMonth ?? 0);
+                    
+                    var userProgress = progressLogs.Where(p => p.UserId == u.Id && p.ActivityDate >= dateBoundary).ToList();
+                    periodVocab = userProgress.Sum(p => p.NewWordsSaved ?? 0);
+                    periodPractice = userProgress.Sum(p => (p.FlashcardsReviewed ?? 0) + (p.QuizzesCompleted ?? 0));
+                    periodReadingDocs = userProgress.Sum(p => p.DocumentsRead ?? 0);
+                    periodReadingMins = userProgress.Sum(p => p.StudyMinutes ?? 0);
+
+                    periodReadingChars = readingProgressList
+                        .Where(p => p.UserId == u.Id && p.LastReadAt >= timeBoundaryUtc)
+                        .Sum(p => (p.Document != null && p.Document.ExtractedText != null)
+                            ? ((double)(p.ProgressPercent ?? 0) / 100.0 * p.Document.ExtractedText.Length)
+                            : 0.0);
+                }
 
                 double finalScore = 0;
                 string? secondaryValue = null;
-                int xpUsed = totalXp;
+                int xpToShow = period == "global" ? totalXp : periodXp;
 
-                // Determine sorting values and secondary info text based on filters
-                if (period == "global")
+                if (criteria == "vocabulary")
                 {
-                    if (criteria == "default")
-                    {
-                        finalScore = globalRankingScore;
-                        secondaryValue = $"{globalRankingScore} điểm";
-                    }
-                    else if (criteria == "vocabulary")
-                    {
-                        finalScore = totalWordsMastered;
-                        secondaryValue = $"{totalWordsMastered} từ";
-                    }
-                    else if (criteria == "practice")
-                    {
-                        finalScore = totalQuizzesDone;
-                        secondaryValue = $"{totalQuizzesDone} bài quiz";
-                    }
-                    else if (criteria == "reading")
-                    {
-                        finalScore = totalDocsRead;
-                        secondaryValue = $"{totalDocsRead} tài liệu";
-                    }
-                    else if (criteria == "pronunciation")
-                    {
-                        finalScore = avgPronunciation;
-                        secondaryValue = stats.TotalPronunciationAttempts > 0 ? $"{avgPronunciation:F1} điểm" : "Chưa thử";
-                    }
+                    finalScore = period == "global" ? allTimeVocab : periodVocab;
+                    secondaryValue = $"{finalScore} từ";
                 }
-                else // weekly or monthly
+                else if (criteria == "practice")
                 {
-                    xpUsed = period == "weekly" ? (stats.XpThisWeek ?? 0) : (stats.XpThisMonth ?? 0);
-
-                    if (criteria == "default")
-                    {
-                        finalScore = xpUsed;
-                        secondaryValue = $"+{xpUsed} XP";
-                    }
-                    else if (criteria == "vocabulary")
-                    {
-                        periodVocab.TryGetValue(u.Id, out int pv);
-                        finalScore = pv;
-                        secondaryValue = $"{pv} từ";
-                    }
-                    else if (criteria == "practice")
-                    {
-                        periodPractice.TryGetValue(u.Id, out int pp);
-                        finalScore = pp;
-                        secondaryValue = $"{pp} bài quiz";
-                    }
-                    else if (criteria == "reading")
-                    {
-                        periodReading.TryGetValue(u.Id, out int pr);
-                        finalScore = pr;
-                        secondaryValue = $"{pr} tài liệu";
-                    }
-                    else if (criteria == "pronunciation")
-                    {
-                        // Pronunciation uses all-time average since it is not logged daily
-                        finalScore = avgPronunciation;
-                        secondaryValue = stats.TotalPronunciationAttempts > 0 ? $"{avgPronunciation:F1} điểm" : "Chưa thử";
-                    }
+                    finalScore = period == "global" ? allTimePractice : periodPractice;
+                    secondaryValue = $"{finalScore} lượt";
+                }
+                else if (criteria == "reading")
+                {
+                    int mins = period == "global" ? allTimeReadingMins : periodReadingMins;
+                    int docs = period == "global" ? allTimeReadingDocs : periodReadingDocs;
+                    double chars = period == "global" ? allTimeReadingChars : periodReadingChars;
+                    
+                    finalScore = mins + (docs * 50) + (chars / 100.0);
+                    secondaryValue = $"{docs} tài liệu";
+                }
+                else if (criteria == "pronunciation")
+                {
+                    finalScore = (double)(stats.AveragePronunciationScore ?? 0.00m);
+                    secondaryValue = stats.TotalPronunciationAttempts > 0 ? $"{finalScore:F1} điểm" : "Chưa thử";
+                }
+                else // default/XP
+                {
+                    finalScore = xpToShow;
+                    secondaryValue = period == "global" ? $"{finalScore} XP" : $"+{finalScore} XP";
                 }
 
-                // If sorting by pronunciation, skip users who haven't done pronunciation tests yet
+                // Skip pronunciation if no attempts
                 if (criteria == "pronunciation" && stats.TotalPronunciationAttempts == 0)
                 {
-                    // Do not show them on the leaderboard if they haven't tried
                     continue;
                 }
 
@@ -192,15 +153,15 @@ namespace Services
                     Username = u.Username,
                     DisplayName = u.DisplayName ?? u.Username,
                     AvatarUrl = u.AvatarUrl,
-                    Level = LevelForXp(totalXp),
+                    Level = StatsService.CalculateLevel(totalXp),
                     Score = finalScore,
                     Streak = currentStreak,
-                    Xp = xpUsed,
+                    Xp = xpToShow,
                     SecondaryValue = secondaryValue
                 });
             }
 
-            // 5. Sort list and assign ranks
+            // 4. Sort list and assign ranks
             var sortedList = list
                 .OrderByDescending(x => x.Score)
                 .ThenByDescending(x => x.UserId) // break ties consistently
@@ -219,11 +180,11 @@ namespace Services
                 })
                 .ToList();
 
-            // 6. Split into Top 3 and remaining
+            // 5. Split into Top 3 and remaining (Top 10 total)
             var top3 = sortedList.Take(3).ToList();
-            var rankings = sortedList.Skip(3).Take(97).ToList(); // Top 100 overall
+            var rankings = sortedList.Skip(3).Take(7).ToList(); // Only return ranks 4 to 10 for Top 10 limit!
 
-            // 7. Find current user card info
+            // 6. Find current user card info (can be outside Top 10)
             var currentUserDto = sortedList.FirstOrDefault(x => x.UserId == userId);
             if (currentUserDto != null)
             {
@@ -235,10 +196,10 @@ namespace Services
                     string unit = criteria switch
                     {
                         "vocabulary" => "từ",
-                        "practice" => "bài quiz",
-                        "reading" => "tài liệu",
+                        "practice" => "lượt thực hành",
+                        "reading" => "điểm đọc",
                         "pronunciation" => "điểm phát âm",
-                        _ => period == "global" ? "điểm" : "XP"
+                        _ => period == "global" ? "XP" : "XP"
                     };
                     nextRankDiffText = $"Cần thêm {diff:F1} {unit} để đạt Hạng #{targetUser.Rank}";
                 }
@@ -246,7 +207,7 @@ namespace Services
                 currentUserDto = currentUserDto with { SecondaryValue = nextRankDiffText };
             }
 
-            // 8. Calculate Hall of Fame (always all-time based)
+            // 7. Calculate Hall of Fame
             var hallOfFame = await CalculateHallOfFameAsync(rawUsers);
 
             return new LeaderboardResultDto

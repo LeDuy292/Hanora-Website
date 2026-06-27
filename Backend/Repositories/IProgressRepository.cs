@@ -121,9 +121,8 @@ namespace Repositories
 
         public async Task<int> GetTotalXpAsync(long userId)
         {
-            return await _db.QuizSessions
-                .Where(q => q.UserId == userId && q.Status == "Completed")
-                .SumAsync(q => q.Xp ?? 0);
+            var stat = await _db.UserStats.FirstOrDefaultAsync(us => us.UserId == userId);
+            return stat?.TotalXp ?? 0;
         }
 
         public async Task<(int count, int xp, int timeSeconds)> GetQuizStatsInRangeAsync(long userId, DateTime fromUtc, DateTime toUtc)

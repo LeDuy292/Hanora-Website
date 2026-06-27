@@ -29,7 +29,7 @@ public partial class UserVocabulary
 
     public DateTime? SavedAt { get; set; }
 
-    public virtual Flashcard? Flashcard { get; set; }
+    public virtual ICollection<Flashcard> Flashcards { get; set; } = new List<Flashcard>();
 
     public virtual Document? SourceDocument { get; set; }
 

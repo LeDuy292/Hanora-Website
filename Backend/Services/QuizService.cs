@@ -11,6 +11,7 @@ public class QuizService : IQuizService
     private readonly IVocabularyRepository _vocabRepo;
     private readonly IQuizAiService _quizAi;
     private readonly ILogger<QuizService> _logger;
+    private readonly IStatsService _statsService;
 
     // Mastery is tracked on a 0–100 scale (see spec). +5 correct, -3 wrong.
     private const int MasteryMax = 100;
@@ -23,12 +24,14 @@ public class QuizService : IQuizService
         IQuizRepository quizRepo,
         IVocabularyRepository vocabRepo,
         IQuizAiService quizAi,
-        ILogger<QuizService> logger)
+        ILogger<QuizService> logger,
+        IStatsService statsService)
     {
         _quizRepo = quizRepo;
         _vocabRepo = vocabRepo;
         _quizAi = quizAi;
         _logger = logger;
+        _statsService = statsService;
     }
 
     // ============================================================
@@ -322,11 +325,31 @@ public class QuizService : IQuizService
             : 0;
         session.Score = finalScore;
         session.TimeSpentSeconds = totalTimeMs / 1000;
-        session.Xp = session.AccuracyPercent > 90 ? 70 : (session.AccuracyPercent > 50 ? 50 : 20);
-        session.XpEarned = session.Xp;
+
+        string diff = (session.Difficulty ?? "medium").ToLowerInvariant();
+        double baseMultiplier = diff switch
+        {
+            "easy" => 3.0,
+            "hard" => 4.0,
+            _ => 50.0 / 15.0 // medium
+        };
+        int calculatedXp = (int)Math.Round(baseMultiplier * correctCount);
+        if (diff == "hard" && session.AccuracyPercent >= 95m)
+        {
+            calculatedXp += 20;
+        }
+
+        session.Xp = calculatedXp;
+        session.XpEarned = calculatedXp;
         session.CompletedAt = DateTime.UtcNow;
         session.Status = "Completed";
         session.SkillsJson = JsonSerializer.Serialize(CalculateSkills(session));
+
+        // Track quiz completion stats
+        await _statsService.TrackQuizCompletionAsync(session.UserId, total, correctCount);
+
+        // Award XP
+        await _statsService.AwardXpAsync(session.UserId, calculatedXp, $"Làm bài kiểm tra Flashcard ({session.Difficulty})");
 
         // Mastery updates + weak-word review list.
         var reviews = await UpdateMasteryAndCollectReviewsAsync(session);

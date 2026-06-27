@@ -18,7 +18,7 @@ public class FlashcardRepository : IFlashcardRepository
         return await _db.UserVocabularies
             .Include(uv => uv.Vocabulary)
                 .ThenInclude(v => v.ExampleSentencesNavigation)
-            .Include(uv => uv.Flashcard)
+            .Include(uv => uv.Flashcards)
             .Include(uv => uv.SourceDocument)
             .Where(uv => uv.UserId == userId)
             .ToListAsync();
@@ -27,7 +27,7 @@ public class FlashcardRepository : IFlashcardRepository
     public async Task<UserVocabulary?> GetUserVocabularyByIdsAsync(long userId, long vocabularyId)
     {
         return await _db.UserVocabularies
-            .Include(uv => uv.Flashcard)
+            .Include(uv => uv.Flashcards)
             .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId);
     }
 
