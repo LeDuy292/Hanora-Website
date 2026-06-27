@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations, 
   saveDocumentAnnotations, exportDocx, askAiAssistant 
@@ -64,6 +64,8 @@ const ReaderPage = () => {
   const { id } = useParams();
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
+  const WORDS_PER_PAGE = 500;
+  const totalPages = Math.ceil(segments.length / WORDS_PER_PAGE) || 1;
   const [selectedWord, setSelectedWord] = useState(null);
   const [vocabData, setVocabData] = useState(null);
   const [isLoadingVocab, setIsLoadingVocab] = useState(false);
@@ -210,6 +212,48 @@ const ReaderPage = () => {
     fetchDocsList();
   }, []);
 
+  const currentPageRef = useRef(currentPage);
+  const totalPagesRef = useRef(totalPages);
+  const readingSecondsRef = useRef(readingSeconds);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  useEffect(() => {
+    totalPagesRef.current = totalPages;
+  }, [totalPages]);
+
+  useEffect(() => {
+    readingSecondsRef.current = readingSeconds;
+  }, [readingSeconds]);
+
+  const saveReadingProgress = async () => {
+    if (!document?.id) return;
+    const currPage = currentPageRef.current;
+    const totPages = totalPagesRef.current;
+    const sec = readingSecondsRef.current;
+    try {
+      await apiRequest(`/documents/${document.id}/progress`, {
+        method: 'POST',
+        body: {
+          lastPage: currPage,
+          progressPercent: Math.min(100, Math.round((currPage / totPages) * 100)),
+          readingMinutes: Math.floor(sec / 60)
+        },
+        auth: true
+      });
+    } catch (err) {
+      console.error("Error saving reading progress:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (document) {
+      saveReadingProgress();
+    }
+  }, [currentPage, document]);
+
   // Set up document study time active tracking
   useEffect(() => {
     if (!document) return;
@@ -220,6 +264,7 @@ const ReaderPage = () => {
         if (next > 0 && next % 60 === 0) {
           trackStudyTime(1).then(() => {
             refreshStats();
+            saveReadingProgress();
           });
         }
         return next;
@@ -702,8 +747,7 @@ const ReaderPage = () => {
     }
   };
 
-  const WORDS_PER_PAGE = 500;
-  const totalPages = Math.ceil(segments.length / WORDS_PER_PAGE) || 1;
+
   const validCurrentPage = Math.min(currentPage, totalPages);
   const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
 
@@ -1530,6 +1574,7 @@ const ReaderPage = () => {
                         documentId={id}
                         documentTitle={document?.title}
                         documentText={segments.join('')}
+                        pageNumber={validCurrentPage}
                       />
                     </div>
                   )}

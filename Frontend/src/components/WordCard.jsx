@@ -40,12 +40,22 @@ const getHskLevel = (w) => {
   return (hash % 6) + 1;
 };
 
-const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitle, documentText }) => {
+const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitle, documentText, pageNumber }) => {
   const addWord = useVocabularyStore(state => state.addWord);
   const updateServerStatus = useVocabularyStore(state => state.updateServerStatus);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingFlashcard, setIsSavingFlashcard] = useState(false);
+
+  const [showDeckModal, setShowDeckModal] = useState(false);
+  const [decks, setDecks] = useState([]);
+  const [selectedDeckId, setSelectedDeckId] = useState('');
+  const [isCreatingNewDeck, setIsCreatingNewDeck] = useState(false);
+  const [newDeckName, setNewDeckName] = useState('');
+  const [isLoadingDecks, setIsLoadingDecks] = useState(false);
+
+  const fetchDecks = useVocabularyStore(state => state.fetchDecks);
+  const bulkAddCards = useVocabularyStore(state => state.bulkAddCards);
 
   // States for sentence translation
   const isSentence = word && (word.trim().length > 4 || /[,.!?，。！？]/g.test(word));
@@ -130,7 +140,10 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         pinyin: data.pinyin,
         translation: typeof data.definitions === 'string' ? data.definitions : JSON.stringify(data.definitions),
         documentId: documentId,
-        documentTitle: documentTitle
+        documentTitle: documentTitle,
+        hanViet: data.hanViet,
+        wordType: data.wordType,
+        pageNumber: pageNumber
       });
       alert('Đã lưu vào sổ tay thành công!');
     } catch (error) {
@@ -141,12 +154,44 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
     }
   };
 
-  const handleSaveToFlashcard = async () => {
-    if (!word) return;
+  const handleOpenDeckModal = async () => {
+    setShowDeckModal(true);
+    setIsLoadingDecks(true);
+    try {
+      const userDecks = await fetchDecks();
+      setDecks(userDecks || []);
+      if (!userDecks || userDecks.length === 0) {
+        setIsCreatingNewDeck(true);
+      } else {
+        setSelectedDeckId(userDecks[0].id);
+        setIsCreatingNewDeck(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingDecks(false);
+    }
+  };
+
+  const handleDeckSubmit = async (e) => {
+    e.preventDefault();
+    if (isCreatingNewDeck && !newDeckName.trim()) {
+      alert("Vui lòng nhập tên bộ Flashcard mới.");
+      return;
+    }
+    
     setIsSavingFlashcard(true);
     try {
-      await updateServerStatus(data.word, "learning", 0);
-      alert('Đã lưu vào danh sách Flashcard thành công!');
+      await bulkAddCards({
+        deckId: isCreatingNewDeck ? null : selectedDeckId,
+        newDeckName: isCreatingNewDeck ? newDeckName : null,
+        source: documentTitle || "Dịch thuật",
+        documentId: documentId,
+        words: [data.word]
+      });
+      alert('Đã thêm từ vào Flashcard thành công!');
+      setShowDeckModal(false);
+      setNewDeckName('');
     } catch (error) {
       console.error(error);
       alert('Có lỗi xảy ra khi lưu Flashcard.');
@@ -663,14 +708,113 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         </button>
         
         <button 
-          onClick={handleSaveToFlashcard}
+          onClick={handleOpenDeckModal}
           disabled={isSavingFlashcard}
           className="flex-grow flex items-center justify-center gap-1 bg-[#005BAC] hover:bg-[#004b90] disabled:bg-blue-400 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider active:scale-95"
         >
           <Layers className="w-4 h-4" />
-          {isSavingFlashcard ? 'Lưu Flashcard...' : 'Lưu Flashcard'}
+          Thêm Flashcard
         </button>
       </div>
+
+      {/* Deck Selection/Creation Modal */}
+      {showDeckModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-800">Thêm vào bộ Flashcard</h3>
+              <button 
+                onClick={() => setShowDeckModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors font-bold text-sm"
+              >
+                Đóng
+              </button>
+            </div>
+            
+            <form onSubmit={handleDeckSubmit} className="space-y-4">
+              {isLoadingDecks ? (
+                <div className="py-6 text-center text-slate-500 text-xs">Đang tải danh sách bộ...</div>
+              ) : (
+                <>
+                  {decks.length > 0 && (
+                    <div className="flex items-center gap-4 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="deckMode" 
+                          checked={!isCreatingNewDeck} 
+                          onChange={() => setIsCreatingNewDeck(false)}
+                          className="text-blue-600"
+                        />
+                        Chọn bộ có sẵn
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="deckMode" 
+                          checked={isCreatingNewDeck} 
+                          onChange={() => setIsCreatingNewDeck(true)}
+                          className="text-blue-600"
+                        />
+                        Tạo bộ mới
+                      </label>
+                    </div>
+                  )}
+
+                  {!isCreatingNewDeck ? (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-455 uppercase tracking-wider">Chọn bộ Flashcard</label>
+                      <select
+                        value={selectedDeckId}
+                        onChange={(e) => setSelectedDeckId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
+                      >
+                        {decks.map(d => (
+                          <option key={d.id} value={d.id}>{d.name} ({d.cardCount} từ)</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tên bộ mới</label>
+                      <input
+                        type="text"
+                        value={newDeckName}
+                        onChange={(e) => setNewDeckName(e.target.value)}
+                        placeholder="Ví dụ: HSK4 Reading Lesson 19"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 space-y-1 text-xs">
+                    <p className="text-slate-500"><span className="font-bold text-slate-700">Từ vựng:</span> {data.word}</p>
+                    <p className="text-slate-500"><span className="font-bold text-slate-700">Nguồn:</span> {documentTitle || "Dịch thuật"}</p>
+                  </div>
+                </>
+              )}
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeckModal(false)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-500 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingFlashcard || isLoadingDecks}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
+                >
+                  {isSavingFlashcard ? 'Đang thêm...' : 'Xác nhận'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -225,24 +225,32 @@ Return ONLY a valid JSON object matching exactly this schema:
 }}
 Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
 
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
-        var payload = new { contents = new[] { new { parts = new[] { new { text = prompt } } } }, generationConfig = new { responseMimeType = "application/json" } };
+        var url = "https://api.deepseek.com/chat/completions";
+        var payload = new 
+        { 
+            model = "deepseek-chat",
+            messages = new[] { new { role = "user", content = prompt } }, 
+            response_format = new { type = "json_object" } 
+        };
 
         try
         {
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
 
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Gemini API error (AnalyzeSentence): {StatusCode} {Error}", response.StatusCode, error);
+                _logger.LogWarning("Deepseek API error (AnalyzeSentence): {StatusCode} {Error}", response.StatusCode, error);
                 return null;
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
-            var textResponse = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+            var textResponse = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
             if (string.IsNullOrEmpty(textResponse)) return null;
 
@@ -273,24 +281,32 @@ Return ONLY a valid JSON object matching exactly this schema:
 }}
 Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
 
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
-        var payload = new { contents = new[] { new { parts = new[] { new { text = prompt } } } }, generationConfig = new { responseMimeType = "application/json" } };
+        var url = "https://api.deepseek.com/chat/completions";
+        var payload = new 
+        { 
+            model = "deepseek-chat",
+            messages = new[] { new { role = "user", content = prompt } }, 
+            response_format = new { type = "json_object" } 
+        };
 
         try
         {
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
 
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Gemini API error (CompareSentences): {StatusCode} {Error}", response.StatusCode, error);
+                _logger.LogWarning("Deepseek API error (CompareSentences): {StatusCode} {Error}", response.StatusCode, error);
                 return null;
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
-            var textResponse = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+            var textResponse = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
             if (string.IsNullOrEmpty(textResponse)) return null;
 
@@ -316,36 +332,33 @@ Câu hỏi của học viên là: '{question}'.
 
 Hãy trả lời ngắn gọn, súc tích, dễ hiểu bằng tiếng Việt để giúp người học làm rõ thắc mắc của họ, cung cấp mẹo ghi nhớ hoặc các ví dụ thực tế liên quan nếu cần.";
 
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_apiKey}";
-        var payload = new
-        {
-            contents = new[]
-            {
-                new {
-                    parts = new[] {
-                        new { text = prompt }
-                    }
-                }
-            }
+        var url = "https://api.deepseek.com/chat/completions";
+        var payload = new 
+        { 
+            model = "deepseek-chat",
+            messages = new[] { new { role = "user", content = prompt } }
         };
 
         try
         {
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
 
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Gemini API error (AskAiAssistant): {StatusCode} {Error}", response.StatusCode, error);
+                _logger.LogWarning("Deepseek API error (AskAiAssistant): {StatusCode} {Error}", response.StatusCode, error);
                 return "Không thể kết nối với AI lúc này.";
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
-            var reply = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+            var textResponse = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
-            return reply ?? "Không nhận được phản hồi từ AI.";
+            return textResponse ?? "Không nhận được phản hồi từ AI.";
         }
         catch (Exception ex)
         {

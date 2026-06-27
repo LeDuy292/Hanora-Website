@@ -326,6 +326,29 @@ export function LeaderboardPage() {
               </div>
             )}
             
+            {!currentUserCard && (
+              <div className="bg-gradient-to-br from-slate-650 to-slate-800 rounded-[2rem] p-6 shadow-md text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">Thứ hạng của bạn</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-xl font-extrabold">Chưa xếp hạng</span>
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/20 shadow-inner">
+                    <Award className="w-5 h-5 text-slate-400" />
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <p className="text-xs text-white/80 font-medium leading-relaxed">
+                    Bạn chưa có hoạt động học tập nào. Hãy bắt đầu học từ mới, làm bài kiểm tra hoặc đọc tài liệu để được xếp hạng nhé!
+                  </p>
+                </div>
+              </div>
+            )}
+            
             {/* HALL OF FAME BENTO GRID */}
             {hallOfFame && (
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-5">
