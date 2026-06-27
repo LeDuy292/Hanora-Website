@@ -391,54 +391,31 @@ export function FlashcardPage() {
             </Button>
           </div>
         </header>
-
-
-
-        {/* Custom Decks Section */}
-        <div className="mt-5 mb-5 px-1">
-          <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-blue-600" />
-            Bộ thẻ tự chọn
-          </h3>
-          {isLoadingDecks ? (
-            <div className="text-xs text-slate-400 italic py-4 animate-pulse">Đang tải các bộ thẻ...</div>
-          ) : customDecks.length === 0 ? (
-            <p className="text-xs text-slate-450 italic py-2 bg-slate-50 rounded-xl px-4 border border-slate-100">Chưa có bộ thẻ tự chọn nào. Bạn có thể tạo từ Sổ tay hoặc trình đọc tài liệu.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customDecks.map(deck => {
-                const isSelected = selectedDeck?.id === deck.id;
-                return (
-                  <div
-                    key={deck.id}
-                    onClick={() => {
-                      setSelectedDeck({
-                        id: deck.id,
-                        title: deck.name,
-                        count: deck.cardCount,
-                        isCustom: true,
-                        getWords: () => vocabList
-                      });
-                      setCurrentIndex(0);
-                    }}
-                    className={`p-4 bg-white border rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01] flex flex-col justify-between space-y-2.5 ${
-                      isSelected ? 'ring-2 ring-blue-600 border-blue-200 shadow-sm shadow-blue-50' : 'border-slate-200/80'
-                    }`}
-                  >
-                    <div>
-                      <h4 className="font-extrabold text-slate-800 text-sm line-clamp-1">{deck.name}</h4>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Nguồn: {deck.source || "Tự tạo"}</p>
-                    </div>
-                    <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100">
-                      <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Số từ</span>
-                      <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-black text-[10px]">{deck.cardCount} từ</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* 2. Stats Bar */}
+        <div className="stats-grid">
+          <div 
+            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'new' ? 'ring-2 ring-teal-500 border-teal-200' : ''}`}
+            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'new')); setCurrentIndex(0); }}
+          >
+            <span className="stat-label">Học mới</span>
+            <span className="stat-value text-teal-600">{counts.newCount}</span>
+          </div>
+          <div 
+            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'learning' ? 'ring-2 ring-blue-500 border-blue-200' : ''}`}
+            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'learning')); setCurrentIndex(0); }}
+          >
+            <span className="stat-label">Đang học</span>
+            <span className="stat-value text-blue-600">{counts.learningCount}</span>
+          </div>
+          <div 
+            className={`stat-card cursor-pointer transition-all hover:scale-[1.02] ${selectedDeck?.id === 'known' ? 'ring-2 ring-emerald-500 border-emerald-200' : ''}`}
+            onClick={() => { setSelectedDeck(decks.find(d => d.id === 'known')); setCurrentIndex(0); }}
+          >
+            <span className="stat-label text-emerald-500 font-bold">Đã thuộc</span>
+            <span className="stat-value text-emerald-600">{counts.knownCount}</span>
+          </div>
         </div>
+
 
         {/* 3. Progress Bar */}
         <div className="progress-section">

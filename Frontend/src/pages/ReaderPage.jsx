@@ -154,10 +154,24 @@ const ReaderPage = () => {
         if (doc.extractedText) {
           try {
             const parsed = JSON.parse(doc.extractedText);
-            setSegments(parsed);
+            // Normalize \r\n to \n so LINE_BREAK/PARAGRAPH_BREAK comparisons work
+            const normalized = parsed.map(s =>
+              typeof s === 'string' ? s.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : s
+            );
+            setSegments(normalized);
           } catch (e) {
-            console.warn("Extracted text is not valid JSON, splitting by spaces.", e);
-            setSegments(doc.extractedText.split(/\s+/).filter(Boolean));
+            console.warn("Extracted text is not valid JSON, preserving line breaks.", e);
+            // Fallback: split by newline and words but preserve structure markers
+            const raw = doc.extractedText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const fallbackSegs = [];
+            raw.split('\n\n').forEach((para, pi) => {
+              if (pi > 0) fallbackSegs.push('\n\n');
+              para.split('\n').forEach((line, li) => {
+                if (li > 0) fallbackSegs.push('\n');
+                line.split(/\s+/).filter(Boolean).forEach(w => fallbackSegs.push(w));
+              });
+            });
+            setSegments(fallbackSegs);
           }
         }
       } catch (error) {
@@ -1358,8 +1372,8 @@ const ReaderPage = () => {
 
                   <div
                     ref={readerContainerRef}
-                    className={`flex-1 tracking-wide break-words text-justify overflow-y-auto pr-3 select-text scrollbar-thin ${fontStyles[fontMode]}`}
-                    style={{ fontSize: `${fontSize}px`, lineHeight: '2.4' }}
+                    className={`flex-1 break-words overflow-y-auto pr-3 select-text scrollbar-thin ${fontStyles[fontMode]}`}
+                    style={{ fontSize: `${fontSize}px`, lineHeight: '2.4', wordSpacing: '0', letterSpacing: '0.02em' }}
                     onMouseUp={handleTextSelection}
                   >
                     <div className="relative min-h-full">
@@ -1402,7 +1416,7 @@ const ReaderPage = () => {
                               onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
                               onMouseLeave={handleWordMouseLeave}
                               style={highlightColor ? { backgroundColor: highlightColor } : undefined}
-                              className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-lg px-1.5 mx-0.5 transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
+                              className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-sm transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
                                 } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
                             >
                               <span className="leading-none flex items-center">
