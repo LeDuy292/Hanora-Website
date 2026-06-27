@@ -91,18 +91,21 @@ public class VocabularyService : IVocabularyService
             if (vocab == null)
             {
                 vocab = new Vocabulary
+
                 {
                     Word = aiResponse.Word,
                     Pinyin = aiResponse.Pinyin,
                     Definitions = newDefinitionsJson,
                     UsageNotes = aiResponse.UsageNotes,
                     WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null,
+
                     HanViet = aiResponse.HanViet,
                     Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null,
                     GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     ExampleSentencesNavigation = aiResponse.Examples.Select(e => new ExampleSentence
+
                     {
                         ZhText = e.ZhText,
                         ViText = e.ViText,
@@ -119,6 +122,7 @@ public class VocabularyService : IVocabularyService
                 vocab.Definitions = newDefinitionsJson;
                 vocab.UsageNotes = aiResponse.UsageNotes;
                 vocab.WordType = Enum.TryParse<WordType>(aiResponse.WordType, true, out var type) ? type : null;
+
                 vocab.HanViet = aiResponse.HanViet;
                 vocab.Collocations = aiResponse.Collocations != null ? JsonSerializer.Serialize(aiResponse.Collocations) : null;
                 vocab.GrammarPatterns = aiResponse.GrammarPatterns != null ? JsonSerializer.Serialize(aiResponse.GrammarPatterns) : null;
@@ -138,6 +142,7 @@ public class VocabularyService : IVocabularyService
                         });
                     }
                 }
+
 
                 await _vocabularyRepo.UpdateAsync(vocab);
             }

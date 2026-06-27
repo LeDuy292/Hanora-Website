@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using UglyToad.PdfPig;
@@ -42,16 +43,16 @@ public class OcrService : IOcrService
             }
             else if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                var (text, pdfBytes, paddleError) = ExtractWithPaddleOcrAndPdf(memoryStream, fileName);
+                var (text, pdfBytes, ocrError) = await ExtractWithAzureOcrAndPdfAsync(memoryStream, fileName);
                 
-                if (!string.IsNullOrEmpty(paddleError))
+                if (!string.IsNullOrEmpty(ocrError))
                 {
-                    return (null, null, $"PaddleOCR Error: {paddleError}");
+                    return (null, null, $"Azure OCR Error: {ocrError}");
                 }
 
                 if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 5)
                 {
-                    _logger.LogInformation("PaddleOCR extraction failed or yielded little text. Rejecting image.");
+                    _logger.LogInformation("Azure OCR extraction failed or yielded little text. Rejecting image.");
                     return (null, null, "Ảnh quá mờ không thể dịch thuật được.");
                 }
 
@@ -85,7 +86,7 @@ public class OcrService : IOcrService
         return text.ToString();
     }
 
-    private (string? text, byte[]? pdfBytes, string? errorMessage) ExtractWithPaddleOcrAndPdf(Stream fileStream, string fileName)
+    private async Task<(string? text, byte[]? pdfBytes, string? errorMessage)> ExtractWithAzureOcrAndPdfAsync(Stream fileStream, string fileName)
     {
         try
         {
@@ -93,53 +94,94 @@ public class OcrService : IOcrService
             fileStream.CopyTo(ms);
             var bytes = ms.ToArray();
 
-            string text = "";
-            byte[]? pdfBytes = null;
+            // --- Azure Computer Vision Read API (REST) ---
+            var endpoint = _config["AzureComputerVision:Endpoint"]?.Trim().TrimEnd('/')
+                ?? throw new InvalidOperationException("AzureComputerVision:Endpoint is not configured.");
+            var key = _config["AzureComputerVision:Key"]?.Trim()
+                ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
-            // Run PaddleOCR
-            using var img = OpenCvSharp.Cv2.ImDecode(bytes, OpenCvSharp.ImreadModes.Color);
-            var model = Sdcb.PaddleOCR.Models.Local.LocalFullModels.ChineseV5;
-            using var all = new Sdcb.PaddleOCR.PaddleOcrAll(model, config =>
+            var requestUrl = $"{endpoint}/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read";
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", key);
+            request.Content = new ByteArrayContent(bytes);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+            var response = await _httpClient.SendAsync(request);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
             {
-                config.UseGpu = false;
-            });
-            
-            var result = all.Run(img);
-            text = result.Text;
+                _logger.LogWarning("Azure Computer Vision API error: {StatusCode} {Body}", response.StatusCode, responseBody);
+                return (null, null, $"Azure API Error ({(int)response.StatusCode}): {responseBody}");
+            }
 
-            // Generate Searchable PDF using iText7
+            // Parse the JSON response
+            using var doc = JsonDocument.Parse(responseBody);
+            var readResult = doc.RootElement.GetProperty("readResult");
+            var blocks = readResult.GetProperty("blocks");
+
+            // Build full text from all blocks/lines
+            var textBuilder = new StringBuilder();
+            var lineInfos = new List<(string Text, float X, float Y, float Width, float Height)>();
+
+            foreach (var block in blocks.EnumerateArray())
+            {
+                foreach (var line in block.GetProperty("lines").EnumerateArray())
+                {
+                    var lineText = line.GetProperty("text").GetString() ?? "";
+                    textBuilder.AppendLine(lineText);
+
+                    // Parse bounding polygon [x0,y0, x1,y1, x2,y2, x3,y3]
+                    var polygon = line.GetProperty("boundingPolygon").EnumerateArray().ToList();
+                    if (polygon.Count >= 4)
+                    {
+                        float x0 = polygon[0].GetProperty("x").GetSingle();
+                        float y0 = polygon[0].GetProperty("y").GetSingle();
+                        float x1 = polygon[1].GetProperty("x").GetSingle();
+                        float y3 = polygon[3].GetProperty("y").GetSingle();
+
+                        float rectWidth = Math.Abs(x1 - x0);
+                        float rectHeight = Math.Abs(y3 - y0);
+                        if (rectWidth > 0 && rectHeight > 0)
+                        {
+                            lineInfos.Add((lineText, x0, y0, rectWidth, rectHeight));
+                        }
+                    }
+                }
+            }
+            var text = textBuilder.ToString().Trim();
+
+            // --- Generate Searchable PDF using iText7 ---
+            byte[]? pdfBytes = null;
             using var outMs = new MemoryStream();
             using (var writer = new iText.Kernel.Pdf.PdfWriter(outMs))
             {
                 using var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
-                var imageData = iText.IO.Image.ImageDataFactory.Create(bytes);
-                float imgWidth = imageData.GetWidth();
-                float imgHeight = imageData.GetHeight();
+                var imageData2 = iText.IO.Image.ImageDataFactory.Create(bytes);
+                float imgWidth = imageData2.GetWidth();
+                float imgHeight = imageData2.GetHeight();
 
                 var page = pdf.AddNewPage(new iText.Kernel.Geom.PageSize(imgWidth, imgHeight));
                 var canvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
                 
                 // Draw image at (0, 0)
-                canvas.AddImageAt(imageData, 0, 0, false);
+                canvas.AddImageAt(imageData2, 0, 0, false);
 
                 // Setup font (use standard font for cross-platform compatibility)
                 var font = iText.Kernel.Font.PdfFontFactory.CreateFont("STSong-Light", "UniGB-UTF16-H", iText.Kernel.Font.PdfFontFactory.EmbeddingStrategy.PREFER_NOT_EMBEDDED);
 
-                foreach (var region in result.Regions)
+                foreach (var lineInfo in lineInfos)
                 {
-                    // PDF origin (0,0) is bottom-left. OCR origin is top-left.
-                    var bounds = region.Rect.BoundingRect();
-                    float rectX = bounds.X;
-                    float rectY = imgHeight - bounds.Y - bounds.Height;
-                    float rectWidth = bounds.Width;
-                    float rectHeight = bounds.Height;
+                    if (string.IsNullOrEmpty(lineInfo.Text)) continue;
 
-                    if (rectHeight <= 0 || string.IsNullOrEmpty(region.Text)) continue;
+                    // PDF origin (0,0) is bottom-left. Azure OCR origin is top-left.
+                    float pdfY = imgHeight - lineInfo.Y - lineInfo.Height;
 
-                    // Calculate width per character assuming monospaced (typical for Chinese)
-                    float charWidth = rectWidth / region.Text.Length;
+                    // Calculate width per character
+                    float charWidth = lineInfo.Width / lineInfo.Text.Length;
 
-                    for (int i = 0; i < region.Text.Length; i++)
+                    for (int i = 0; i < lineInfo.Text.Length; i++)
                     {
                         canvas.SaveState();
                         canvas.BeginText();
@@ -148,10 +190,10 @@ public class OcrService : IOcrService
                         canvas.SetTextRenderingMode(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.TextRenderingMode.INVISIBLE);
                         
                         // Set font and size to match bounding box height
-                        canvas.SetFontAndSize(font, rectHeight);
+                        canvas.SetFontAndSize(font, lineInfo.Height);
                         
-                        string singleChar = region.Text[i].ToString();
-                        float singleCharWidth = font.GetWidth(singleChar, rectHeight);
+                        string singleChar = lineInfo.Text[i].ToString();
+                        float singleCharWidth = font.GetWidth(singleChar, lineInfo.Height);
                         
                         // Calculate horizontal scaling to fit the character width
                         if (singleCharWidth > 0)
@@ -161,7 +203,7 @@ public class OcrService : IOcrService
                         }
 
                         // Move text cursor to the character's specific position
-                        canvas.MoveText(rectX + (i * charWidth), rectY);
+                        canvas.MoveText(lineInfo.X + (i * charWidth), pdfY);
                         canvas.ShowText(singleChar);
                         
                         canvas.EndText();
@@ -174,10 +216,15 @@ public class OcrService : IOcrService
 
             return (text, pdfBytes, null);
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Azure Computer Vision API request failed.");
+            return (null, null, $"Azure API Error: {ex.Message}");
+        }
         catch (Exception ex)
         {
             var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
-            _logger.LogWarning(ex, "PaddleOCR failed to extract text and generate PDF.");
+            _logger.LogWarning(ex, "Azure OCR failed to extract text and generate PDF.");
             return (null, null, fullError);
         }
     }
