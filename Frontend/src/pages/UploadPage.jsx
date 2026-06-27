@@ -28,7 +28,7 @@ const UploadPage = () => {
         } catch (error) {
           console.error(error);
         }
-      }, 2000);
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [processingId, navigate]);

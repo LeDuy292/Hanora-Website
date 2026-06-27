@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { translateSentence, compareSentences, askAiAssistant } from '../lib/api';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { CHINESE_DICTIONARY } from '../utils/chineseUtils';
+import { splitDocumentParagraphs } from '../utils/documentTextUtils';
 import { 
   Volume2, Bookmark, Award, HelpCircle, Layers, 
   ArrowRight, BookOpen, Plus, Activity, RefreshCw, 
@@ -99,16 +100,23 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Extract examples from local document text
+  // Extract examples from local document text, preserving paragraph structure
   const getLocalExamples = () => {
     if (!documentText || !data?.word) return [];
-    // Split document into sentences by standard punctuation
+
+    const matchingParagraphs = splitDocumentParagraphs(documentText)
+      .filter((paragraph) => paragraph.includes(data.word));
+
+    if (matchingParagraphs.length > 0) {
+      return [...new Set(matchingParagraphs)].slice(0, 2);
+    }
+
     const sentences = documentText
-      .split(/[。！？\n\r]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-    // Find matching sentences
-    return [...new Set(sentences.filter(s => s.includes(data.word)))].slice(0, 2);
+      .split(/[。！？]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    return [...new Set(sentences.filter((s) => s.includes(data.word)))].slice(0, 2);
   };
   const localExamples = getLocalExamples();
 
@@ -477,7 +485,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
               {localExamples.map((ex, idx) => (
                 <div key={idx} className="p-4 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex justify-between items-start gap-4">
                   <div className="space-y-1">
-                    <p className="text-[15px] text-gray-800 font-bold">{ex}</p>
+                    <p className="text-[15px] text-gray-800 font-bold whitespace-pre-line leading-relaxed">{ex}</p>
                     <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Ngữ cảnh thực tế</p>
                   </div>
                   <button 

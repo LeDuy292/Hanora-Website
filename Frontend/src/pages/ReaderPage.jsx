@@ -11,6 +11,9 @@ import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import {
+  isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
+} from '../utils/documentTextUtils';
 import { 
   MousePointer, Highlighter, Pencil, Eraser, 
   FileText, Pin, Save, Download, X, Upload, ChevronLeft, ChevronRight,
@@ -485,10 +488,10 @@ const ReaderPage = () => {
 
     // Default Pointer (Lookup)
 
-    if (!word || word.trim() === '') return;
+    if (!word || word.trim() === '' || isStructureMarker(word)) return;
     
     setSelectedWord(word);
-    setVococabData: setVocabData(null);
+    setVocabData(null);
     setIsLoadingVocab(true);
     setLookupCount(prev => prev + 1);
     setSidebarTab('dict');
@@ -664,7 +667,7 @@ const ReaderPage = () => {
 
     try {
       const titleContext = document?.title || "Tài liệu tiếng Trung";
-      const snippetContext = segments.slice(0, 30).join(' ');
+      const snippetContext = joinDocumentSegments(segments.slice(0, 30));
       const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -715,7 +718,7 @@ const ReaderPage = () => {
 
   // Count saved words in current document
   const savedWordsInDoc = vocabList.filter(w => String(w.documentId) === String(id)).length;
-  const totalDocChars = segments.reduce((sum, s) => sum + s.length, 0);
+  const totalDocChars = segments.reduce((sum, s) => sum + (isStructureMarker(s) ? 0 : s.length), 0);
 
   // Theme styling configurations
   const themeStyles = {
@@ -1339,6 +1342,14 @@ const ReaderPage = () => {
                       <div className="relative z-0 pb-12 pr-2">
                         {currentSegments.map((word, relIndex) => {
                           const absIndex = (validCurrentPage - 1) * WORDS_PER_PAGE + relIndex;
+
+                          if (word === PARAGRAPH_BREAK) {
+                            return <span key={relIndex} data-abs-index={absIndex} className="block h-6 w-full" aria-hidden="true" />;
+                          }
+                          if (word === LINE_BREAK) {
+                            return <br key={relIndex} data-abs-index={absIndex} />;
+                          }
+
                           const highlightColor = annotations.highlights[absIndex];
                           const hasTextNote = annotations.textNotes[absIndex];
                           const hasStickyNote = annotations.stickyNotes[absIndex];
@@ -1529,7 +1540,7 @@ const ReaderPage = () => {
                         }}
                         documentId={id}
                         documentTitle={document?.title}
-                        documentText={segments.join('')}
+                        documentText={joinDocumentSegments(segments)}
                       />
                     </div>
                   )}

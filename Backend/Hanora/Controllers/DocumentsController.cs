@@ -315,11 +315,16 @@ public class DocumentsController : ControllerBase
 
                 if (segments.Count > 0)
                 {
-                    var textParagraph = doc.InsertParagraph();
-                    textParagraph.Append(string.Join(" ", segments))
-                        .Font(new Xceed.Document.NET.Font("Arial"))
-                        .FontSize(12D);
-                    textParagraph.SpacingAfter(20D);
+                    var fullText = string.Join("", segments);
+                    var paragraphs = fullText.Split(new[] { "\n\n" }, StringSplitOptions.None);
+                    foreach (var paragraph in paragraphs)
+                    {
+                        var textParagraph = doc.InsertParagraph();
+                        textParagraph.Append(paragraph.Replace("\n", " "))
+                            .Font(new Xceed.Document.NET.Font("Arial"))
+                            .FontSize(12D);
+                        textParagraph.SpacingAfter(10D);
+                    }
                 }
                 else
                 {
