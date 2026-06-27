@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace Services;
 
@@ -12,13 +13,23 @@ public class VocabularyService : IVocabularyService
     private readonly IDictionaryAiService _aiService;
     private readonly ILogger<VocabularyService> _logger;
     private readonly IBackgroundTaskQueue _taskQueue;
+    private readonly IStatsService _statsService;
+    private readonly DataAccessObjects.AppDbContext _db;
 
-    public VocabularyService(IVocabularyRepository vocabularyRepo, IDictionaryAiService aiService, ILogger<VocabularyService> logger, IBackgroundTaskQueue taskQueue)
+    public VocabularyService(
+        IVocabularyRepository vocabularyRepo,
+        IDictionaryAiService aiService,
+        ILogger<VocabularyService> logger,
+        IBackgroundTaskQueue taskQueue,
+        IStatsService statsService,
+        DataAccessObjects.AppDbContext db)
     {
         _vocabularyRepo = vocabularyRepo;
         _aiService = aiService;
         _logger = logger;
         _taskQueue = taskQueue;
+        _statsService = statsService;
+        _db = db;
     }
 
     public async Task<Vocabulary?> LookupWordAsync(string word)
@@ -226,12 +237,91 @@ public class VocabularyService : IVocabularyService
         }
     }
 
-    public async Task<bool> SaveToNotebookAsync(long userId, string word, long? documentId)
+    public async Task<bool> SaveToNotebookAsync(
+        long userId,
+        string word,
+        long? documentId,
+        string? customDefinition = null,
+        string? pinyin = null,
+        string? hanViet = null,
+        string? wordType = null,
+        int? pageNumber = null,
+        string? personalNote = null)
     {
-        var vocab = await LookupWordAsync(word);
-        if (vocab == null) return false;
+        var vocab = await _vocabularyRepo.GetByWordAsync(word);
+        if (vocab == null)
+        {
+            var defJson = !string.IsNullOrWhiteSpace(customDefinition)
+                ? JsonSerializer.Serialize(new[] { new { lang = "vn", meaning = customDefinition } })
+                : "[]";
 
-        await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId);
+            vocab = new Vocabulary
+            {
+                Word = word,
+                Pinyin = pinyin ?? "",
+                Definitions = defJson,
+                HanViet = hanViet,
+                WordType = Enum.TryParse<WordType>(wordType, true, out var wt) ? wt : null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _vocabularyRepo.CreateAsync(vocab);
+        }
+        else
+        {
+            bool updated = false;
+            if (!string.IsNullOrWhiteSpace(customDefinition))
+            {
+                vocab.Definitions = JsonSerializer.Serialize(new[] { new { lang = "vn", meaning = customDefinition } });
+                updated = true;
+            }
+            if (!string.IsNullOrWhiteSpace(pinyin))
+            {
+                vocab.Pinyin = pinyin;
+                updated = true;
+            }
+            if (!string.IsNullOrWhiteSpace(hanViet))
+            {
+                vocab.HanViet = hanViet;
+                updated = true;
+            }
+            if (!string.IsNullOrWhiteSpace(wordType) && Enum.TryParse<WordType>(wordType, true, out var wt))
+            {
+                vocab.WordType = wt;
+                updated = true;
+            }
+            if (updated)
+            {
+                vocab.UpdatedAt = DateTime.UtcNow;
+                await _vocabularyRepo.UpdateAsync(vocab);
+            }
+        }
+
+        bool isNew = await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId, pageNumber, personalNote);
+        if (isNew)
+        {
+            var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (stats != null)
+            {
+                stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + 1;
+                stats.UpdatedAt = DateTime.UtcNow;
+                _db.UserStats.Update(stats);
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
+            var progress = await _db.LearningProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
+            if (progress != null)
+            {
+                progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + 1;
+                progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + 1;
+                _db.LearningProgresses.Update(progress);
+            }
+            await _db.SaveChangesAsync();
+
+            await _statsService.AwardXpAsync(userId, 2, "Lưu từ mới vào Sổ tay");
+        }
+
         return true;
     }
 

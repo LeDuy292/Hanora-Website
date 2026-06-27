@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Repositories;
 using Services;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace Hanora.Controllers;
 
@@ -17,14 +18,21 @@ public class DocumentsController : ControllerBase
     private readonly IDocumentRepository _documentRepository;
     private readonly IS3StorageService _s3StorageService;
 
+    private readonly DataAccessObjects.AppDbContext _db;
+    private readonly IStatsService _statsService;
+
     public DocumentsController(
         IDocumentProcessingService documentProcessingService,
         IDocumentRepository documentRepository,
-        IS3StorageService s3StorageService)
+        IS3StorageService s3StorageService,
+        DataAccessObjects.AppDbContext db,
+        IStatsService statsService)
     {
         _documentProcessingService = documentProcessingService;
         _documentRepository = documentRepository;
         _s3StorageService = s3StorageService;
+        _db = db;
+        _statsService = statsService;
     }
 
     public class PresignedUrlRequestDto
@@ -181,10 +189,134 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId)) userId = 1;
+
+        int length = document.ExtractedText?.Length ?? 0;
+        int maxHighlights = Math.Max(5, length / 100);
+        int maxNotes = Math.Max(3, length / 200);
+
+        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        
+        int oldHighlightsCount = 0;
+        int oldNotesCount = 0;
+        if (!string.IsNullOrEmpty(document.AnnotationsJson))
+        {
+            try
+            {
+                var oldAnnos = System.Text.Json.JsonSerializer.Deserialize<AnnotationsDto>(document.AnnotationsJson, options);
+                if (oldAnnos != null)
+                {
+                    oldHighlightsCount = oldAnnos.Highlights?.Count ?? 0;
+                    oldNotesCount = (oldAnnos.TextNotes?.Count ?? 0) + (oldAnnos.StickyNotes?.Count ?? 0);
+                }
+            }
+            catch {}
+        }
+
+        int newHighlightsCount = 0;
+        int newNotesCount = 0;
+        if (!string.IsNullOrEmpty(request.AnnotationsJson))
+        {
+            try
+            {
+                var newAnnos = System.Text.Json.JsonSerializer.Deserialize<AnnotationsDto>(request.AnnotationsJson, options);
+                if (newAnnos != null)
+                {
+                    newHighlightsCount = newAnnos.Highlights?.Count ?? 0;
+                    newNotesCount = (newAnnos.TextNotes?.Count ?? 0) + (newAnnos.StickyNotes?.Count ?? 0);
+                }
+            }
+            catch {}
+        }
+
+        int awardHighlights = Math.Max(0, Math.Min(newHighlightsCount - oldHighlightsCount, maxHighlights - oldHighlightsCount));
+        int awardNotes = Math.Max(0, Math.Min(newNotesCount - oldNotesCount, maxNotes - oldNotesCount));
+
+        int totalXpToAward = (awardHighlights * 1) + (awardNotes * 2);
+
         document.AnnotationsJson = request.AnnotationsJson;
         await _documentRepository.UpdateAsync(document);
 
+        if (totalXpToAward > 0)
+        {
+            await _statsService.AwardXpAsync(userId, totalXpToAward, $"Tạo highlight/note trên tài liệu: {document.Title}");
+        }
+
         return Ok(new { Message = "Annotations saved successfully." });
+    }
+
+    [HttpPost("{id}/progress")]
+    public async Task<IActionResult> UpdateProgress(long id, [FromBody] UpdateProgressRequest request)
+    {
+        var document = await _documentRepository.GetByIdAsync(id);
+        if (document == null)
+        {
+            return NotFound();
+        }
+
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId)) userId = 1;
+
+        var progress = await _db.DocumentReadingProgresses
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.DocumentId == id);
+
+        decimal oldPercent = progress?.ProgressPercent ?? 0m;
+        int oldMinutes = progress?.ReadingMinutes ?? 0;
+
+        if (progress == null)
+        {
+            progress = new DocumentReadingProgress
+            {
+                UserId = userId,
+                DocumentId = id,
+                LastPage = request.LastPage,
+                ProgressPercent = request.ProgressPercent,
+                ReadingMinutes = request.ReadingMinutes,
+                LastReadAt = DateTime.UtcNow
+            };
+            _db.DocumentReadingProgresses.Add(progress);
+        }
+        else
+        {
+            progress.LastPage = request.LastPage;
+            progress.ProgressPercent = request.ProgressPercent;
+            progress.ReadingMinutes = request.ReadingMinutes;
+            progress.LastReadAt = DateTime.UtcNow;
+            _db.DocumentReadingProgresses.Update(progress);
+        }
+        await _db.SaveChangesAsync();
+
+        int deltaMinutes = request.ReadingMinutes - oldMinutes;
+        if (deltaMinutes > 0)
+        {
+            await _statsService.TrackTimeAsync(userId, deltaMinutes);
+        }
+
+        if (oldPercent < 100m && request.ProgressPercent >= 100m)
+        {
+            var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (stats != null)
+            {
+                stats.TotalDocumentsRead = (stats.TotalDocumentsRead ?? 0) + 1;
+                stats.UpdatedAt = DateTime.UtcNow;
+                _db.UserStats.Update(stats);
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
+            var dailyProgress = await _db.LearningProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
+            if (dailyProgress != null)
+            {
+                dailyProgress.DocumentsRead = (dailyProgress.DocumentsRead ?? 0) + 1;
+                _db.LearningProgresses.Update(dailyProgress);
+            }
+            await _db.SaveChangesAsync();
+
+            await _statsService.AwardXpAsync(userId, 40, $"Đọc hoàn thành tài liệu: {document.Title}");
+        }
+
+        return Ok(new { message = "Progress updated successfully." });
     }
 
     [HttpGet("all-highlights")]
@@ -447,6 +579,13 @@ public class DocumentsController : ControllerBase
 public class SaveAnnotationsRequest
 {
     public string? AnnotationsJson { get; set; }
+}
+
+public class UpdateProgressRequest
+{
+    public int LastPage { get; set; }
+    public decimal ProgressPercent { get; set; }
+    public int ReadingMinutes { get; set; }
 }
 
 public class AnnotationsDto

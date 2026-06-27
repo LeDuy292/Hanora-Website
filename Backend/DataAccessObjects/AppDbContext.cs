@@ -76,6 +76,12 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<WordRelation> WordRelations { get; set; }
 
+    public virtual DbSet<FlashcardDeck> FlashcardDecks { get; set; }
+
+    public virtual DbSet<UserNotification> UserNotifications { get; set; }
+
+    public virtual DbSet<LeaderboardReward> LeaderboardRewards { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -378,7 +384,7 @@ public partial class AppDbContext : DbContext
 
             entity.ToTable("flashcards");
 
-            entity.HasIndex(e => e.UserVocabularyId, "flashcards_user_vocabulary_id_key").IsUnique();
+            entity.HasIndex(e => new { e.UserVocabularyId, e.DeckId }, "idx_flashcards_user_vocab_deck").IsUnique();
 
             entity.HasIndex(e => e.UserVocabularyId, "idx_flashcard_user_vocab");
 
@@ -396,10 +402,15 @@ public partial class AppDbContext : DbContext
                 .HasDefaultValueSql("'not_started'::character varying")
                 .HasColumnName("learn_status");
             entity.Property(e => e.UserVocabularyId).HasColumnName("user_vocabulary_id");
+            entity.Property(e => e.DeckId).HasColumnName("deck_id");
 
-            entity.HasOne(d => d.UserVocabulary).WithOne(p => p.Flashcard)
-                .HasForeignKey<Flashcard>(d => d.UserVocabularyId)
+            entity.HasOne(d => d.UserVocabulary).WithMany(p => p.Flashcards)
+                .HasForeignKey(d => d.UserVocabularyId)
                 .HasConstraintName("flashcards_user_vocabulary_id_fkey");
+
+            entity.HasOne(d => d.Deck).WithMany(p => p.Flashcards)
+                .HasForeignKey(d => d.DeckId)
+                .HasConstraintName("flashcards_deck_id_fkey");
         });
 
         modelBuilder.Entity<FlipReview>(entity =>
@@ -1149,6 +1160,64 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Vocab).WithMany(p => p.WordRelationVocabs)
                 .HasForeignKey(d => d.VocabId)
                 .HasConstraintName("word_relations_vocab_id_fkey");
+        });
+
+        modelBuilder.Entity<FlashcardDeck>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("flashcard_decks_pkey");
+            entity.ToTable("flashcard_decks");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Name).HasMaxLength(255).HasColumnName("name");
+            entity.Property(e => e.Source).HasMaxLength(255).HasColumnName("source");
+            entity.Property(e => e.DocumentId).HasColumnName("document_id");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()").HasColumnName("updated_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.FlashcardDecks)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("flashcard_decks_user_id_fkey");
+
+            entity.HasOne(d => d.Document).WithMany(p => p.FlashcardDecks)
+                .HasForeignKey(d => d.DocumentId)
+                .HasConstraintName("flashcard_decks_document_id_fkey");
+        });
+
+        modelBuilder.Entity<UserNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("user_notifications_pkey");
+            entity.ToTable("user_notifications");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Title).HasMaxLength(255).HasColumnName("title");
+            entity.Property(e => e.Message).HasColumnName("message");
+            entity.Property(e => e.IsRead).HasDefaultValue(false).HasColumnName("is_read");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()").HasColumnName("created_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserNotifications)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("user_notifications_user_id_fkey");
+        });
+
+        modelBuilder.Entity<LeaderboardReward>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("leaderboard_rewards_pkey");
+            entity.ToTable("leaderboard_rewards");
+
+            entity.HasIndex(e => new { e.UserId, e.WeekStart }, "leaderboard_rewards_user_id_week_start_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Rank).HasColumnName("rank");
+            entity.Property(e => e.XpRewarded).HasColumnName("xp_rewarded");
+            entity.Property(e => e.WeekStart).HasColumnName("week_start");
+            entity.Property(e => e.RewardedAt).HasDefaultValueSql("now()").HasColumnName("rewarded_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.LeaderboardRewards)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("leaderboard_rewards_user_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);

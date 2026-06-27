@@ -68,7 +68,16 @@ public class VocabularyController : ControllerBase
             userId = 1; 
         }
 
-        var success = await _vocabularyService.SaveToNotebookAsync(userId, word, request.DocumentId);
+        var success = await _vocabularyService.SaveToNotebookAsync(
+            userId,
+            word,
+            request.DocumentId,
+            request.CustomDefinition,
+            request.Pinyin,
+            request.HanViet,
+            request.WordType,
+            request.PageNumber,
+            request.PersonalNote);
         if (!success)
         {
             return BadRequest("Could not save to notebook.");
@@ -127,6 +136,12 @@ public class VocabularyController : ControllerBase
 public class SaveVocabularyRequest
 {
     public long? DocumentId { get; set; }
+    public string? CustomDefinition { get; set; }
+    public string? Pinyin { get; set; }
+    public string? HanViet { get; set; }
+    public string? WordType { get; set; }
+    public int? PageNumber { get; set; }
+    public string? PersonalNote { get; set; }
 }
 
 public class TranslateSentenceRequest
