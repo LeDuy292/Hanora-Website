@@ -1388,73 +1388,100 @@ const ReaderPage = () => {
                         onPointerLeave={handlePointerUp}
                       />
 
-                      {/* CJK segment mapping render */}
+                      {/* CJK segment mapping render — grouped by paragraph / line */}
                       <div className="relative z-0 pb-12 pr-2">
-                        {currentSegments.map((word, relIndex) => {
-                          const absIndex = (validCurrentPage - 1) * WORDS_PER_PAGE + relIndex;
+                        {(() => {
+                          // Pre-group segments into paragraphs → lines while tracking absIndex
+                          const absBase = (validCurrentPage - 1) * WORDS_PER_PAGE;
+                          const paragraphs = [];
+                          let curPara = [];
+                          let curLine = [];
 
-                          if (word === PARAGRAPH_BREAK) {
-                            return <span key={relIndex} data-abs-index={absIndex} className="block h-6 w-full" aria-hidden="true" />;
-                          }
-                          if (word === LINE_BREAK) {
-                            return <br key={relIndex} data-abs-index={absIndex} />;
-                          }
+                          const flushLine = () => {
+                            if (curLine.length > 0) { curPara.push(curLine); curLine = []; }
+                          };
+                          const flushPara = () => {
+                            flushLine();
+                            if (curPara.length > 0) { paragraphs.push(curPara); curPara = []; }
+                          };
 
-                          const highlightColor = annotations.highlights[absIndex];
-                          const hasTextNote = annotations.textNotes[absIndex];
-                          const hasStickyNote = annotations.stickyNotes[absIndex];
-                          const isWordSelected = selectedWord === word;
+                          currentSegments.forEach((word, relIndex) => {
+                            const absIndex = absBase + relIndex;
+                            const w = typeof word === 'string'
+                              ? word.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+                              : word;
 
-                          const noteInfo = hasTextNote ? parseNoteContent(hasTextNote) : null;
-                          const stickyInfo = hasStickyNote ? parseNoteContent(hasStickyNote) : null;
+                            if (w === '\n\n') { flushPara(); }
+                            else if (w === '\n') { flushLine(); }
+                            else { curLine.push({ word: w, absIndex }); }
+                          });
+                          flushPara();
 
-                          return (
-                            <span
-                              key={relIndex}
-                              data-abs-index={absIndex}
-                              onClick={(e) => handleWordClick(word, relIndex, e)}
-                              onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
-                              onMouseLeave={handleWordMouseLeave}
-                              style={highlightColor ? { backgroundColor: highlightColor } : undefined}
-                              className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-sm transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
-                                } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
-                            >
-                              <span className="leading-none flex items-center">
-                                {word}
-                                {hasTextNote && (
-                                  <span
-                                    className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none"
-                                    title={noteInfo.text}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditingNote(absIndex, 'text', hasTextNote);
-                                    }}
-                                  >
-                                    {noteInfo.icon}
-                                  </span>
-                                )}
-                                {hasStickyNote && (
-                                  <span
-                                    className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none animate-bounce"
-                                    title={stickyInfo.text}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditingNote(absIndex, 'sticky', hasStickyNote);
-                                    }}
-                                  >
-                                    📌
-                                  </span>
-                                )}
-                              </span>
-                              {showPinyin && (
-                                <span className="text-[0.4em] text-slate-500 font-normal leading-none mt-1.5 select-none text-center block">
-                                  {pinyin(word, { type: 'string' })}
-                                </span>
-                              )}
-                            </span>
-                          );
-                        })}
+                          return paragraphs.map((lines, pi) => (
+                            <div key={pi} className="mb-4">
+                              {lines.map((lineWords, li) => (
+                                <div key={li} className="flex flex-wrap leading-none mb-1">
+                                  {lineWords.map(({ word, absIndex }) => {
+                                    const highlightColor = annotations.highlights[absIndex];
+                                    const hasTextNote = annotations.textNotes[absIndex];
+                                    const hasStickyNote = annotations.stickyNotes[absIndex];
+                                    const isWordSelected = selectedWord === word;
+                                    const noteInfo = hasTextNote ? parseNoteContent(hasTextNote) : null;
+                                    const stickyInfo = hasStickyNote ? parseNoteContent(hasStickyNote) : null;
+
+                                    return (
+                                      <span
+                                        key={absIndex}
+                                        data-abs-index={absIndex}
+                                        onClick={(e) => handleWordClick(word, absIndex, e)}
+                                        onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
+                                        onMouseLeave={handleWordMouseLeave}
+                                        style={highlightColor ? { backgroundColor: highlightColor } : undefined}
+                                        className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-sm transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
+                                          } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
+                                      >
+                                        <span className="leading-none flex items-center">
+                                          {word}
+                                          {hasTextNote && (
+                                            <span
+                                              className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none"
+                                              title={noteInfo.text}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                startEditingNote(absIndex, 'text', hasTextNote);
+                                              }}
+                                            >
+                                              {noteInfo.icon}
+                                            </span>
+                                          )}
+                                          {hasStickyNote && (
+                                            <span
+                                              className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none animate-bounce"
+                                              title={stickyInfo.text}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                startEditingNote(absIndex, 'sticky', hasStickyNote);
+                                              }}
+                                            >
+                                              📌
+                                            </span>
+                                          )}
+                                        </span>
+                                        {showPinyin && (
+                                          <span className="text-[0.4em] text-slate-500 font-normal leading-none mt-1.5 select-none text-center block">
+                                            {pinyin(word, { type: 'string' })}
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          ));
+                        })()}
                       </div>
+
                     </div>
                   </div>
 
