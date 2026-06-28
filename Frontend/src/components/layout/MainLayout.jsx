@@ -4,6 +4,7 @@ import { Bell, X, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { AiChatbox } from '../chat/AiChatbox';
 
 export function MainLayout({ children }) {
   const [showBanner, setShowBanner] = useState(false);
@@ -73,6 +74,10 @@ export function MainLayout({ children }) {
   const isFlashcardPage = location.pathname === '/flashcards';
   const displayBanner = showBanner && !isFlashcardPage;
 
+  const hideChatbox = 
+    location.pathname.startsWith('/quiz') || 
+    location.pathname.startsWith('/pronunciation');
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans relative overflow-x-hidden">
       {/* Background radial shapes for aesthetic continuity */}
@@ -117,6 +122,9 @@ export function MainLayout({ children }) {
           {children}
         </div>
       </main>
+
+      {/* Smart AI Learning Assistant Chatbox */}
+      {!hideChatbox && <AiChatbox />}
 
       <Footer />
     </div>

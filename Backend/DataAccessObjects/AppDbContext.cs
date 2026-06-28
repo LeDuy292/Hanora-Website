@@ -20,6 +20,10 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<CommunityMessage> CommunityMessages { get; set; }
 
+    public virtual DbSet<ChatSession> ChatSessions { get; set; }
+
+    public virtual DbSet<ChatMessage> ChatMessages { get; set; }
+
     public virtual DbSet<Document> Documents { get; set; }
 
     public virtual DbSet<DocumentPage> DocumentPages { get; set; }
@@ -224,6 +228,45 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Sender).WithMany(p => p.CommunityMessages)
                 .HasForeignKey(d => d.SenderId)
                 .HasConstraintName("community_messages_sender_id_fkey");
+        });
+
+        modelBuilder.Entity<ChatSession>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("chat_sessions_pkey");
+
+            entity.ToTable("chat_sessions");
+
+            entity.HasIndex(e => e.UserId, "idx_chat_sessions_user");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Title).HasMaxLength(255).HasColumnName("title");
+            entity.Property(e => e.IsPinned).HasDefaultValue(false).HasColumnName("is_pinned");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()").HasColumnName("updated_at");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ChatSessions)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("chat_sessions_user_id_fkey");
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("chat_messages_pkey");
+
+            entity.ToTable("chat_messages");
+
+            entity.HasIndex(e => e.SessionId, "idx_chat_messages_session");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SessionId).HasColumnName("session_id");
+            entity.Property(e => e.Role).HasMaxLength(10).HasColumnName("role");
+            entity.Property(e => e.Content).HasColumnName("content");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()").HasColumnName("created_at");
+
+            entity.HasOne(d => d.Session).WithMany(p => p.ChatMessages)
+                .HasForeignKey(d => d.SessionId)
+                .HasConstraintName("chat_messages_session_id_fkey");
         });
 
         modelBuilder.Entity<Document>(entity =>
