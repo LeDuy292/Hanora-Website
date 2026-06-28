@@ -68,6 +68,9 @@ namespace Hanora
             builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
             builder.Services.AddScoped<IProgressService, ProgressService>();
             builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+            builder.Services.AddScoped<IChatRepository, ChatRepository>();
+            builder.Services.AddScoped<IDeepseekChatService, DeepseekChatService>();
+            builder.Services.AddScoped<IChatService, ChatService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -186,6 +189,26 @@ namespace Hanora
                             rewarded_at   TIMESTAMPTZ DEFAULT NOW(),
                             UNIQUE (user_id, week_start)
                         );
+
+                        CREATE TABLE IF NOT EXISTS chat_sessions (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            title       VARCHAR(255) NOT NULL,
+                            is_pinned   BOOLEAN      DEFAULT FALSE,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW(),
+                            updated_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE TABLE IF NOT EXISTS chat_messages (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            session_id  BIGINT       NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+                            role        VARCHAR(10)  NOT NULL,
+                            content     TEXT         NOT NULL,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
+                        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
                     ");
                 }
                 catch (Exception ex)

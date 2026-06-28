@@ -581,7 +581,7 @@ export function VocabularyPage() {
 
                       return (
                         <tr 
-                          key={row.text}
+                          key={row.id || row.text}
                           onMouseEnter={() => setHoveredWord(cleanWordText)}
                           onMouseLeave={() => setHoveredWord(null)}
                           className={`group hover:bg-blue-50 border-b border-slate-100 transition-colors duration-150 cursor-default ${
