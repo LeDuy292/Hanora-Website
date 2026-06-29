@@ -63,6 +63,7 @@ namespace Hanora
             builder.Services.AddScoped<IQuizService, QuizService>();
             builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
             builder.Services.AddScoped<IFlashcardService, FlashcardService>();
+            builder.Services.AddScoped<ISrsService, SrsService>();
             builder.Services.AddScoped<IStatsRepository, StatsRepository>();
             builder.Services.AddScoped<IStatsService, StatsService>();
             builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
@@ -166,6 +167,8 @@ namespace Hanora
                             created_at    TIMESTAMPTZ  DEFAULT NOW(),
                             updated_at    TIMESTAMPTZ  DEFAULT NOW()
                         );
+
+                        ALTER TABLE flashcard_decks ADD COLUMN IF NOT EXISTS description TEXT;
 
                         ALTER TABLE flashcards DROP CONSTRAINT IF EXISTS flashcards_user_vocabulary_id_key;
                         ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS deck_id BIGINT REFERENCES flashcard_decks(id) ON DELETE CASCADE;

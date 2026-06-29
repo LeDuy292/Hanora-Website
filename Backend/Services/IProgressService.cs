@@ -11,6 +11,7 @@ public interface IProgressService
     /// sessions, study sessions, documents) plus the login streak on user_stats.
     /// </summary>
     Task<DashboardDto> GetDashboardAsync(long userId);
+    Task SetGoalAsync(long userId, int minutes);
 }
 
 // ---- DTOs (shape the frontend consumes; mirrors the spec's dashboard JSON) ----
@@ -97,6 +98,11 @@ public class ProgressService : IProgressService
     {
         _repo = repo;
         _statsRepo = statsRepo;
+    }
+
+    public async Task SetGoalAsync(long userId, int minutes)
+    {
+        await _statsRepo.SetDailyGoalMinutesAsync(userId, minutes);
     }
 
     private static DateOnly TodayVn() => DateOnly.FromDateTime(DateTime.UtcNow + VietnamOffset);

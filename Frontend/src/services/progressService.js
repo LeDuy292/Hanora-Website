@@ -10,4 +10,11 @@ export const progressApi = {
   getDashboard: async () => {
     return apiRequest("/progress/dashboard", { auth: true });
   },
+  setGoal: async (goalMinutes) => {
+    return apiRequest("/progress/goal", {
+      method: "PUT",
+      auth: true,
+      body: { goalMinutes }
+    });
+  },
 };

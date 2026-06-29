@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { progressApi } from '../services/progressService';
+import { toast } from '../store/notificationStore';
 import { Button } from '../components/common/Button';
 import streakBadgeImg from '../assets/StreakImage.png';
 
@@ -59,7 +60,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
-  const [tempGoal, setTempGoal] = useState(20);
+  const [tempGoal, setTempGoal] = useState(90);
   const [activePoint, setActivePoint] = useState(null);
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function DashboardPage() {
   const wordsSaved = data?.wordsSaved ?? 0;
   const reviewToday = data?.reviewToday ?? 0;
 
-  const targetMinutes = data?.dailyGoal?.target ?? 20;
+  const targetMinutes = data?.dailyGoal?.target ?? 90;
   const todayMins = data?.dailyGoal?.current ?? 0;
   const progressPercent = targetMinutes > 0
     ? Math.min(Math.round((todayMins / targetMinutes) * 100), 100)
@@ -298,60 +299,88 @@ export function DashboardPage() {
 
         {/* SVG Goal Ring */}
         <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
-          <div className="w-full flex justify-between items-center border-b border-slate-50 pb-3 text-left">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-600" />
-              <span>Mục Tiêu Mỗi Ngày</span>
-              {isEditingGoal ? (
-                <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="180" 
-                    value={tempGoal} 
-                    onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
-                    className="w-12 px-1 py-0.5 text-xs border border-slate-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800"
-                  />
+          <div className="w-full flex justify-between items-start border-b border-slate-50 pb-3 text-left">
+            <div className="flex-grow">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span>Mục Tiêu Mỗi Ngày</span>
+                {!isEditingGoal && (
                   <button 
-                    onClick={async () => {
-                      if (tempGoal > 0) {
-                        const res = await updateProfileOnServer({ name: user.name, email: user.email, dailyMinutesGoal: tempGoal });
-                        if (res.success) {
-                          setData(prev => ({
-                            ...prev,
-                            dailyGoal: {
-                              ...prev.dailyGoal,
-                              target: tempGoal
-                            }
-                          }));
-                          setIsEditingGoal(false);
-                        }
-                      }
+                    onClick={() => {
+                      setTempGoal(targetMinutes);
+                      setIsEditingGoal(true);
                     }}
-                    className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold hover:bg-blue-700 transition"
+                    className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
                   >
-                    Lưu
+                    (Sửa)
                   </button>
-                  <button 
-                    onClick={() => setIsEditingGoal(false)}
-                    className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold hover:bg-slate-200 transition"
-                  >
-                    Hủy
-                  </button>
+                )}
+              </h3>
+
+              {isEditingGoal && (
+                <div className="flex flex-col gap-2.5 p-3.5 bg-slate-50/80 border border-slate-150 rounded-2xl w-full max-w-[285px] mt-2.5 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide select-none">Chọn nhanh (phút):</div>
+                  <div className="flex flex-wrap gap-1">
+                    {[15, 30, 45, 60, 90, 120, 180].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => setTempGoal(mins)}
+                        className={`px-2.5 py-1 text-[10px] rounded-lg font-bold border transition ${
+                          tempGoal === mins
+                            ? 'bg-blue-600 border-transparent text-white shadow-sm'
+                            : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2.5 mt-1 pt-2 border-t border-slate-200/50">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Tự nhập:</span>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="1440" 
+                      value={tempGoal} 
+                      onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
+                      className="w-16 px-2 py-1 text-xs border border-slate-250 rounded-lg text-center focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800"
+                    />
+                    <span className="text-[11px] text-slate-400 font-bold">phút</span>
+                  </div>
+                  <div className="flex justify-end gap-1.5 mt-2">
+                    <button 
+                      onClick={() => setIsEditingGoal(false)}
+                      className="px-2.5 py-1 text-[10px] bg-white border border-slate-250 text-slate-500 rounded-lg font-bold hover:bg-slate-100 transition active:scale-97"
+                    >
+                      Hủy
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (tempGoal <= 0) {
+                          toast.warning("Mục tiêu học phải lớn hơn 0.");
+                          return;
+                        }
+                        try {
+                          const updatedDashboard = await progressApi.setGoal(tempGoal);
+                          setData(updatedDashboard);
+                          setIsEditingGoal(false);
+                          // Sync global stats instantly
+                          await useAuthStore.getState().refreshStats();
+                          toast.success("Đã cập nhật mục tiêu học tập thành công!");
+                        } catch (err) {
+                          toast.error(err.message || "Lỗi khi cập nhật mục tiêu.");
+                        }
+                      }}
+                      className="px-2.5 py-1 text-[10px] bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition active:scale-97 shadow-md"
+                    >
+                      Lưu
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <button 
-                  onClick={() => {
-                    setTempGoal(targetMinutes);
-                    setIsEditingGoal(true);
-                  }}
-                  className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
-                >
-                  (Sửa)
-                </button>
               )}
-            </h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 tracking-widest bg-slate-50 px-2 py-1 rounded-md shrink-0">
               HÔM NAY
             </span>
           </div>

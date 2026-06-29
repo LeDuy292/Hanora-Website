@@ -5,6 +5,7 @@ import {
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
   saveDocumentAnnotations, exportDocx, askAiAssistant
 } from '../lib/api';
+import { toast } from '../store/notificationStore';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
@@ -492,10 +493,10 @@ const ReaderPage = () => {
   const handleSaveAnnotations = async () => {
     try {
       await saveDocumentAnnotations(id, JSON.stringify(annotations));
-      alert("Đã lưu toàn bộ ghi chú và nét vẽ thành công!");
+      toast.success("Đã lưu toàn bộ ghi chú và nét vẽ thành công!");
     } catch (error) {
       console.error(error);
-      alert("Lỗi khi lưu ghi chú.");
+      toast.error("Lỗi khi lưu ghi chú.");
     }
   };
 
@@ -505,7 +506,7 @@ const ReaderPage = () => {
       await exportDocx(id, document.title);
     } catch (error) {
       console.error(error);
-      alert("Có lỗi xảy ra khi xuất file Word (.docx).");
+      toast.error("Có lỗi xảy ra khi xuất file Word (.docx).");
     }
   };
 
@@ -675,7 +676,7 @@ const ReaderPage = () => {
         documentId: id,
         documentTitle: document?.title
       });
-      alert('Đã lưu vào sổ tay từ vựng thành công!');
+      toast.success('Đã lưu vào sổ tay từ vựng thành công!');
     } catch (error) {
       console.error(error);
       try {
@@ -686,9 +687,9 @@ const ReaderPage = () => {
           documentId: id,
           documentTitle: document?.title
         });
-        alert('Đã lưu vào sổ tay thành công!');
+        toast.success('Đã lưu vào sổ tay thành công!');
       } catch (e2) {
-        alert('Lỗi khi lưu vào sổ tay.');
+        toast.error('Lỗi khi lưu vào sổ tay.');
       }
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
@@ -699,10 +700,10 @@ const ReaderPage = () => {
     if (!bubbleMenu.text) return;
     try {
       await updateServerStatus(bubbleMenu.text, "learning", 0);
-      alert('Đã lưu vào danh sách Flashcard thành công!');
+      toast.success('Đã lưu vào danh sách Flashcard thành công!');
     } catch (error) {
       console.error(error);
-      alert('Có lỗi xảy ra khi lưu Flashcard.');
+      toast.error('Có lỗi xảy ra khi lưu Flashcard.');
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
     }
@@ -846,7 +847,7 @@ const ReaderPage = () => {
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (
         <div
-          className="fixed z-50 bg-gray-900/95 backdrop-blur-sm text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
+          className="fixed z-[100] bg-gray-950/95 backdrop-blur-md text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
           style={{
             left: `${bubbleMenu.x}px`,
             top: `${bubbleMenu.y}px`,
@@ -854,52 +855,50 @@ const ReaderPage = () => {
           }}
         >
           <button
-            onClick={handleBubbleSaveToFlashcard}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
-
-
-          >
-            + Flashcard
-          </button>
-          <div className="w-[1px] h-4 bg-white/20" />
-          <button
-            onClick={handleBubbleSaveToNotebook}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
-          >
-            + Sổ tay
-          </button>
-          <div className="w-[1px] h-4 bg-white/20" />
-          <button
             onClick={() => {
               startEditingNote(bubbleMenu.startIndex, 'text', annotations.textNotes[bubbleMenu.startIndex]);
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Ghi chú
+            📝 Ghi chú
           </button>
           <div className="w-[1px] h-4 bg-white/20" />
           <button
-            onClick={() => {
-              setSelectedWord(bubbleMenu.text);
+            onClick={async () => {
+              const word = bubbleMenu.text;
+              setSelectedWord(word);
+              setVocabData(null);
+              setIsLoadingVocab(true);
+              setLookupCount(prev => prev + 1);
+              setSidebarTab('dict');
+              setIsSidebarOpen(true);
               setBubbleMenu(prev => ({ ...prev, visible: false }));
+              try {
+                const data = await getVocabulary(word);
+                setVocabData(data);
+              } catch (error) {
+                console.error(error);
+              } finally {
+                setIsLoadingVocab(false);
+              }
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Dịch nhanh
+            🔍 Dịch nhanh
           </button>
           <div className="w-[1px] h-4 bg-white/20" />
           <button
             onClick={() => {
               navigator.clipboard.writeText(bubbleMenu.text);
-              alert('Đã sao chép nội dung vào bộ nhớ tạm!');
+              toast.success('Đã sao chép nội dung vào bộ nhớ tạm!');
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Sao chép
+            📋 Sao chép
           </button>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-900/95" />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-955" />
         </div>
       )}
 

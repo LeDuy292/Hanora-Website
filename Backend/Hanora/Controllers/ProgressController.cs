@@ -32,4 +32,26 @@ public class ProgressController : ControllerBase
         var dashboard = await _progressService.GetDashboardAsync(userId);
         return Ok(dashboard);
     }
+
+    [HttpPut("goal")]
+    public async Task<IActionResult> SetGoal([FromBody] SetGoalRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        if (request.GoalMinutes <= 0)
+        {
+            return BadRequest(new { Message = "Mục tiêu học phải lớn hơn 0." });
+        }
+
+        await _progressService.SetGoalAsync(userId, request.GoalMinutes);
+        var dashboard = await _progressService.GetDashboardAsync(userId);
+        return Ok(dashboard);
+    }
+}
+
+public class SetGoalRequest
+{
+    public int GoalMinutes { get; set; }
 }
