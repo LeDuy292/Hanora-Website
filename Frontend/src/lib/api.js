@@ -85,6 +85,22 @@ export const getMyDocuments = async () => {
   return await response.json();
 };
 
+export const deleteDocument = async (id) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+    method: 'DELETE',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete document');
+  }
+  return await response.json();
+};
+
+
 export const getVocabulary = async (word) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}`, {

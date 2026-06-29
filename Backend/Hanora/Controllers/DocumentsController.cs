@@ -579,7 +579,54 @@ public class DocumentsController : ControllerBase
             return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"{docTitle}.docx");
         }
     }
-}
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteDocument(long id)
+        {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!long.TryParse(userIdString, out long userId))
+            {
+                userId = 1; 
+            }
+
+            var document = await _db.Documents
+                .Include(d => d.DocumentPages)
+                .FirstOrDefaultAsync(d => d.Id == id && d.UserId == userId);
+
+            if (document == null)
+            {
+                return NotFound(new { error = "Tài liệu không tồn tại hoặc không thuộc quyền sở hữu của bạn." });
+            }
+
+            // 1. Clear references in UserVocabularies
+            var linkedVocabs = await _db.UserVocabularies.Where(v => v.SourceDocumentId == id).ToListAsync();
+            foreach (var v in linkedVocabs)
+            {
+                v.SourceDocumentId = null;
+            }
+
+            // 2. Clear references in FlashcardDecks
+            var linkedDecks = await _db.FlashcardDecks.Where(d => d.DocumentId == id).ToListAsync();
+            foreach (var d in linkedDecks)
+            {
+                d.DocumentId = null;
+            }
+
+            // 3. Delete DocumentReadingProgress entries
+            var progressEntries = await _db.DocumentReadingProgresses.Where(p => p.DocumentId == id).ToListAsync();
+            _db.DocumentReadingProgresses.RemoveRange(progressEntries);
+
+            // 4. Delete DocumentPages
+            _db.DocumentPages.RemoveRange(document.DocumentPages);
+
+            // 5. Delete the Document
+            _db.Documents.Remove(document);
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Xóa tài liệu thành công." });
+        }
+    }
 
 public class SaveAnnotationsRequest
 {

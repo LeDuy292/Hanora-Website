@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { FileText, X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { FileText, X, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react';
 import { formatDate } from '../utils/formatDate';
 
-export const DocumentSelectModal = ({ isOpen, onClose, documents, onSelect, currentId }) => {
+export const DocumentSelectModal = ({ isOpen, onClose, documents, onSelect, currentId, onDelete }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -58,25 +58,40 @@ export const DocumentSelectModal = ({ isOpen, onClose, documents, onSelect, curr
                   onSelect(doc.id);
                   onClose();
                 }}
-                className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
                   currentId == doc.id 
                     ? 'border-blue-500 bg-blue-50' 
                     : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
                 }`}
               >
-                <div>
-                  <h4 className={`font-semibold text-sm ${currentId == doc.id ? 'text-blue-700' : 'text-gray-800'}`}>
+                <div className="flex-1 min-w-0 mr-3">
+                  <h4 className={`font-semibold text-sm truncate ${currentId == doc.id ? 'text-blue-700' : 'text-gray-800'}`}>
                     {doc.title}
                   </h4>
                   <span className="text-xs text-gray-500 mt-1 block">
                     Đã tải lên: {formatDate(doc.createdAt || doc.date || new Date().toISOString())}
                   </span>
                 </div>
-                {currentId == doc.id && (
-                  <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-md">
-                    Đang đọc
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {currentId == doc.id ? (
+                    <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-md shrink-0">
+                      Đang đọc
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDelete) {
+                          onDelete(doc.id, doc.title);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+                      title="Xóa tài liệu"
+                    >
+                      <Trash2 className="w-4.5 h-4.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           ) : (
