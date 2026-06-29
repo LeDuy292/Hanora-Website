@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/notificationStore';
 import logoImg from '../../assets/logo.png';
 
 // Simple lightweight Markdown formatter to handle bullet points, bolding, code, and breaks safely.
@@ -171,9 +172,13 @@ export function AiChatbox() {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (confirm('Bạn có chắc chắn muốn xóa cuộc hội thoại này?')) {
-      await deleteSession(id);
-    }
+    toast.confirm(
+      'Bạn có chắc chắn muốn xóa cuộc hội thoại này?',
+      async () => {
+        await deleteSession(id);
+      },
+      'Xóa cuộc hội thoại'
+    );
   };
 
   // Quick prompt templates

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Volume2, Star } from 'lucide-react';
+import { Volume2, Star, Sparkles } from 'lucide-react';
 
 export function Flashcard({ 
   word, 
   isFlipped, 
   onFlip, 
   onFavorite,
-  isFavorite 
+  isFavorite,
+  showPinyin = true
 }) {
   // TTS audio handler
   const speakWord = (e) => {
@@ -34,7 +35,7 @@ export function Flashcard({
           <div className="card-header">
             <div className="card-header-left">
               <span className="hsk-badge">HSK {word.hsk || 4}</span>
-              <span className="pos-badge">{word.wordType || 'Từ vựng'}</span>
+              <span className="pos-badge">{word.wordType || word.type || 'Từ vựng'}</span>
             </div>
             <button 
               className={`favorite-btn ${isFavorite ? 'is-favorite' : ''}`} 
@@ -47,13 +48,13 @@ export function Flashcard({
           
           <div className="card-content-center">
             <h2 className="main-character">{word.text}</h2>
-            <p className="main-pinyin">{word.pinyin}</p>
+            {showPinyin && <p className="main-pinyin">{word.pinyin}</p>}
             <button className="audio-btn" onClick={speakWord}>
               <Volume2 className="w-5 h-5" />
               Nghe phát âm
             </button>
           </div>
-
+ 
           <div className="front-footer animate-fade-in" style={{ marginTop: 'auto', paddingTop: '2rem', display: 'flex', justifyContent: 'center' }}>
             <span className="touch-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
               <span>👆 Click hoặc nhấn</span>
@@ -68,7 +69,7 @@ export function Flashcard({
           <div className="back-header">
             <div className="back-title-group">
               <h2 className="back-character">{word.text}</h2>
-              <span className="back-pinyin">[{word.pinyin}]</span>
+              {showPinyin && <span className="back-pinyin">[{word.pinyin}]</span>}
             </div>
             <button className="audio-btn-circle" onClick={speakWord}>
               <Volume2 className="w-5 h-5" />
@@ -82,9 +83,9 @@ export function Flashcard({
           </div>
 
           <div className="detail-section">
-            <div className="detail-label-subtle">NGHĨA</div>
+            <div className="detail-label-subtle">NGHĨA ({word.wordType || word.type || 'Từ vựng'})</div>
             <div className="meaning-box">
-              {word.translation}
+              {word.translation || word.meaning}
               {word.fullDefinitions?.length > 1 && (
                 <div className="additional-meanings">
                   {word.fullDefinitions.slice(1).map((d, i) => (
@@ -101,8 +102,14 @@ export function Flashcard({
               {word.examples && word.examples.length > 0 ? (
                 <>
                   <div className="example-cn-bold">{word.examples[0].chinese || word.examples[0].zhText}</div>
-                  <div className="example-py-italic">{word.examples[0].pinyin}</div>
+                  {showPinyin && <div className="example-py-italic">{word.examples[0].pinyin}</div>}
                   <div className="example-vn-small">{word.examples[0].vietnamese || word.examples[0].meaning || word.examples[0].viText}</div>
+                </>
+              ) : word.exampleChinese ? (
+                <>
+                  <div className="example-cn-bold">{word.exampleChinese}</div>
+                  {showPinyin && <div className="example-py-italic">{word.examplePinyin}</div>}
+                  <div className="example-vn-small">{word.exampleVietnamese}</div>
                 </>
               ) : (
                 <div className="text-slate-400 text-sm italic">Chưa có ví dụ cho từ này.</div>
@@ -111,15 +118,41 @@ export function Flashcard({
           </div>
 
           <div className="detail-section">
-            <div className="detail-label-subtle">GHI CHÚ</div>
+            <div className="detail-label-subtle">GIẢI THÍCH</div>
             <div className="context-box">
-              <p>
-                {word.wordType === 'Động từ' 
-                  ? 'Thường đứng sau chủ ngữ để biểu thị hành động.' 
-                  : (word.wordType === 'Danh từ' ? 'Thường làm tân ngữ hoặc chủ ngữ trong câu.' : 'Từ vựng quan trọng trong bài học.')}
-              </p>
+              <p>{word.context || 'Từ vựng quan trọng trong bài học của bạn.'}</p>
             </div>
           </div>
+
+          <div className="detail-section">
+            <div className="detail-label-subtle">NGUỒN TÀI LIỆU</div>
+            <div className="context-box text-xs text-slate-500 font-semibold italic">
+              {word.source || 'Dịch thuật / Sổ tay từ vựng'}
+            </div>
+          </div>
+
+          {(word.collocations || word.grammarPatterns) && (
+            <div className="detail-section">
+              <div className="detail-label-subtle flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
+                <span>GỢI Ý CỦA AI</span>
+              </div>
+              <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-4 text-xs text-slate-600 space-y-2">
+                {word.collocations && (
+                  <div>
+                    <strong className="text-slate-700">Cụm từ thường gặp:</strong>
+                    <p className="mt-0.5">{word.collocations}</p>
+                  </div>
+                )}
+                {word.grammarPatterns && (
+                  <div>
+                    <strong className="text-slate-700">Mẫu ngữ pháp:</strong>
+                    <p className="mt-0.5">{word.grammarPatterns}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="back-footer">
             <span className="touch-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>

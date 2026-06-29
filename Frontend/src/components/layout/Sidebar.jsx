@@ -11,6 +11,7 @@ import {
   BookMarked
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/notificationStore';
 import logoImg from '../../assets/logo.png';
 
 export function Sidebar() {
@@ -103,7 +104,7 @@ export function Sidebar() {
                 key={item.to}
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('Tính năng hiện đang được phát triển!');
+                  toast.warning('Tính năng hiện đang được phát triển!');
                 }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 cursor-pointer"
               >
