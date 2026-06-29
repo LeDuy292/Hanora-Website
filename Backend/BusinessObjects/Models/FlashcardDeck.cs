@@ -13,6 +13,8 @@ public partial class FlashcardDeck
 
     public string? Source { get; set; }
 
+    public string? Description { get; set; }
+
     public long? DocumentId { get; set; }
 
     public DateTime? CreatedAt { get; set; }
