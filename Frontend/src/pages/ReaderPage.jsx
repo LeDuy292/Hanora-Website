@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
-  saveDocumentAnnotations, exportDocx, askAiAssistant
+  saveDocumentAnnotations, exportDocx, askAiAssistant, deleteDocument
 } from '../lib/api';
 import { toast } from '../store/notificationStore';
 import WordCard from '../components/WordCard';
@@ -12,6 +12,7 @@ import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
 } from '../utils/documentTextUtils';
@@ -229,6 +230,25 @@ const ReaderPage = () => {
     };
     fetchDocsList();
   }, []);
+
+  const handleDeleteDocument = async (docId, title) => {
+    toast.confirm(
+      `Bạn có chắc chắn muốn xóa tài liệu "${title}" không? Hành động này sẽ xóa tất cả ghi chú, vẽ vẽ, và các dữ liệu liên quan.`,
+      async () => {
+        try {
+          await deleteDocument(docId);
+          toast.success("Xóa tài liệu thành công!");
+          // Refresh the documents list
+          const docs = await getMyDocuments();
+          setDocumentsList(docs);
+        } catch (error) {
+          console.error(error);
+          toast.error(error.message || "Không thể xóa tài liệu.");
+        }
+      },
+      "Xóa tài liệu"
+    );
+  };
 
   const currentPageRef = useRef(currentPage);
   const totalPagesRef = useRef(totalPages);
@@ -842,6 +862,7 @@ const ReaderPage = () => {
           if (newId) navigate(`/reader/${newId}`);
           else navigate(`/reader`);
         }}
+        onDelete={handleDeleteDocument}
       />
 
       {/* Bubble Context Menu */}
