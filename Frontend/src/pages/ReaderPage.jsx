@@ -11,6 +11,7 @@ import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
 } from '../utils/documentTextUtils';
@@ -1417,10 +1418,32 @@ const ReaderPage = () => {
                           });
                           flushPara();
 
-                          return paragraphs.map((lines, pi) => (
-                            <div key={pi} className="mb-4">
+                          return paragraphs.map((lines, pi) => {
+                            let isHeading = false;
+                            if (lines.length > 0 && lines[0].length > 0) {
+                              const firstWord = lines[0][0].word;
+                              if (firstWord.includes('#HEADING#')) {
+                                isHeading = true;
+                                lines[0][0].word = firstWord.replace('#HEADING#', '').trim();
+                                if (!lines[0][0].word) lines[0].shift();
+                              } else if (lines[0].length > 2 && lines[0][0].word === '#' && lines[0][1].word === 'HEADING' && lines[0][2].word === '#') {
+                                isHeading = true;
+                                lines[0].splice(0, 3);
+                              }
+                            }
+                            
+                            // Remove empty lines that might have been left
+                            if (lines.length > 0 && lines[0].length === 0) lines.shift();
+                            if (lines.length === 0) return null;
+
+                            const paraClass = isHeading 
+                               ? "mb-6 text-[1.4em] font-bold text-slate-900 border-b border-slate-200/50 pb-2" 
+                               : "mb-4 text-slate-800 leading-relaxed";
+
+                            return (
+                            <div key={pi} className={paraClass}>
                               {lines.map((lineWords, li) => (
-                                <div key={li} className="flex flex-wrap leading-none mb-1">
+                                <div key={li} className={`flex flex-wrap leading-none mb-1 ${isHeading ? 'mb-2' : ''}`}>
                                   {lineWords.map(({ word, absIndex }) => {
                                     const highlightColor = annotations.highlights[absIndex];
                                     const hasTextNote = annotations.textNotes[absIndex];
@@ -1476,9 +1499,10 @@ const ReaderPage = () => {
                                     );
                                   })}
                                 </div>
-                              ))}
-                            </div>
-                          ));
+                                ))}
+                              </div>
+                            );
+                          });
                         })()}
                       </div>
 

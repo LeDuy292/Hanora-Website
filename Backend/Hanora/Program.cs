@@ -40,6 +40,7 @@ namespace Hanora
             builder.Services.AddHttpClient<IOcrService, OcrService>();
             builder.Services.AddSingleton<IBackgroundTaskQueue, DefaultBackgroundTaskQueue>();
             builder.Services.AddSingleton<IChineseSegmenterService, ChineseSegmenterService>();
+            builder.Services.AddScoped<ILayoutAnalysisService, LayoutAnalysisService>();
 
             var documentWorkerCount = Math.Clamp(
                 builder.Configuration.GetValue("DocumentProcessing:WorkerCount", 2),
@@ -138,61 +139,6 @@ namespace Hanora
             });
 
             var app = builder.Build();
-
-            // Run database updates at startup
-            using (var scope = app.Services.CreateScope())
-            {
-                try
-                {
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    context.Database.ExecuteSqlRaw(@"
-                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
-                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
-                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
-
-                        -- New additions for XP, Leaderboard, Decks, and Notifications
-                        CREATE TABLE IF NOT EXISTS flashcard_decks (
-                            id            BIGSERIAL    PRIMARY KEY,
-                            user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            name          VARCHAR(255) NOT NULL,
-                            source        VARCHAR(255),
-                            document_id   BIGINT       REFERENCES documents(id) ON DELETE SET NULL,
-                            created_at    TIMESTAMPTZ  DEFAULT NOW(),
-                            updated_at    TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        ALTER TABLE flashcards DROP CONSTRAINT IF EXISTS flashcards_user_vocabulary_id_key;
-                        ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS deck_id BIGINT REFERENCES flashcard_decks(id) ON DELETE CASCADE;
-                        CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcards_user_vocab_deck ON flashcards(user_vocabulary_id, deck_id);
-
-                        CREATE TABLE IF NOT EXISTS user_notifications (
-                            id          BIGSERIAL    PRIMARY KEY,
-                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            title       VARCHAR(255) NOT NULL,
-                            message     TEXT         NOT NULL,
-                            is_read     BOOLEAN      DEFAULT FALSE,
-                            created_at  TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        CREATE TABLE IF NOT EXISTS leaderboard_rewards (
-                            id            BIGSERIAL   PRIMARY KEY,
-                            user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            rank          INTEGER     NOT NULL,
-                            xp_rewarded   INTEGER     NOT NULL,
-                            week_start    DATE        NOT NULL,
-                            rewarded_at   TIMESTAMPTZ DEFAULT NOW(),
-                            UNIQUE (user_id, week_start)
-                        );
-                    ");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error running database migrations: {ex.Message}");
-                }
-            }
 
             if (app.Environment.IsDevelopment())
             {

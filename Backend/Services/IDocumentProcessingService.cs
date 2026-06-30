@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Repositories;
+using System.Text;
 using System.Text.Json;
 
 namespace Services;
@@ -104,6 +105,7 @@ public class DocumentProcessingService : IDocumentProcessingService
         var docRepo = serviceProvider.GetRequiredService<IDocumentRepository>();
         var s3Service = serviceProvider.GetRequiredService<IS3StorageService>();
         var ocrService = serviceProvider.GetRequiredService<IOcrService>();
+        var layoutService = serviceProvider.GetRequiredService<ILayoutAnalysisService>();
 
         var doc = await docRepo.GetByIdAsync(documentId);
         if (doc == null) return;
@@ -112,7 +114,7 @@ public class DocumentProcessingService : IDocumentProcessingService
         {
             using var fileStream = await s3Service.DownloadFileAsync(fileUrl);
             
-            var (extractedText, generatedPdfBytes, errorMessage) = await ocrService.ExtractTextAndPdfAsync(fileStream, fileName, contentType);
+            var (extractedText, pages, errorMessage) = await ocrService.ExtractLayoutAsync(fileStream, fileName, contentType);
 
             if (!string.IsNullOrEmpty(errorMessage))
             {
@@ -121,22 +123,26 @@ public class DocumentProcessingService : IDocumentProcessingService
             }
             else
             {
-                if (generatedPdfBytes != null)
+                if (pages != null && pages.Any())
                 {
-                    var newPdfUrl = await s3Service.UploadBytesAsync(generatedPdfBytes, fileName, "application/pdf");
-                    doc.FileUrl = newPdfUrl;
+                    var blocks = layoutService.AnalyzeLayout(pages);
                     
-                    if (!doc.Title.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                    {
-                        doc.Title += ".pdf";
-                    }
-                    if (!doc.OriginalFilename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                    {
-                        doc.OriginalFilename += ".pdf";
-                    }
-                }
+                    // Reconstruct text based on blocks to preserve structural layout
+                    var formattedText = string.Join("\n\n", blocks.Select(b => 
+                        (b.Type.StartsWith("heading") ? "#HEADING# " : "") + 
+                        string.Join("\n", b.Lines.Select(l => l.Text))
+                    ));
 
-                if (!string.IsNullOrWhiteSpace(extractedText))
+                    var segments = _segmenterService.SegmentPreservingStructure(formattedText);
+                    doc.ExtractedText = JsonSerializer.Serialize(segments);
+
+                    var layoutJson = JsonSerializer.Serialize(blocks, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    var layoutBytes = Encoding.UTF8.GetBytes(layoutJson);
+                    var layoutFileName = $"{Guid.NewGuid()}_layout.json";
+                    var layoutUrl = await s3Service.UploadBytesAsync(layoutBytes, layoutFileName, "application/json");
+                    doc.OcrJsonUrl = layoutUrl;
+                }
+                else if (!string.IsNullOrWhiteSpace(extractedText))
                 {
                     var segments = _segmenterService.SegmentPreservingStructure(extractedText);
                     doc.ExtractedText = JsonSerializer.Serialize(segments);
