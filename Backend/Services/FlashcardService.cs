@@ -392,7 +392,7 @@ public class FlashcardService : IFlashcardService
 
     public async Task<bool> CreateFlashcardSetAsync(long userId, CreateFlashcardSetRequest request)
     {
-        if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 10)
+        if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 1)
         {
             return false;
         }
