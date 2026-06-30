@@ -137,11 +137,6 @@ export function VocabularyPage() {
     const selectedWordsList = fullVocabularyDataset.filter(w => selectedRows.includes(w.text));
     if (selectedWordsList.length === 0) return;
 
-    if (selectedWordsList.length < 10) {
-      toast.warning('Bạn cần chọn ít nhất 10 từ vựng để tạo một bộ Flashcard.');
-      return;
-    }
-
     const firstWord = selectedWordsList[0];
     const allSameSource = selectedWordsList.every(w => w.source === firstWord.source && w.documentId === firstWord.documentId);
     

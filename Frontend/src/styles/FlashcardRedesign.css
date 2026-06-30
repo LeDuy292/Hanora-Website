@@ -144,7 +144,7 @@
 /* Flashcard Area */
 .flashcard-main {
   width: 100%;
-  max-width: 1050px;
+  max-width: 1200px;
   margin: 0 auto;
   perspective: 2500px;
 }
@@ -152,7 +152,7 @@
 .flashcard-inner {
   position: relative;
   width: 100%;
-  min-height: 520px;
+  height: 500px;
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   transform-style: preserve-3d;
   cursor: pointer;
@@ -170,7 +170,7 @@
   backface-visibility: hidden;
   background: white;
   border-radius: 2.5rem;
-  padding: 3rem;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
   box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.12);
@@ -367,6 +367,19 @@
 
 .detail-section {
   margin-bottom: 1.75rem;
+}
+
+.detail-section-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .detail-section-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .detail-label-subtle {

@@ -145,7 +145,18 @@ export function FlashcardPage() {
   }, [vocabList, customDecks]);
 
   useEffect(() => {
-    loadCustomDecks();
+    const initPageData = async () => {
+      setIsLoadingDecks(true);
+      try {
+        await store.fetchUserFlashcards(); // Initial sync of vocabList
+        await loadCustomDecks();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoadingDecks(false);
+      }
+    };
+    initPageData();
   }, []);
 
   const handleOpenEditModal = (deck) => {
@@ -167,6 +178,7 @@ export function FlashcardPage() {
       toast.success('Cập nhật bộ Flashcard thành công!');
       setShowEditDeckModal(false);
       loadCustomDecks();
+      store.fetchUserFlashcards();
     } catch (err) {
       toast.error('Lỗi khi cập nhật bộ Flashcard.');
     } finally {
@@ -182,6 +194,7 @@ export function FlashcardPage() {
           await store.deleteDeck(deckId);
           toast.success('Xóa bộ Flashcard thành công!');
           loadCustomDecks();
+          store.fetchUserFlashcards();
           if (activeDeck && activeDeck.id === deckId) {
             setActiveDeck(null);
           }
@@ -198,6 +211,7 @@ export function FlashcardPage() {
       await store.duplicateDeck(deckId);
       toast.success('Sao chép bộ thẻ thành công!');
       loadCustomDecks();
+      store.fetchUserFlashcards();
     } catch (err) {
       toast.error('Không thể sao chép bộ thẻ.');
     }
@@ -226,6 +240,7 @@ export function FlashcardPage() {
           toast.success('Đã loại bỏ từ khỏi bộ thẻ thành công!');
           setDeckWords(prev => prev.filter(w => w.id !== cardId));
           loadCustomDecks();
+          store.fetchUserFlashcards();
         } catch (err) {
           toast.error('Lỗi khi loại bỏ từ.');
         }
@@ -255,6 +270,7 @@ export function FlashcardPage() {
       toast.success('Đã thêm từ vựng thành công!');
       setShowAddWordModal(false);
       loadCustomDecks();
+      store.fetchUserFlashcards();
     } catch (err) {
       toast.error('Lỗi khi thêm từ.');
     } finally {

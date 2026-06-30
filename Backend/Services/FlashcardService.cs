@@ -62,6 +62,10 @@ public class FlashcardService : IFlashcardService
                 nextReviewDate = f.UserVocabulary.LastReviewed?.AddDays(f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
                 isFavorite = false,
                 documentTitle = f.UserVocabulary.SourceDocument?.Title,
+                hanViet = f.UserVocabulary.Vocabulary.HanViet,
+                collocations = f.UserVocabulary.Vocabulary.Collocations,
+                grammarPatterns = f.UserVocabulary.Vocabulary.GrammarPatterns,
+                context = f.UserVocabulary.Vocabulary.UsageNotes,
                 examples = f.UserVocabulary.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                     zhText = e.ZhText,
                     viText = e.ViText,
@@ -603,6 +607,10 @@ public class FlashcardService : IFlashcardService
                 wordType = f.UserVocabulary.Vocabulary.WordType?.ToString() ?? "Other",
                 srsLevel = f.UserVocabulary.MasteryLevel,
                 nextReviewDate = f.UserVocabulary.LastReviewed?.AddDays(f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
+                hanViet = f.UserVocabulary.Vocabulary.HanViet,
+                collocations = f.UserVocabulary.Vocabulary.Collocations,
+                grammarPatterns = f.UserVocabulary.Vocabulary.GrammarPatterns,
+                context = f.UserVocabulary.Vocabulary.UsageNotes,
                 examples = f.UserVocabulary.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                     zhText = e.ZhText,
                     viText = e.ViText,
