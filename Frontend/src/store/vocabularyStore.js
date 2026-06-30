@@ -4,6 +4,29 @@ import { apiRequest } from '../services/apiClient';
 
 const INITIAL_VOCABULARY = [];
 
+const cleanTranslation = (val) => {
+  if (!val) return "";
+  let current = val.trim();
+  for (let i = 0; i < 5; i++) {
+    if (!(current.startsWith("[") && current.endsWith("]")) && !(current.startsWith("{") && current.endsWith("}"))) {
+      break;
+    }
+    try {
+      const parsed = JSON.parse(current);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        current = parsed[0].meaning || parsed[0].translation || current;
+      } else if (parsed && typeof parsed === 'object') {
+        current = parsed.meaning || parsed.translation || current;
+      } else {
+        break;
+      }
+    } catch (e) {
+      break;
+    }
+  }
+  return current;
+};
+
 export const useVocabularyStore = create(
   persist(
     (set, get) => ({
@@ -40,7 +63,7 @@ export const useVocabularyStore = create(
         const newWord = {
           text: word.text,
           pinyin: word.pinyin || "",
-          translation: word.translation || "",
+          translation: cleanTranslation(word.translation || word.meaning || ""),
           hsk: word.hsk || 1,
           documentTitle: word.documentTitle,
           documentId: word.documentId,

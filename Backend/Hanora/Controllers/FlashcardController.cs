@@ -102,11 +102,11 @@ public class FlashcardController : ControllerBase
         
         long userId = long.Parse(userIdClaim.Value);
         
-        if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 10)
+        if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 1)
         {
             return BadRequest(new {
                 success = false,
-                message = "Bạn cần chọn nhất 10 từ vựng để tạo Flashcard."
+                message = "Bạn cần chọn ít nhất 1 từ vựng để tạo Flashcard."
             });
         }
         
