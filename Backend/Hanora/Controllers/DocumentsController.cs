@@ -461,25 +461,157 @@ public class DocumentsController : ControllerBase
                 var segments = new System.Collections.Generic.List<string>();
                 if (!string.IsNullOrEmpty(documentEntity.ExtractedText))
                 {
-                    try
-                    {
-                        segments = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(documentEntity.ExtractedText)
-                                   ?? new System.Collections.Generic.List<string>();
-                    }
-                    catch { }
+                    try { segments = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(documentEntity.ExtractedText) ?? new System.Collections.Generic.List<string>(); } catch { }
+                }
+
+                AnnotationsDto docAnnotations = null;
+                if (!string.IsNullOrEmpty(documentEntity.AnnotationsJson))
+                {
+                    try {
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        docAnnotations = System.Text.Json.JsonSerializer.Deserialize<AnnotationsDto>(documentEntity.AnnotationsJson, options);
+                    } catch { }
                 }
 
                 if (segments.Count > 0)
                 {
-                    var fullText = string.Join("", segments);
-                    var paragraphs = fullText.Split(new[] { "\n\n" }, StringSplitOptions.None);
-                    foreach (var paragraph in paragraphs)
+                    var p = doc.InsertParagraph();
+                    p.SpacingAfter(10D);
+                    
+                    bool nextIsHeading = false;
+                    bool nextIsCenter = false;
+                    bool nextIsIndent = false;
+
+                    for (int i = 0; i < segments.Count; i++)
                     {
-                        var textParagraph = doc.InsertParagraph();
-                        textParagraph.Append(paragraph.Replace("\n", " "))
-                            .Font(new Xceed.Document.NET.Font("Arial"))
-                            .FontSize(12D);
-                        textParagraph.SpacingAfter(10D);
+                        string text = segments[i];
+
+                        if (text.Contains("#CENTER#")) { nextIsCenter = true; text = text.Replace("#CENTER#", ""); segments[i] = text; }
+                        if (text.Contains("#INDENT#")) { nextIsIndent = true; text = text.Replace("#INDENT#", ""); segments[i] = text; }
+                        if (text.Contains("#HEADING#")) { nextIsHeading = true; text = text.Replace("#HEADING#", ""); segments[i] = text; }
+                        if (text.StartsWith("#IMAGE:")) { text = System.Text.RegularExpressions.Regex.Replace(text, @"#IMAGE:.*?#", ""); segments[i] = text; }
+                        
+                        if (text == "#")
+                        {
+                            string peek = "";
+                            int endIdx = -1;
+                            for (int k = i + 1; k < segments.Count && k < i + 15; k++)
+                            {
+                                peek += segments[k];
+                                if (segments[k].Contains("#")) { endIdx = k; break; }
+                            }
+                            
+                            string fullMarker = "#" + peek;
+                            if (fullMarker == "#CENTER#" || fullMarker == "#INDENT#" || fullMarker == "#HEADING#" || fullMarker.StartsWith("#IMAGE:"))
+                            {
+                                if (fullMarker == "#CENTER#") nextIsCenter = true;
+                                else if (fullMarker == "#INDENT#") nextIsIndent = true;
+                                else if (fullMarker == "#HEADING#") nextIsHeading = true;
+
+                                for (int k = i; k <= endIdx; k++) segments[k] = "";
+                                text = "";
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(text) && !text.Contains("\n")) continue;
+
+                        Xceed.Document.NET.Highlight highlightColor = Xceed.Document.NET.Highlight.none;
+                        string textNote = null;
+                        string stickyNote = null;
+
+                        if (docAnnotations != null)
+                        {
+                            string key = i.ToString();
+                            if (docAnnotations.Highlights != null && docAnnotations.Highlights.TryGetValue(key, out var colorHex))
+                            {
+                                if (colorHex == "#fef08a") highlightColor = Xceed.Document.NET.Highlight.yellow;
+                                else if (colorHex == "#bbf7d0") highlightColor = Xceed.Document.NET.Highlight.green;
+                                else if (colorHex == "#bfdbfe") highlightColor = Xceed.Document.NET.Highlight.blue;
+                                else if (colorHex == "#e9d5ff") highlightColor = Xceed.Document.NET.Highlight.magenta;
+                                else if (colorHex == "#fbcfe8") highlightColor = Xceed.Document.NET.Highlight.magenta;
+                                else if (colorHex == "#fecaca") highlightColor = Xceed.Document.NET.Highlight.red;
+                                else highlightColor = Xceed.Document.NET.Highlight.yellow;
+                            }
+                            if (docAnnotations.TextNotes != null) docAnnotations.TextNotes.TryGetValue(key, out textNote);
+                            if (docAnnotations.StickyNotes != null) docAnnotations.StickyNotes.TryGetValue(key, out stickyNote);
+                        }
+
+                        if (!string.IsNullOrEmpty(textNote)) textNote = System.Text.RegularExpressions.Regex.Replace(textNote, @"^\[.*?\]\s*", "");
+                        if (!string.IsNullOrEmpty(stickyNote)) stickyNote = System.Text.RegularExpressions.Regex.Replace(stickyNote, @"^\[.*?\]\s*", "");
+
+                        if (text.Contains("\n"))
+                        {
+                            var parts = text.Split('\n');
+                            for (int j = 0; j < parts.Length; j++)
+                            {
+                                if (j > 0)
+                                {
+                                    p = doc.InsertParagraph();
+                                    p.SpacingAfter(10D);
+                                    if (nextIsCenter) { p.Alignment = Xceed.Document.NET.Alignment.center; nextIsCenter = false; }
+                                    if (nextIsIndent) { p.IndentationFirstLine = 36.0f; nextIsIndent = false; }
+                                    if (parts.Length > 1 && j == parts.Length - 1) { nextIsHeading = false; } // Reset heading on new paragraph
+                                }
+                                if (!string.IsNullOrEmpty(parts[j]))
+                                {
+                                    if (string.IsNullOrWhiteSpace(p.Text) && nextIsCenter) { p.Alignment = Xceed.Document.NET.Alignment.center; nextIsCenter = false; }
+                                    if (string.IsNullOrWhiteSpace(p.Text) && nextIsIndent) { p.IndentationFirstLine = 36.0f; nextIsIndent = false; }
+
+                                    var app = p.Append(parts[j]).Font(new Xceed.Document.NET.Font("Arial")).FontSize(nextIsHeading ? 14D : 12D);
+                                    if (nextIsHeading) app.Bold();
+                                    if (highlightColor != Xceed.Document.NET.Highlight.none) app.Highlight(highlightColor);
+                                }
+
+                                if (j == parts.Length - 1)
+                                {
+                                    if (!string.IsNullOrEmpty(textNote))
+                                    {
+                                        p.Append($" [Ghi chú: {textNote}] ")
+                                         .Font(new Xceed.Document.NET.Font("Arial"))
+                                         .FontSize(11D)
+                                         .Italic()
+                                         .Color(Xceed.Drawing.Color.DarkRed);
+                                    }
+                                    if (!string.IsNullOrEmpty(stickyNote))
+                                    {
+                                        p.Append($" [Ghi chú nổi: {stickyNote}] ")
+                                         .Font(new Xceed.Document.NET.Font("Arial"))
+                                         .FontSize(11D)
+                                         .Italic()
+                                         .Color(Xceed.Drawing.Color.DarkMagenta);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(text))
+                            {
+                                if (string.IsNullOrWhiteSpace(p.Text) && nextIsCenter) { p.Alignment = Xceed.Document.NET.Alignment.center; nextIsCenter = false; }
+                                if (string.IsNullOrWhiteSpace(p.Text) && nextIsIndent) { p.IndentationFirstLine = 36.0f; nextIsIndent = false; }
+
+                                var app = p.Append(text).Font(new Xceed.Document.NET.Font("Arial")).FontSize(nextIsHeading ? 14D : 12D);
+                                if (nextIsHeading) app.Bold();
+                                if (highlightColor != Xceed.Document.NET.Highlight.none) app.Highlight(highlightColor);
+                                
+                                if (!string.IsNullOrEmpty(textNote))
+                                {
+                                    p.Append($" [Ghi chú: {textNote}] ")
+                                     .Font(new Xceed.Document.NET.Font("Arial"))
+                                     .FontSize(11D)
+                                     .Italic()
+                                     .Color(Xceed.Drawing.Color.DarkRed);
+                                }
+                                if (!string.IsNullOrEmpty(stickyNote))
+                                {
+                                    p.Append($" [Ghi chú nổi: {stickyNote}] ")
+                                     .Font(new Xceed.Document.NET.Font("Arial"))
+                                     .FontSize(11D)
+                                     .Italic()
+                                     .Color(Xceed.Drawing.Color.DarkMagenta);
+                                }
+                            }
+                        }
                     }
                 }
                 else
