@@ -12,6 +12,7 @@ export function PronunciationPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   const filteredSamples = PRONUNCIATION_SAMPLES.filter(s => 
     s.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -19,7 +20,7 @@ export function PronunciationPage() {
   );
 
   const handleStartPractice = (lessonId) => {
-    navigate(`/pronunciation/practice/${lessonId}`);
+    setShowComingSoon(true);
   };
 
   return (
@@ -211,6 +212,27 @@ export function PronunciationPage() {
           </div>
         </button>
       </div>
+
+      {/* Coming Soon Modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowComingSoon(false)}>
+          <div className="bg-white rounded-[24px] p-8 max-w-sm w-full shadow-2xl text-center flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-[16px] flex items-center justify-center mb-5 border border-blue-100">
+              <span className="material-symbols-outlined text-[32px]">construction</span>
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2 font-display">Đang Phát Triển</h3>
+            <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+              Tính năng luyện phát âm AI đang được đội ngũ hoàn thiện. Vui lòng quay lại trải nghiệm sau nhé!
+            </p>
+            <button 
+              onClick={() => setShowComingSoon(false)}
+              className="w-full py-3 bg-[#2088E2] text-white font-black rounded-xl hover:bg-[#1b75c4] transition-all shadow-md active:scale-95"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

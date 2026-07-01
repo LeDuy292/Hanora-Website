@@ -28,6 +28,8 @@ public partial class Document
     public int? TotalVocabularyCount { get; set; }
     
     public string? AnnotationsJson { get; set; }
+    
+    public string? OcrJsonUrl { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 

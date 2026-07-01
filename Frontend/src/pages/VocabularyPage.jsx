@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
 import { toast } from '../store/notificationStore';
 
@@ -163,7 +164,7 @@ export function VocabularyPage() {
   const handleCreateDeckSubmit = async (e) => {
     e.preventDefault();
     if (!newDeckName.trim()) {
-      toast.warning('Vui lòng nhập tên bộ Flashcard.');
+      useToastStore.getState().addToast('Vui lòng nhập tên bộ Flashcard.', 'error');
       return;
     }
     setIsSavingDeck(true);
@@ -179,13 +180,13 @@ export function VocabularyPage() {
         selectedWordsList
       );
 
-      toast.success('Đã tạo bộ Flashcard thành công!');
+      useToastStore.getState().addToast('Đã tạo bộ Flashcard thành công!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
       navigate('/flashcards');
     } catch (err) {
       console.error(err);
-      toast.error('Có lỗi xảy ra khi tạo bộ Flashcard.');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
     } finally {
       setIsSavingDeck(false);
     }
