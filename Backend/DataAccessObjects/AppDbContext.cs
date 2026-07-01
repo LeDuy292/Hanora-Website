@@ -303,6 +303,7 @@ public partial class AppDbContext : DbContext
                 .HasDefaultValue(0)
                 .HasColumnName("total_vocabulary_count");
             entity.Property(e => e.AnnotationsJson).HasColumnName("annotations_json");
+            entity.Property(e => e.OcrJsonUrl).HasColumnName("ocr_json_url");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.User).WithMany(p => p.Documents)

@@ -21,7 +21,7 @@ public class OcrService : IOcrService
         _httpClient.Timeout = TimeSpan.FromMinutes(2);
     }
 
-    public async Task<(string? ExtractedText, byte[]? GeneratedPdfBytes, string? ErrorMessage)> ExtractTextAndPdfAsync(Stream fileStream, string fileName, string contentType)
+    public async Task<(string? Text, List<Services.DTOs.PageLinesDto>? Pages, string? ErrorMessage)> ExtractLayoutAsync(Stream fileStream, string fileName, string contentType)
     {
         try
         {
@@ -39,12 +39,13 @@ public class OcrService : IOcrService
             if (contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
                 || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             {
-                var text = ExtractFromPdf(memoryStream);
+                var pages = ExtractLayoutFromPdf(memoryStream);
+                var text = string.Join("\n\n", pages.SelectMany(p => p.Lines).Select(l => l.Text));
                 var chineseCharCount = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
 
                 if (!string.IsNullOrWhiteSpace(text) && chineseCharCount > 10)
                 {
-                    return (text, null, null);
+                    return (text, pages, null);
                 }
 
                 _logger.LogInformation("PDF seems to be scanned or contains unmapped CJK fonts. Rejecting.");
@@ -53,7 +54,7 @@ public class OcrService : IOcrService
 
             if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
-                var (text, ocrError) = await ExtractWithAzureOcrAsync(memoryStream.ToArray());
+                var (text, pages, ocrError) = await ExtractWithAzureOcrLayoutAsync(memoryStream.ToArray());
 
                 if (!string.IsNullOrEmpty(ocrError))
                 {
@@ -66,7 +67,7 @@ public class OcrService : IOcrService
                     return (null, null, "Ảnh quá mờ không thể dịch thuật được.");
                 }
 
-                return (text, null, null);
+                return (text, pages, null);
             }
 
             return (null, null, "Định dạng file không được hỗ trợ.");
@@ -84,53 +85,73 @@ public class OcrService : IOcrService
             || fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
     }
 
-    private string ExtractFromPdf(Stream fileStream)
+    private List<Services.DTOs.PageLinesDto> ExtractLayoutFromPdf(Stream fileStream)
     {
-        var pages = new List<string>();
+        var pagesDto = new List<Services.DTOs.PageLinesDto>();
         try
         {
             using var document = PdfDocument.Open(fileStream);
             foreach (var page in document.GetPages())
             {
-                var rawText = page.Text ?? "";
-                // Normalize line endings within a page: single \n per line, \n\n between paragraphs
-                // PdfPig returns text as one block; we detect paragraph boundaries by blank lines or
-                // short lines (headings/titles) that are not sentence continuations.
-                var lines = rawText
-                    .Replace("\r\n", "\n")
-                    .Replace('\r', '\n')
-                    .Split('\n');
+                var pageDto = new Services.DTOs.PageLinesDto { PageNumber = page.Number };
+                var words = page.GetWords().ToList();
+                
+                // Group words by approximate Y coordinate (line)
+                var lines = words
+                    .GroupBy(w => Math.Round(w.BoundingBox.Bottom, 0))
+                    .OrderByDescending(g => g.Key)
+                    .ToList();
 
-                var sb = new StringBuilder();
-                for (int i = 0; i < lines.Length; i++)
+                foreach (var lineGroup in lines)
                 {
-                    var line = lines[i].Trim();
-                    if (string.IsNullOrEmpty(line))
+                    var lineWords = lineGroup.OrderBy(w => w.BoundingBox.Left).ToList();
+                    if (!lineWords.Any()) continue;
+
+                    var minX = lineWords.Min(w => w.BoundingBox.Left);
+                    var maxX = lineWords.Max(w => w.BoundingBox.Right);
+                    var minY = lineWords.Min(w => w.BoundingBox.Bottom);
+                    var maxY = lineWords.Max(w => w.BoundingBox.Top);
+
+                    var lineDto = new Services.DTOs.OcrLineDto
                     {
-                        // blank line → paragraph break
-                        if (sb.Length > 0 && !sb.ToString().EndsWith("\n\n"))
-                            sb.Append("\n\n");
-                    }
-                    else
-                    {
-                        sb.AppendLine(line);
-                    }
+                        Text = string.Join(" ", lineWords.Select(w => w.Text)),
+                        BoundingBox = new Services.DTOs.BoundingBoxDto
+                        {
+                            X = minX,
+                            Y = minY,
+                            Width = maxX - minX,
+                            Height = maxY - minY
+                        },
+                        Words = lineWords.Select(w => new Services.DTOs.OcrWordDto
+                        {
+                            Text = w.Text,
+                            BoundingBox = new Services.DTOs.BoundingBoxDto
+                            {
+                                X = w.BoundingBox.Left,
+                                Y = w.BoundingBox.Bottom,
+                                Width = w.BoundingBox.Width,
+                                Height = w.BoundingBox.Height
+                            }
+                        }).ToList()
+                    };
+                    pageDto.Lines.Add(lineDto);
                 }
-                var pageText = sb.ToString().Trim();
-                if (!string.IsNullOrEmpty(pageText))
-                    pages.Add(pageText);
+                
+                if (pageDto.Lines.Any())
+                {
+                    pagesDto.Add(pageDto);
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "PdfPig failed to extract text.");
+            _logger.LogWarning(ex, "PdfPig failed to extract layout.");
         }
-        // Join pages with double newline to mark page breaks as paragraph breaks
-        return string.Join("\n\n", pages);
+        return pagesDto;
     }
 
 
-    private async Task<(string? text, string? errorMessage)> ExtractWithAzureOcrAsync(byte[] bytes)
+    private async Task<(string? text, List<Services.DTOs.PageLinesDto>? pages, string? errorMessage)> ExtractWithAzureOcrLayoutAsync(byte[] bytes)
     {
         try
         {
@@ -152,7 +173,7 @@ public class OcrService : IOcrService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Azure Computer Vision API error: {StatusCode} {Body}", response.StatusCode, responseBody);
-                return (null, $"Azure API Error ({(int)response.StatusCode}): {responseBody}");
+                return (null, null, $"Azure API Error ({(int)response.StatusCode}): {responseBody}");
             }
 
             using var doc = JsonDocument.Parse(responseBody);
@@ -160,6 +181,8 @@ public class OcrService : IOcrService
             var blocks = readResult.GetProperty("blocks");
 
             var textBuilder = new StringBuilder();
+            var pagesDto = new List<Services.DTOs.PageLinesDto>();
+            var pageDto = new Services.DTOs.PageLinesDto { PageNumber = 1 };
 
             foreach (var block in blocks.EnumerateArray())
             {
@@ -167,21 +190,65 @@ public class OcrService : IOcrService
                 {
                     var lineText = line.GetProperty("text").GetString() ?? "";
                     textBuilder.AppendLine(lineText);
+
+                    var boundingPoly = line.GetProperty("boundingPolygon").EnumerateArray().Select(x => x.GetProperty("x").GetDouble()).ToArray();
+                    var boundingPolyY = line.GetProperty("boundingPolygon").EnumerateArray().Select(x => x.GetProperty("y").GetDouble()).ToArray();
+                    var minX = boundingPoly.Min();
+                    var maxX = boundingPoly.Max();
+                    var minY = boundingPolyY.Min();
+                    var maxY = boundingPolyY.Max();
+
+                    var lineDto = new Services.DTOs.OcrLineDto
+                    {
+                        Text = lineText,
+                        BoundingBox = new Services.DTOs.BoundingBoxDto
+                        {
+                            X = minX,
+                            Y = minY,
+                            Width = maxX - minX,
+                            Height = maxY - minY
+                        }
+                    };
+
+                    if (line.TryGetProperty("words", out var wordsProp))
+                    {
+                        foreach (var word in wordsProp.EnumerateArray())
+                        {
+                            var wPolyX = word.GetProperty("boundingPolygon").EnumerateArray().Select(x => x.GetProperty("x").GetDouble()).ToArray();
+                            var wPolyY = word.GetProperty("boundingPolygon").EnumerateArray().Select(x => x.GetProperty("y").GetDouble()).ToArray();
+                            lineDto.Words.Add(new Services.DTOs.OcrWordDto
+                            {
+                                Text = word.GetProperty("text").GetString() ?? "",
+                                BoundingBox = new Services.DTOs.BoundingBoxDto
+                                {
+                                    X = wPolyX.Min(),
+                                    Y = wPolyY.Min(),
+                                    Width = wPolyX.Max() - wPolyX.Min(),
+                                    Height = wPolyY.Max() - wPolyY.Min()
+                                }
+                            });
+                        }
+                    }
+                    pageDto.Lines.Add(lineDto);
                 }
             }
+            if (pageDto.Lines.Any())
+            {
+                pagesDto.Add(pageDto);
+            }
 
-            return (textBuilder.ToString().Trim(), null);
+            return (textBuilder.ToString().Trim(), pagesDto, null);
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Azure Computer Vision API request failed.");
-            return (null, $"Azure API Error: {ex.Message}");
+            return (null, null, $"Azure API Error: {ex.Message}");
         }
         catch (Exception ex)
         {
             var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
             _logger.LogWarning(ex, "Azure OCR failed to extract text.");
-            return (null, fullError);
+            return (null, null, fullError);
         }
     }
 }
