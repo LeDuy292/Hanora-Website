@@ -21,7 +21,8 @@ import {
   MousePointer, Highlighter, Pencil, Eraser,
   FileText, Pin, Save, Download, X, Upload, ChevronLeft, ChevronRight,
   Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare,
-  Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send
+  Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send,
+  Copy, Trash2, Undo2, Redo2
 } from 'lucide-react';
 
 const HIGHLIGHT_COLORS = [
@@ -33,12 +34,52 @@ const HIGHLIGHT_COLORS = [
   { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
 ];
 
+const DRAWING_COLORS = [
+  { id: 'red', name: 'Do', value: '#ef4444' },
+  { id: 'yellow', name: 'Vang', value: '#facc15' },
+  { id: 'green', name: 'Xanh la', value: '#22c55e' },
+  { id: 'blue', name: 'Xanh duong', value: '#2563eb' },
+  { id: 'purple', name: 'Tim', value: '#9333ea' },
+  { id: 'black', name: 'Den', value: '#111827' }
+];
+
+const PEN_WIDTHS = [
+  { value: 1, label: '1px' },
+  { value: 3, label: '3px' },
+  { value: 5, label: '5px' },
+  { value: 8, label: '8px' }
+];
+
+const PEN_STYLES = [
+  { id: 'solid', name: 'Net lien' },
+  { id: 'dashed', name: 'Net dut' },
+  { id: 'highlight', name: 'Highlight' },
+  { id: 'pencil', name: 'But chi' },
+  { id: 'marker', name: 'Marker' }
+];
+
 const NOTE_CATEGORIES = [
   { id: 'text', name: 'Ghi chú văn bản', icon: '📝', prefix: '[Text] ' },
   { id: 'vocab', name: 'Ghi chú từ vựng', icon: '📖', prefix: '[Vocabulary] ' },
   { id: 'grammar', name: 'Ghi chú ngữ pháp', icon: '💡', prefix: '[Grammar] ' },
   { id: 'personal', name: 'Nhận xét cá nhân', icon: '👤', prefix: '[Personal] ' }
 ];
+
+const EMPTY_ANNOTATIONS = {
+  pencilStrokes: {},
+  highlights: {},
+  highlightRanges: {},
+  textNotes: {},
+  stickyNotes: {}
+};
+
+const normalizeAnnotations = (value = {}) => ({
+  pencilStrokes: value.pencilStrokes || {},
+  highlights: value.highlights || {},
+  highlightRanges: value.highlightRanges || {},
+  textNotes: value.textNotes || {},
+  stickyNotes: value.stickyNotes || {}
+});
 
 const saveNotePrefix = (text, category) => {
   const clean = text.replace(/^\[(Text|Vocabulary|Grammar|Personal)\]\s*/, '');
@@ -112,31 +153,42 @@ const ReaderPage = () => {
   const { user, trackStudyTime, refreshStats } = useAuthStore();
 
   // Annotations state
-  const [annotations, setAnnotations] = useState({
-    pencilStrokes: {},
-    highlights: {},
-    textNotes: {},
-    stickyNotes: {}
-  });
+  const [annotations, setAnnotations] = useState(EMPTY_ANNOTATIONS);
 
   // Editor states
   const [activeTool, setActiveTool] = useState('pointer'); // pointer, highlight, pencil, eraser, textNote, stickyNote
   const [activeColor, setActiveColor] = useState('#fef08a'); // yellow default
+  const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
+  const [penColor, setPenColor] = useState('#ef4444');
+  const [penWidth, setPenWidth] = useState(3);
+  const [penStyle, setPenStyle] = useState('solid');
+  const [redoStrokes, setRedoStrokes] = useState({});
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState([]);
   const [editingNote, setEditingNote] = useState(null); // { absIndex, type, text, category }
   const [hoveredNote, setHoveredNote] = useState(null); // { text, x, y }
+  const [highlightMenu, setHighlightMenu] = useState({
+    visible: false,
+    absIndex: -1,
+    range: null,
+    x: 0,
+    y: 0
+  });
 
   // Bubble menu state
   const [bubbleMenu, setBubbleMenu] = useState({
     visible: false,
     text: '',
     startIndex: -1,
+    endIndex: -1,
     x: 0,
     y: 0
   });
 
   const canvasRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+
+  useEffect(() => () => clearLongPressTimer(), []);
 
   useEffect(() => {
     if (!id) {
@@ -186,12 +238,7 @@ const ReaderPage = () => {
 
   useEffect(() => {
     if (!id) {
-      setAnnotations({
-        pencilStrokes: {},
-        highlights: {},
-        textNotes: {},
-        stickyNotes: {}
-      });
+      setAnnotations(EMPTY_ANNOTATIONS);
       return;
     }
     const fetchAnnotations = async () => {
@@ -199,19 +246,9 @@ const ReaderPage = () => {
         const res = await getDocumentAnnotations(id);
         if (res && res.annotationsJson) {
           const parsed = JSON.parse(res.annotationsJson);
-          setAnnotations({
-            pencilStrokes: parsed.pencilStrokes || {},
-            highlights: parsed.highlights || {},
-            textNotes: parsed.textNotes || {},
-            stickyNotes: parsed.stickyNotes || {}
-          });
+          setAnnotations(normalizeAnnotations(parsed));
         } else {
-          setAnnotations({
-            pencilStrokes: {},
-            highlights: {},
-            textNotes: {},
-            stickyNotes: {}
-          });
+          setAnnotations(EMPTY_ANNOTATIONS);
         }
       } catch (error) {
         console.error("Error loading annotations:", error);
@@ -350,6 +387,32 @@ const ReaderPage = () => {
     return () => window.document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  const applyStrokeStyle = (ctx, stroke) => {
+    const style = stroke.style || stroke.tool || 'solid';
+    const baseWidth = stroke.width || 3;
+
+    ctx.strokeStyle = stroke.color || '#ef4444';
+    ctx.lineWidth = style === 'highlight' ? baseWidth * 3 : baseWidth;
+    ctx.lineCap = style === 'dashed' ? 'butt' : 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = style === 'highlight' ? 0.34 : style === 'marker' ? 0.72 : 1;
+    ctx.setLineDash(style === 'dashed' ? [baseWidth * 4, baseWidth * 2.5] : []);
+  };
+
+  const drawStroke = (ctx, stroke, width, height) => {
+    if (!stroke?.points?.length) return;
+
+    ctx.save();
+    applyStrokeStyle(ctx, stroke);
+    ctx.beginPath();
+    ctx.moveTo(stroke.points[0].x * width, stroke.points[0].y * height);
+    for (let i = 1; i < stroke.points.length; i++) {
+      ctx.lineTo(stroke.points[i].x * width, stroke.points[i].y * height);
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+
   // Redraw hand-drawn canvas
   const drawCanvas = () => {
     const canvas = canvasRef.current;
@@ -369,37 +432,24 @@ const ReaderPage = () => {
     // Draw saved strokes for this page
     const pageStrokes = annotations.pencilStrokes[currentPage] || [];
     pageStrokes.forEach(stroke => {
-      if (stroke.points.length < 1) return;
-      ctx.beginPath();
-      ctx.strokeStyle = stroke.color || '#ef4444';
-      ctx.lineWidth = stroke.width || 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.moveTo(stroke.points[0].x * width, stroke.points[0].y * height);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x * width, stroke.points[i].y * height);
-      }
-      ctx.stroke();
+      drawStroke(ctx, stroke, width, height);
     });
 
     // Draw current stroke
     if (activeTool === 'pencil' && currentStroke.length >= 1) {
-      ctx.beginPath();
-      ctx.strokeStyle = activeColor || '#ef4444';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.moveTo(currentStroke[0].x * width, currentStroke[0].y * height);
-      for (let i = 1; i < currentStroke.length; i++) {
-        ctx.lineTo(currentStroke[i].x * width, currentStroke[i].y * height);
-      }
-      ctx.stroke();
+      drawStroke(ctx, {
+        color: penColor,
+        width: penWidth,
+        style: penStyle,
+        tool: penStyle,
+        points: currentStroke
+      }, width, height);
     }
   };
 
   useEffect(() => {
     drawCanvas();
-  }, [annotations.pencilStrokes, currentPage, currentStroke, activeTool]);
+  }, [annotations.pencilStrokes, currentPage, currentStroke, activeTool, penColor, penWidth, penStyle]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -407,7 +457,7 @@ const ReaderPage = () => {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [annotations.pencilStrokes, currentPage, currentStroke, activeTool]);
+  }, [annotations.pencilStrokes, currentPage, currentStroke, activeTool, penColor, penWidth, penStyle]);
 
   // Pointer events for Canvas Pencil / Eraser
   const handlePointerDown = (e) => {
@@ -421,6 +471,18 @@ const ReaderPage = () => {
       setIsDrawing(true);
       setCurrentStroke([{ x: xPercent, y: yPercent }]);
     } else if (activeTool === 'eraser') {
+      const targetToken = window.document
+        .elementsFromPoint(e.clientX, e.clientY)
+        .map(el => el?.closest?.('[data-abs-index]'))
+        .find(Boolean);
+
+      if (targetToken) {
+        const absIndex = Number(targetToken.dataset.absIndex);
+        if (eraseAnnotationAt(absIndex)) {
+          return;
+        }
+      }
+
       setIsDrawing(true);
       eraseStrokesNear(xPercent, yPercent);
     }
@@ -446,8 +508,10 @@ const ReaderPage = () => {
     setIsDrawing(false);
     if (activeTool === 'pencil' && currentStroke.length > 0) {
       const stroke = {
-        color: activeColor || '#ef4444',
-        width: 3,
+        color: penColor,
+        width: penWidth,
+        style: penStyle,
+        tool: penStyle,
         points: currentStroke
       };
       setAnnotations(prev => {
@@ -462,6 +526,7 @@ const ReaderPage = () => {
         autoSaveAnnotations(next);
         return next;
       });
+      setRedoStrokes(prev => ({ ...prev, [currentPage]: [] }));
     }
     setCurrentStroke([]);
   };
@@ -488,6 +553,8 @@ const ReaderPage = () => {
       return !isClose;
     });
 
+    if (updatedStrokes.length === pageStrokes.length) return;
+
     setAnnotations(prev => {
       const next = {
         ...prev,
@@ -499,22 +566,276 @@ const ReaderPage = () => {
       autoSaveAnnotations(next);
       return next;
     });
+    setRedoStrokes(prev => ({ ...prev, [currentPage]: [] }));
+  };
+
+  const handleUndoStroke = () => {
+    const pageStrokes = annotations.pencilStrokes[currentPage] || [];
+    if (pageStrokes.length === 0) return;
+
+    const removedStroke = pageStrokes[pageStrokes.length - 1];
+    const nextPageStrokes = pageStrokes.slice(0, -1);
+    const next = normalizeAnnotations({
+      ...annotations,
+      pencilStrokes: {
+        ...annotations.pencilStrokes,
+        [currentPage]: nextPageStrokes
+      }
+    });
+
+    setAnnotations(next);
+    setRedoStrokes(prev => ({
+      ...prev,
+      [currentPage]: [removedStroke, ...(prev[currentPage] || [])]
+    }));
+    autoSaveAnnotations(next);
+  };
+
+  const handleRedoStroke = () => {
+    const pageRedo = redoStrokes[currentPage] || [];
+    if (pageRedo.length === 0) return;
+
+    const [restoredStroke, ...remainingRedo] = pageRedo;
+    const pageStrokes = annotations.pencilStrokes[currentPage] || [];
+    const next = normalizeAnnotations({
+      ...annotations,
+      pencilStrokes: {
+        ...annotations.pencilStrokes,
+        [currentPage]: [...pageStrokes, restoredStroke]
+      }
+    });
+
+    setAnnotations(next);
+    setRedoStrokes(prev => ({
+      ...prev,
+      [currentPage]: remainingRedo
+    }));
+    autoSaveAnnotations(next);
   };
 
   // Annotations saving & exporting
   const autoSaveAnnotations = async (nextAnnotations) => {
     if (!id) return;
     try {
-      await saveDocumentAnnotations(id, JSON.stringify(nextAnnotations));
+      await saveDocumentAnnotations(id, JSON.stringify(normalizeAnnotations(nextAnnotations)));
     } catch (error) {
       console.error("Auto-save failed:", error);
     }
   };
 
+  const getTextForRange = (startOffset, endOffset) => {
+    const start = Math.max(0, Math.min(startOffset, endOffset));
+    const end = Math.min(segments.length - 1, Math.max(startOffset, endOffset));
+    return joinDocumentSegments(
+      segments.slice(start, end + 1).filter(part => !isStructureMarker(part))
+    ).trim();
+  };
+
+  const getHighlightRangeAt = (absIndex, source = annotations) => {
+    const ranges = Object.values(source.highlightRanges || {});
+    const found = ranges.find(range =>
+      Number(range.startOffset) <= absIndex && Number(range.endOffset) >= absIndex
+    );
+
+    if (found) {
+      return found;
+    }
+
+    const color = source.highlights?.[absIndex];
+    if (!color) return null;
+
+    return {
+      id: `legacy-${absIndex}`,
+      startOffset: absIndex,
+      endOffset: absIndex,
+      selectedText: segments[absIndex] || '',
+      color,
+      noteContent: source.textNotes?.[absIndex] || '',
+      createdAt: null,
+      updatedAt: null,
+      legacy: true
+    };
+  };
+
+  const createHighlightRange = (startOffset, endOffset, color = activeColor) => {
+    const start = Math.max(0, Math.min(startOffset, endOffset));
+    const end = Math.min(segments.length - 1, Math.max(startOffset, endOffset));
+    const now = new Date().toISOString();
+    const rangeId = `hl_${Date.now()}_${start}_${end}`;
+    const selectedText = getTextForRange(start, end);
+
+    setAnnotations(prev => {
+      const nextHighlights = { ...prev.highlights };
+      for (let i = start; i <= end; i++) {
+        if (!isStructureMarker(segments[i])) {
+          nextHighlights[i] = color;
+        }
+      }
+
+      const next = normalizeAnnotations({
+        ...prev,
+        highlights: nextHighlights,
+        highlightRanges: {
+          ...prev.highlightRanges,
+          [rangeId]: {
+            id: rangeId,
+            selectedText,
+            startOffset: start,
+            endOffset: end,
+            color,
+            noteContent: prev.textNotes?.[start] || '',
+            createdAt: now,
+            updatedAt: now
+          }
+        }
+      });
+      autoSaveAnnotations(next);
+      return next;
+    });
+  };
+
+  const updateHighlightColor = (range, color) => {
+    if (!range) return;
+    const start = Number(range.startOffset);
+    const end = Number(range.endOffset);
+
+    setAnnotations(prev => {
+      const nextHighlights = { ...prev.highlights };
+      for (let i = start; i <= end; i++) {
+        if (nextHighlights[i]) {
+          nextHighlights[i] = color;
+        }
+      }
+
+      const nextRanges = { ...prev.highlightRanges };
+      if (!range.legacy && nextRanges[range.id]) {
+        nextRanges[range.id] = {
+          ...nextRanges[range.id],
+          color,
+          updatedAt: new Date().toISOString()
+        };
+      }
+
+      const next = normalizeAnnotations({
+        ...prev,
+        highlights: nextHighlights,
+        highlightRanges: nextRanges
+      });
+      autoSaveAnnotations(next);
+      return next;
+    });
+
+    setActiveColor(color);
+    setHighlightMenu(prev => ({ ...prev, visible: false }));
+  };
+
+  const deleteHighlightRange = (range, options = {}) => {
+    if (!range) return;
+    const shouldConfirm = options.confirm !== false;
+    const start = Number(range.startOffset);
+    const end = Number(range.endOffset);
+
+    const removeHighlight = () => {
+      setAnnotations(prev => {
+        const nextHighlights = { ...prev.highlights };
+        for (let i = start; i <= end; i++) {
+          delete nextHighlights[i];
+        }
+
+        const nextRanges = { ...prev.highlightRanges };
+        if (!range.legacy) {
+          delete nextRanges[range.id];
+        }
+
+        const next = normalizeAnnotations({
+          ...prev,
+          highlights: nextHighlights,
+          highlightRanges: nextRanges
+        });
+        autoSaveAnnotations(next);
+        return next;
+      });
+      setHighlightMenu(prev => ({ ...prev, visible: false }));
+    };
+
+    if (shouldConfirm) {
+      toast.confirm('Ban co muon xoa highlight nay khong?', removeHighlight, 'Xoa highlight');
+      return;
+    }
+
+    removeHighlight();
+  };
+
+  const eraseAnnotationAt = (absIndex) => {
+    const range = getHighlightRangeAt(absIndex);
+    const hasTextNote = !!annotations.textNotes[absIndex];
+    const hasStickyNote = !!annotations.stickyNotes[absIndex];
+
+    if (range) {
+      deleteHighlightRange(range, { confirm: false });
+      toast.success('Da xoa highlight.');
+      return true;
+    }
+
+    if (hasTextNote || hasStickyNote) {
+      setAnnotations(prev => {
+        const nextTextNotes = { ...prev.textNotes };
+        const nextStickyNotes = { ...prev.stickyNotes };
+        delete nextTextNotes[absIndex];
+        delete nextStickyNotes[absIndex];
+        const next = normalizeAnnotations({
+          ...prev,
+          textNotes: nextTextNotes,
+          stickyNotes: nextStickyNotes
+        });
+        autoSaveAnnotations(next);
+        return next;
+      });
+      toast.success('Da xoa ghi chu tai vi tri nay.');
+      return true;
+    }
+
+    return false;
+  };
+
+  const openHighlightMenu = (absIndex, e) => {
+    const range = getHighlightRangeAt(absIndex);
+    if (!range) return false;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHighlightMenu({
+      visible: true,
+      absIndex,
+      range,
+      x: rect.left + rect.width / 2,
+      y: rect.top
+    });
+    setBubbleMenu(prev => ({ ...prev, visible: false }));
+    return true;
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleWordPointerDown = (absIndex, e) => {
+    clearLongPressTimer();
+    if (!annotations.highlights[absIndex]) return;
+
+    longPressTimerRef.current = setTimeout(() => {
+      openHighlightMenu(absIndex, e);
+      longPressTimerRef.current = null;
+    }, 450);
+  };
+
   const handleSaveAnnotations = async () => {
     try {
-      await saveDocumentAnnotations(id, JSON.stringify(annotations));
-      useToastStore.getState().addToast("Đã lưu toàn bộ ghi chú và nét vẽ thành công!", "success");
+      await saveDocumentAnnotations(id, JSON.stringify(normalizeAnnotations(annotations)));
+      toast.success("Đã lưu toàn bộ ghi chú và nét vẽ thành công!");
+
     } catch (error) {
       console.error(error);
       useToastStore.getState().addToast("Lỗi khi lưu ghi chú.", "error");
@@ -531,25 +852,20 @@ const ReaderPage = () => {
     }
   };
 
-  const handleWordClick = async (word, relIndex, e) => {
+  const handleWordClick = async (word, absIndex, e) => {
     const selection = window.getSelection().toString().trim();
     if (selection.length > 0) return;
 
-    const absIndex = (currentPage - 1) * WORDS_PER_PAGE + relIndex;
+    setHighlightMenu(prev => ({ ...prev, visible: false }));
+
+    if (activeTool === 'eraser') {
+      eraseAnnotationAt(absIndex);
+      return;
+    }
 
     // Highlight Tool Mode
     if (activeTool === 'highlight') {
-      setAnnotations(prev => {
-        const highlights = { ...prev.highlights };
-        if (highlights[absIndex] === activeColor) {
-          delete highlights[absIndex];
-        } else {
-          highlights[absIndex] = activeColor;
-        }
-        const next = { ...prev, highlights };
-        autoSaveAnnotations(next);
-        return next;
-      });
+      createHighlightRange(absIndex, absIndex, activeColor);
       return;
     }
 
@@ -564,6 +880,11 @@ const ReaderPage = () => {
     if (activeTool === 'stickyNote') {
       const noteVal = annotations.stickyNotes[absIndex] || '';
       startEditingNote(absIndex, 'sticky', noteVal);
+      return;
+    }
+
+    if (annotations.highlights[absIndex]) {
+      openHighlightMenu(absIndex, e);
       return;
     }
 
@@ -603,6 +924,7 @@ const ReaderPage = () => {
 
   const handleTextSelection = async () => {
     if (activeTool === 'pencil' || activeTool === 'eraser') return;
+    setHighlightMenu(prev => ({ ...prev, visible: false }));
 
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -633,18 +955,7 @@ const ReaderPage = () => {
 
       if (startIdx !== -1 && endIdx !== -1) {
         if (activeTool === 'highlight') {
-          // Highlight selection immediately
-          setAnnotations(prev => {
-            const highlights = { ...prev.highlights };
-            const min = Math.min(startIdx, endIdx);
-            const max = Math.max(startIdx, endIdx);
-            for (let i = min; i <= max; i++) {
-              highlights[i] = activeColor;
-            }
-            const next = { ...prev, highlights };
-            autoSaveAnnotations(next);
-            return next;
-          });
+          createHighlightRange(startIdx, endIdx, activeColor);
           selection.removeAllRanges();
         } else {
           // Normal selection -> show bubble context menu
@@ -653,6 +964,7 @@ const ReaderPage = () => {
             visible: true,
             text: selectedText,
             startIndex: startIdx,
+            endIndex: endIdx,
             x: rect.left + rect.width / 2,
             y: Math.max(10, rect.top - 50)
           });
@@ -799,6 +1111,8 @@ const ReaderPage = () => {
   // Count saved words in current document
   const savedWordsInDoc = vocabList.filter(w => String(w.documentId) === String(id)).length;
   const totalDocChars = segments.reduce((sum, s) => sum + (isStructureMarker(s) ? 0 : s.length), 0);
+  const currentPageStrokes = annotations.pencilStrokes[currentPage] || [];
+  const currentRedoStrokes = redoStrokes[currentPage] || [];
 
   // Theme styling configurations
   const themeStyles = {
@@ -866,6 +1180,99 @@ const ReaderPage = () => {
         onDelete={handleDeleteDocument}
       />
 
+      {/* Highlight Action Menu */}
+      {highlightMenu.visible && highlightMenu.range && (
+        <div
+          className="fixed z-[110] w-[min(92vw,360px)] bg-white text-slate-800 rounded-2xl border border-slate-200 shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150"
+          style={{
+            left: `${highlightMenu.x}px`,
+            top: `${highlightMenu.y - 10}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 mb-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Highlight</p>
+              <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed">
+                {highlightMenu.range.selectedText || segments[highlightMenu.absIndex]}
+              </p>
+            </div>
+            <button
+              onClick={() => setHighlightMenu(prev => ({ ...prev, visible: false }))}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors shrink-0"
+              aria-label="Dong menu highlight"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Doi mau</p>
+              <div className="grid grid-cols-6 gap-2">
+                {HIGHLIGHT_COLORS.map(color => (
+                  <button
+                    key={color.id}
+                    onClick={() => updateHighlightColor(highlightMenu.range, color.value)}
+                    className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm hover:ring-2 hover:ring-blue-300 transition-all"
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                    aria-label={color.name}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  startEditingNote(
+                    Number(highlightMenu.range.startOffset),
+                    'text',
+                    annotations.textNotes[highlightMenu.range.startOffset] || highlightMenu.range.noteContent || ''
+                  );
+                  setHighlightMenu(prev => ({ ...prev, visible: false }));
+                }}
+                className="min-h-[44px] px-3 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-xs font-bold flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Ghi chu</span>
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(highlightMenu.range.selectedText || segments[highlightMenu.absIndex] || '');
+                  toast.success('Da sao chep noi dung highlight.');
+                  setHighlightMenu(prev => ({ ...prev, visible: false }));
+                }}
+                className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Sao chep</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <div className="text-[10px] text-slate-400 leading-relaxed">
+                {highlightMenu.range.createdAt ? (
+                  <span>Tao: {new Date(highlightMenu.range.createdAt).toLocaleDateString('vi-VN')}</span>
+                ) : (
+                  <span>Highlight cu</span>
+                )}
+              </div>
+              <button
+                onClick={() => deleteHighlightRange(highlightMenu.range)}
+                className="min-h-[44px] px-3 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-bold flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xoa</span>
+              </button>
+            </div>
+          </div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[7px] border-transparent border-t-white" />
+        </div>
+      )}
+
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (
         <div
@@ -888,6 +1295,18 @@ const ReaderPage = () => {
             className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
           >
             + Sổ tay
+          </button>
+          <div className="w-[1px] h-4 bg-white/20" />
+          <button
+            onClick={() => {
+              createHighlightRange(bubbleMenu.startIndex, bubbleMenu.endIndex, activeColor);
+              window.getSelection()?.removeAllRanges();
+              setBubbleMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
+          >
+            <Highlighter className="w-3.5 h-3.5" />
+            Highlight
           </button>
           <div className="w-[1px] h-4 bg-white/20" />
           <button
@@ -1016,7 +1435,17 @@ const ReaderPage = () => {
                     const notesKey = editingNote.type === 'text' ? 'textNotes' : 'stickyNotes';
                     const updatedNotes = { ...prev[notesKey] };
                     delete updatedNotes[editingNote.absIndex];
-                    const next = { ...prev, [notesKey]: updatedNotes };
+                    const nextRanges = { ...prev.highlightRanges };
+                    Object.keys(nextRanges).forEach(rangeId => {
+                      if (Number(nextRanges[rangeId].startOffset) === Number(editingNote.absIndex)) {
+                        nextRanges[rangeId] = {
+                          ...nextRanges[rangeId],
+                          noteContent: '',
+                          updatedAt: new Date().toISOString()
+                        };
+                      }
+                    });
+                    const next = normalizeAnnotations({ ...prev, [notesKey]: updatedNotes, highlightRanges: nextRanges });
                     autoSaveAnnotations(next);
                     return next;
                   });
@@ -1037,13 +1466,24 @@ const ReaderPage = () => {
                   setAnnotations(prev => {
                     const notesKey = editingNote.type === 'text' ? 'textNotes' : 'stickyNotes';
                     const serializedNote = saveNotePrefix(editingNote.text, editingNote.category);
-                    const next = {
+                    const nextRanges = { ...prev.highlightRanges };
+                    Object.keys(nextRanges).forEach(rangeId => {
+                      if (Number(nextRanges[rangeId].startOffset) === Number(editingNote.absIndex)) {
+                        nextRanges[rangeId] = {
+                          ...nextRanges[rangeId],
+                          noteContent: serializedNote,
+                          updatedAt: new Date().toISOString()
+                        };
+                      }
+                    });
+                    const next = normalizeAnnotations({
                       ...prev,
+                      highlightRanges: nextRanges,
                       [notesKey]: {
                         ...prev[notesKey],
                         [editingNote.absIndex]: serializedNote
                       }
-                    };
+                    });
                     autoSaveAnnotations(next);
                     return next;
                   });
@@ -1300,12 +1740,16 @@ const ReaderPage = () => {
             {document && (
               <>
                 {/* Canvas Drawing Tools */}
-                <div className={`px-5 py-3.5 flex items-center justify-between gap-3 shrink-0 ${activeTheme.toolbar}`}>
-                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-sm">
+                <div className={`px-3 sm:px-5 py-3 flex flex-col 2xl:flex-row 2xl:items-center gap-3 shrink-0 ${activeTheme.toolbar}`}>
+                  <div className="w-full 2xl:w-auto overflow-x-auto scrollbar-thin">
+                    <div className="inline-flex min-w-max items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-sm">
                     {/* Pointer */}
                     <button
-                      onClick={() => setActiveTool('pointer')}
-                      className={`p-2 rounded-lg transition-all ${activeTool === 'pointer' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => {
+                        setActiveTool('pointer');
+                        setIsColorMenuOpen(false);
+                      }}
+                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'pointer' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       title="Con trỏ chuột tra cứu (Pointer)"
                     >
                       <MousePointer className="w-3.5 h-3.5" />
@@ -1314,8 +1758,11 @@ const ReaderPage = () => {
                     {/* Highlight Dropdown */}
                     <div className="relative group">
                       <button
-                        onClick={() => setActiveTool('highlight')}
-                        className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${activeTool === 'highlight' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        onClick={() => {
+                          setActiveTool('highlight');
+                          setIsColorMenuOpen(prev => !prev);
+                        }}
+                        className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTool === 'highlight' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                         title="Bôi màu Highlight văn bản (H)"
                       >
                         <Highlighter className="w-3.5 h-3.5" />
@@ -1324,15 +1771,16 @@ const ReaderPage = () => {
                           style={{ backgroundColor: activeColor }}
                         />
                       </button>
-                      <div className="absolute left-0 mt-1 hidden group-hover:flex hover:flex flex-col bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 gap-1.5 z-30 w-44">
+                      <div className="hidden">
                         {HIGHLIGHT_COLORS.map(c => (
                           <button
                             key={c.id}
                             onClick={() => {
                               setActiveColor(c.value);
                               setActiveTool('highlight');
+                              setIsColorMenuOpen(false);
                             }}
-                            className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors"
+                            className="min-h-[40px] flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors"
                           >
                             <div className="flex items-center gap-2">
                               <span
@@ -1348,8 +1796,11 @@ const ReaderPage = () => {
 
                     {/* Pencil */}
                     <button
-                      onClick={() => setActiveTool('pencil')}
-                      className={`p-2 rounded-lg transition-all ${activeTool === 'pencil' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => {
+                        setActiveTool('pencil');
+                        setIsColorMenuOpen(false);
+                      }}
+                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'pencil' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       title="Viết vẽ tay (Pencil)"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -1357,8 +1808,11 @@ const ReaderPage = () => {
 
                     {/* Eraser */}
                     <button
-                      onClick={() => setActiveTool('eraser')}
-                      className={`p-2 rounded-lg transition-all ${activeTool === 'eraser' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => {
+                        setActiveTool('eraser');
+                        setIsColorMenuOpen(false);
+                      }}
+                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'eraser' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       title="Tẩy nét vẽ (Eraser)"
                     >
                       <Eraser className="w-3.5 h-3.5" />
@@ -1366,8 +1820,11 @@ const ReaderPage = () => {
 
                     {/* Text Note */}
                     <button
-                      onClick={() => setActiveTool('textNote')}
-                      className={`p-2 rounded-lg transition-all ${activeTool === 'textNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => {
+                        setActiveTool('textNote');
+                        setIsColorMenuOpen(false);
+                      }}
+                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'textNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       title="Thêm Ghi chú văn bản (Text Note)"
                     >
                       <FileText className="w-3.5 h-3.5" />
@@ -1375,28 +1832,122 @@ const ReaderPage = () => {
 
                     {/* Sticky Note */}
                     <button
-                      onClick={() => setActiveTool('stickyNote')}
-                      className={`p-2 rounded-lg transition-all ${activeTool === 'stickyNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => {
+                        setActiveTool('stickyNote');
+                        setIsColorMenuOpen(false);
+                      }}
+                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'stickyNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       title="Thêm Ghi chú nổi (Sticky Note)"
                     >
                       <Pin className="w-3.5 h-3.5" />
                     </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {activeTool === 'highlight' && isColorMenuOpen && (
+                    <div className="w-full 2xl:flex-1 min-w-0 bg-white border border-slate-200/80 rounded-2xl px-3 py-2 shadow-sm">
+                      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin">
+                        <Palette className="w-4 h-4 text-slate-400 shrink-0" />
+                        {HIGHLIGHT_COLORS.map(color => (
+                          <button
+                            key={color.id}
+                            onClick={() => {
+                              setActiveColor(color.value);
+                              setActiveTool('highlight');
+                              setIsColorMenuOpen(false);
+                            }}
+                            className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all flex items-center justify-center ${activeColor === color.value ? 'ring-2 ring-blue-500 ring-offset-2 border-white' : 'border-slate-200 hover:ring-2 hover:ring-slate-300'}`}
+                            title={color.name}
+                            aria-label={color.name}
+                          >
+                            <span
+                              className="w-7 h-7 rounded-full border border-slate-200 shadow-sm"
+                              style={{ backgroundColor: color.value }}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTool === 'pencil' && (
+                    <div className="w-full 2xl:flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_auto_auto_auto] items-center gap-2 bg-white border border-slate-200/80 rounded-2xl px-3 py-2 shadow-sm">
+                      <div className="min-w-0 flex items-center gap-1 overflow-x-auto scrollbar-thin md:pr-2 md:border-r md:border-slate-200">
+                        <Palette className="w-3.5 h-3.5 text-slate-400" />
+                        {DRAWING_COLORS.map(color => (
+                          <button
+                            key={color.id}
+                            onClick={() => setPenColor(color.value)}
+                            className={`w-8 h-8 rounded-full border transition-all ${penColor === color.value ? 'ring-2 ring-blue-500 ring-offset-2 border-white' : 'border-slate-200 hover:ring-2 hover:ring-slate-300'}`}
+                            style={{ backgroundColor: color.value }}
+                            title={color.name}
+                            aria-label={color.name}
+                          />
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin md:pr-2 md:border-r md:border-slate-200">
+                        {PEN_WIDTHS.map(width => (
+                          <button
+                            key={width.value}
+                            onClick={() => setPenWidth(width.value)}
+                            className={`min-w-[40px] min-h-[36px] px-2 rounded-xl text-[11px] font-black transition-all ${penWidth === width.value ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                            title={`Do day ${width.label}`}
+                          >
+                            {width.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-1 md:pr-2 md:border-r md:border-slate-200">
+                        <Type className="w-3.5 h-3.5 text-slate-400" />
+                        <select
+                          value={penStyle}
+                          onChange={(e) => setPenStyle(e.target.value)}
+                          className="min-h-[40px] bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+                          title="Kieu net"
+                        >
+                          {PEN_STYLES.map(style => (
+                            <option key={style.id} value={style.id}>{style.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1 justify-start md:justify-end">
+                        <button
+                          onClick={handleUndoStroke}
+                          disabled={currentPageStrokes.length === 0}
+                          className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-all"
+                          title="Undo net ve"
+                        >
+                          <Undo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={handleRedoStroke}
+                          disabled={currentRedoStrokes.length === 0}
+                          className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-all"
+                          title="Redo net ve"
+                        >
+                          <Redo2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid w-full grid-cols-2 gap-2 2xl:w-auto 2xl:flex 2xl:items-center 2xl:justify-end">
                     <button
                       onClick={handleSaveAnnotations}
-                      className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/10 active:scale-95"
+                      className="min-h-[44px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/10 active:scale-95"
                     >
                       <Save className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Lưu ghi chú</span>
                     </button>
                     <button
                       onClick={handleExportDocx}
-                      className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                      className="min-h-[44px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
                     >
                       <Download className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Xuất Word (.docx)</span>
+                      <span className="hidden sm:inline">Xuất Word (.docx)</span>
                     </button>
                   </div>
                 </div>
@@ -1417,6 +1968,7 @@ const ReaderPage = () => {
                         ref={canvasRef}
                         className={`absolute inset-0 z-10 w-full h-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'
                           }`}
+                        style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
                         onPointerDown={handlePointerDown}
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
@@ -1523,6 +2075,16 @@ const ReaderPage = () => {
                                         key={absIndex}
                                         data-abs-index={absIndex}
                                         onClick={(e) => handleWordClick(word, absIndex, e)}
+                                        onPointerDown={(e) => handleWordPointerDown(absIndex, e)}
+                                        onPointerUp={clearLongPressTimer}
+                                        onPointerCancel={clearLongPressTimer}
+                                        onPointerLeave={clearLongPressTimer}
+                                        onContextMenu={(e) => {
+                                          if (annotations.highlights[absIndex]) {
+                                            e.preventDefault();
+                                            openHighlightMenu(absIndex, e);
+                                          }
+                                        }}
                                         onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
                                         onMouseLeave={handleWordMouseLeave}
                                         style={highlightColor ? { backgroundColor: highlightColor } : undefined}

@@ -644,6 +644,19 @@ public class AnnotationsDto
 {
     public System.Text.Json.Nodes.JsonNode? PencilStrokes { get; set; }
     public Dictionary<string, string>? Highlights { get; set; }
+    public Dictionary<string, HighlightRangeDto>? HighlightRanges { get; set; }
     public Dictionary<string, string>? TextNotes { get; set; }
     public Dictionary<string, string>? StickyNotes { get; set; }
+}
+
+public class HighlightRangeDto
+{
+    public string? Id { get; set; }
+    public string? SelectedText { get; set; }
+    public int StartOffset { get; set; }
+    public int EndOffset { get; set; }
+    public string? Color { get; set; }
+    public string? NoteContent { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
