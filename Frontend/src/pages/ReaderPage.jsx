@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
-  saveDocumentAnnotations, exportDocx, askAiAssistant
+  saveDocumentAnnotations, exportDocx, askAiAssistant, deleteDocument
 } from '../lib/api';
+import { toast } from '../store/notificationStore';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
@@ -230,6 +231,25 @@ const ReaderPage = () => {
     };
     fetchDocsList();
   }, []);
+
+  const handleDeleteDocument = async (docId, title) => {
+    toast.confirm(
+      `Bạn có chắc chắn muốn xóa tài liệu "${title}" không? Hành động này sẽ xóa tất cả ghi chú, vẽ vẽ, và các dữ liệu liên quan.`,
+      async () => {
+        try {
+          await deleteDocument(docId);
+          toast.success("Xóa tài liệu thành công!");
+          // Refresh the documents list
+          const docs = await getMyDocuments();
+          setDocumentsList(docs);
+        } catch (error) {
+          console.error(error);
+          toast.error(error.message || "Không thể xóa tài liệu.");
+        }
+      },
+      "Xóa tài liệu"
+    );
+  };
 
   const currentPageRef = useRef(currentPage);
   const totalPagesRef = useRef(totalPages);
@@ -843,12 +863,13 @@ const ReaderPage = () => {
           if (newId) navigate(`/reader/${newId}`);
           else navigate(`/reader`);
         }}
+        onDelete={handleDeleteDocument}
       />
 
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (
         <div
-          className="fixed z-50 bg-gray-900/95 backdrop-blur-sm text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
+          className="fixed z-[100] bg-gray-950/95 backdrop-blur-md text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
           style={{
             left: `${bubbleMenu.x}px`,
             top: `${bubbleMenu.y}px`,
@@ -874,19 +895,33 @@ const ReaderPage = () => {
               startEditingNote(bubbleMenu.startIndex, 'text', annotations.textNotes[bubbleMenu.startIndex]);
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Ghi chú
+            📝 Ghi chú
           </button>
           <div className="w-[1px] h-4 bg-white/20" />
           <button
-            onClick={() => {
-              setSelectedWord(bubbleMenu.text);
+            onClick={async () => {
+              const word = bubbleMenu.text;
+              setSelectedWord(word);
+              setVocabData(null);
+              setIsLoadingVocab(true);
+              setLookupCount(prev => prev + 1);
+              setSidebarTab('dict');
+              setIsSidebarOpen(true);
               setBubbleMenu(prev => ({ ...prev, visible: false }));
+              try {
+                const data = await getVocabulary(word);
+                setVocabData(data);
+              } catch (error) {
+                console.error(error);
+              } finally {
+                setIsLoadingVocab(false);
+              }
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Dịch nhanh
+            🔍 Dịch nhanh
           </button>
           <div className="w-[1px] h-4 bg-white/20" />
           <button
@@ -895,11 +930,11 @@ const ReaderPage = () => {
               useToastStore.getState().addToast('Đã sao chép nội dung vào bộ nhớ tạm!', 'success');
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
           >
-            Sao chép
+            📋 Sao chép
           </button>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-900/95" />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-955" />
         </div>
       )}
 

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { translateSentence, compareSentences } from '../lib/api';
 import { useToastStore } from '../store/toastStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
+import { toast } from '../store/notificationStore';
 import { CHINESE_DICTIONARY } from '../utils/chineseUtils';
 import { 
   Volume2, Bookmark, Award, HelpCircle,
   ArrowRight, BookOpen, Plus, Activity, RefreshCw, 
-  Sparkles, CheckCircle2, ChevronRight
+  Sparkles, CheckCircle2, ChevronRight, X
 } from 'lucide-react';
 
 const HSK_BADGES = {
@@ -43,8 +44,30 @@ const getHskLevel = (w) => {
 const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitle, documentText, pageNumber }) => {
   const addWord = useVocabularyStore(state => state.addWord);
   const updateServerStatus = useVocabularyStore(state => state.updateServerStatus);
+  const fetchDecks = useVocabularyStore(state => state.fetchDecks);
+  const bulkAddCards = useVocabularyStore(state => state.bulkAddCards);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeckModal, setShowDeckModal] = useState(false);
+  const [decks, setDecks] = useState([]);
+  const [selectedDeckId, setSelectedDeckId] = useState('');
+  const [newDeckName, setNewDeckName] = useState('');
+  const [isAddingFlashcard, setIsAddingFlashcard] = useState(false);
+
+  const handleOpenDeckModal = async () => {
+    setShowDeckModal(true);
+    try {
+      const list = await fetchDecks();
+      setDecks(list || []);
+      if (list && list.length > 0) {
+        setSelectedDeckId(String(list[0].id));
+      } else {
+        setSelectedDeckId('new');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // States for sentence translation
   const isSentence = word && (word.trim().length > 4 || /[,.!?，。！？]/g.test(word));
@@ -540,16 +563,120 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       )}
 
       {/* Action Buttons */}
-      <div className="pt-6 border-t border-gray-100">
+      <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
         <button 
           onClick={handleSaveToNotebook}
           disabled={isSaving}
-          className="w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider active:scale-95"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider active:scale-95 disabled:opacity-50"
         >
-          <Bookmark className="w-4 h-4" />
-          {isSaving ? 'Lưu Sổ Tay...' : 'Lưu Sổ Tay'}
+          <Bookmark className="w-4 h-4 text-blue-500" />
+          {isSaving ? 'Đang lưu...' : 'Lưu Sổ Tay'}
+        </button>
+        <button 
+          onClick={handleOpenDeckModal}
+          disabled={isSaving}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md text-xs uppercase tracking-wider active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Thêm Flashcard</span>
         </button>
       </div>
+
+      {showDeckModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <div 
+            onClick={() => setShowDeckModal(false)}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+          />
+
+          <div className="relative bg-white/95 border border-slate-200/60 backdrop-blur-md max-w-sm w-full rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4 text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-800">Thêm vào bộ Flashcard</h3>
+              <button 
+                onClick={() => setShowDeckModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-50 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-left">
+              <div>
+                <span className="font-bold text-slate-500 block mb-1">Từ vựng:</span>
+                <span className="font-extrabold text-slate-850 text-base">{data.word}</span>
+              </div>
+
+              <div>
+                <span className="font-bold text-slate-500 block mb-1">Nguồn tài liệu:</span>
+                <span className="font-semibold text-slate-700 bg-slate-50 border border-slate-150 px-2.5 py-1.5 rounded-lg block">
+                  {documentTitle ? `Dịch thuật ${documentTitle}` : 'Tra cứu ngoài'}
+                </span>
+              </div>
+
+              <div>
+                <span className="font-bold text-slate-500 block mb-1">Chọn bộ Flashcard:</span>
+                <select
+                  value={selectedDeckId}
+                  onChange={(e) => setSelectedDeckId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {decks.map(deck => (
+                    <option key={deck.id} value={deck.id}>{deck.name}</option>
+                  ))}
+                  <option value="new">+ Tạo bộ mới...</option>
+                </select>
+              </div>
+
+              {selectedDeckId === 'new' && (
+                <div className="space-y-1.5 animate-in fade-in duration-100">
+                  <span className="font-bold text-slate-500 block">Tên bộ Flashcard mới:</span>
+                  <input
+                    type="text"
+                    value={newDeckName}
+                    onChange={(e) => setNewDeckName(e.target.value)}
+                    placeholder="VD: HSK4 Reading Lesson 19"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-bold text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setShowDeckModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 text-xs font-bold rounded-xl transition active:scale-97"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={isAddingFlashcard || (selectedDeckId === 'new' && !newDeckName.trim())}
+                onClick={async () => {
+                  setIsAddingFlashcard(true);
+                  try {
+                    const payload = {
+                      deckId: selectedDeckId === 'new' ? null : Number(selectedDeckId),
+                      newDeckName: selectedDeckId === 'new' ? newDeckName.trim() : null,
+                      source: documentTitle ? `Dịch thuật ${documentTitle}` : 'Tra cứu ngoài',
+                      documentId: documentId || null,
+                      words: [data.word]
+                    };
+                    await bulkAddCards(payload);
+                    setShowDeckModal(false);
+                    toast.success("Đã thêm từ vào bộ Flashcard thành công!");
+                  } catch (e) {
+                    toast.error(e.message || "Lỗi khi lưu Flashcard.");
+                  } finally {
+                    setIsAddingFlashcard(false);
+                  }
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition active:scale-97 shadow-md disabled:opacity-50"
+              >
+                {isAddingFlashcard ? 'Đang tạo...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
     </div>

@@ -85,6 +85,22 @@ export const getMyDocuments = async () => {
   return await response.json();
 };
 
+export const deleteDocument = async (id) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+    method: 'DELETE',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete document');
+  }
+  return await response.json();
+};
+
+
 export const getVocabulary = async (word) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}`, {
@@ -244,3 +260,108 @@ export const exportDocx = async (id, title) => {
     URL.revokeObjectURL(url);
   }, 250);
 };
+
+export const getChatSessions = async () => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch chat sessions');
+  }
+  return await response.json();
+};
+
+export const getChatMessages = async (sessionId) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch chat messages');
+  }
+  return await response.json();
+};
+
+export const createChatSession = async (title) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create chat session');
+  }
+  return await response.json();
+};
+
+export const sendChatMessage = async (sessionId, content, activeDocContext) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ content, activeDocContext })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to send chat message');
+  }
+  return await response.json();
+};
+
+export const renameChatSession = async (sessionId, title) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/title`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to rename chat session');
+  }
+  return response;
+};
+
+export const togglePinChatSession = async (sessionId, isPinned) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/pin`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ isPinned })
+  });
+  if (!response.ok) {
+    throw new Error('Failed to toggle pin state');
+  }
+  return response;
+};
+
+export const deleteChatSession = async (sessionId) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete chat session');
+  }
+  return response;
+};
+

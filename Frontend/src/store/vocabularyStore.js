@@ -4,6 +4,29 @@ import { apiRequest } from '../services/apiClient';
 
 const INITIAL_VOCABULARY = [];
 
+const cleanTranslation = (val) => {
+  if (!val) return "";
+  let current = val.trim();
+  for (let i = 0; i < 5; i++) {
+    if (!(current.startsWith("[") && current.endsWith("]")) && !(current.startsWith("{") && current.endsWith("}"))) {
+      break;
+    }
+    try {
+      const parsed = JSON.parse(current);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        current = parsed[0].meaning || parsed[0].translation || current;
+      } else if (parsed && typeof parsed === 'object') {
+        current = parsed.meaning || parsed.translation || current;
+      } else {
+        break;
+      }
+    } catch (e) {
+      break;
+    }
+  }
+  return current;
+};
+
 export const useVocabularyStore = create(
   persist(
     (set, get) => ({
@@ -40,7 +63,7 @@ export const useVocabularyStore = create(
         const newWord = {
           text: word.text,
           pinyin: word.pinyin || "",
-          translation: word.translation || "",
+          translation: cleanTranslation(word.translation || word.meaning || ""),
           hsk: word.hsk || 1,
           documentTitle: word.documentTitle,
           documentId: word.documentId,
@@ -250,9 +273,17 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchDecks: async () => {
+      fetchDecks: async (search = null, filter = null, sort = null) => {
         try {
-          return await apiRequest('/flashcard/decks', { auth: true });
+          let path = '/flashcard/decks';
+          const params = [];
+          if (search) params.push(`search=${encodeURIComponent(search)}`);
+          if (filter) params.push(`filter=${encodeURIComponent(filter)}`);
+          if (sort) params.push(`sort=${encodeURIComponent(sort)}`);
+          if (params.length > 0) {
+            path += '?' + params.join('&');
+          }
+          return await apiRequest(path, { auth: true });
         } catch (error) {
           console.error("Error fetching decks:", error);
           return [];
@@ -294,6 +325,161 @@ export const useVocabularyStore = create(
           });
         } catch (error) {
           console.error("Error completing flashcard session:", error);
+        }
+      },
+
+      createFlashcardSet: async (flashcardName, description, documentId, listVocabularyIds) => {
+        try {
+          return await apiRequest('/flashcards', {
+            method: 'POST',
+            body: { flashcardName, description, documentId, listVocabularyIds },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error creating flashcard set:", error);
+          throw error;
+        }
+      },
+
+      updateDeck: async (deckId, name, description) => {
+        try {
+          return await apiRequest(`/flashcard/decks/${deckId}`, {
+            method: 'PUT',
+            body: { name, description },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error updating deck:", error);
+          throw error;
+        }
+      },
+
+      deleteDeck: async (deckId) => {
+        try {
+          return await apiRequest(`/flashcard/decks/${deckId}`, {
+            method: 'DELETE',
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error deleting deck:", error);
+          throw error;
+        }
+      },
+
+      removeCardFromDeck: async (cardId) => {
+        try {
+          return await apiRequest(`/flashcard/cards/${cardId}`, {
+            method: 'DELETE',
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error removing card from deck:", error);
+          throw error;
+        }
+      },
+
+      duplicateDeck: async (deckId) => {
+        try {
+          return await apiRequest(`/flashcard/decks/${deckId}/duplicate`, {
+            method: 'POST',
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error duplicating deck:", error);
+          throw error;
+        }
+      },
+
+      fetchDashboardStats: async () => {
+        try {
+          return await apiRequest('/flashcard/dashboard', { auth: true });
+        } catch (error) {
+          console.error("Error fetching dashboard stats:", error);
+          throw error;
+        }
+      },
+
+      fetchReviewCards: async (deckId = null) => {
+        try {
+          const path = deckId ? `/flashcard/review?deckId=${deckId}` : '/flashcard/review';
+          return await apiRequest(path, { auth: true });
+        } catch (error) {
+          console.error("Error fetching review cards:", error);
+          throw error;
+        }
+      },
+
+      submitReview: async (flashcardId, result, responseMs) => {
+        try {
+          return await apiRequest(`/flashcard/review/${flashcardId}`, {
+            method: 'POST',
+            body: { result, responseMs },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error submitting review:", error);
+          throw error;
+        }
+      },
+
+      fetchWriteCards: async (deckId = null, count = 10) => {
+        try {
+          const path = deckId ? `/flashcard/write?deckId=${deckId}&count=${count}` : `/flashcard/write?count=${count}`;
+          return await apiRequest(path, { auth: true });
+        } catch (error) {
+          console.error("Error fetching write cards:", error);
+          throw error;
+        }
+      },
+
+      submitWriteAnswer: async (flashcardId, userAnswer) => {
+        try {
+          return await apiRequest(`/flashcard/write/${flashcardId}`, {
+            method: 'POST',
+            body: { userAnswer },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error submitting write answer:", error);
+          throw error;
+        }
+      },
+
+      startMatchGame: async (deckId = null, cardCount = 8) => {
+        try {
+          return await apiRequest('/flashcard/match/start', {
+            method: 'POST',
+            body: { deckId, cardCount },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error starting match game:", error);
+          throw error;
+        }
+      },
+
+      submitMatchPair: async (matchGameId, flashcardId1, flashcardId2) => {
+        try {
+          return await apiRequest(`/flashcard/match/${matchGameId}/pair`, {
+            method: 'POST',
+            body: { flashcardId1, flashcardId2 },
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error submitting match pair:", error);
+          throw error;
+        }
+      },
+
+      completeMatchGame: async (matchGameId) => {
+        try {
+          return await apiRequest(`/flashcard/match/${matchGameId}/complete`, {
+            method: 'POST',
+            auth: true
+          });
+        } catch (error) {
+          console.error("Error completing match game:", error);
+          throw error;
         }
       },
 

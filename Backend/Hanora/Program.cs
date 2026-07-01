@@ -64,11 +64,15 @@ namespace Hanora
             builder.Services.AddScoped<IQuizService, QuizService>();
             builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
             builder.Services.AddScoped<IFlashcardService, FlashcardService>();
+            builder.Services.AddScoped<ISrsService, SrsService>();
             builder.Services.AddScoped<IStatsRepository, StatsRepository>();
             builder.Services.AddScoped<IStatsService, StatsService>();
             builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
             builder.Services.AddScoped<IProgressService, ProgressService>();
             builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+            builder.Services.AddScoped<IChatRepository, ChatRepository>();
+            builder.Services.AddScoped<IDeepseekChatService, DeepseekChatService>();
+            builder.Services.AddScoped<IChatService, ChatService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -139,6 +143,83 @@ namespace Hanora
             });
 
             var app = builder.Build();
+
+            // Run database updates at startup
+            using (var scope = app.Services.CreateScope())
+            {
+                try
+                {
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    context.Database.ExecuteSqlRaw(@"
+                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
+                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
+                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
+                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
+
+                        -- New additions for XP, Leaderboard, Decks, and Notifications
+                        CREATE TABLE IF NOT EXISTS flashcard_decks (
+                            id            BIGSERIAL    PRIMARY KEY,
+                            user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            name          VARCHAR(255) NOT NULL,
+                            source        VARCHAR(255),
+                            document_id   BIGINT       REFERENCES documents(id) ON DELETE SET NULL,
+                            created_at    TIMESTAMPTZ  DEFAULT NOW(),
+                            updated_at    TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        ALTER TABLE flashcard_decks ADD COLUMN IF NOT EXISTS description TEXT;
+
+                        ALTER TABLE flashcards DROP CONSTRAINT IF EXISTS flashcards_user_vocabulary_id_key;
+                        ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS deck_id BIGINT REFERENCES flashcard_decks(id) ON DELETE CASCADE;
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcards_user_vocab_deck ON flashcards(user_vocabulary_id, deck_id);
+
+                        CREATE TABLE IF NOT EXISTS user_notifications (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            title       VARCHAR(255) NOT NULL,
+                            message     TEXT         NOT NULL,
+                            is_read     BOOLEAN      DEFAULT FALSE,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE TABLE IF NOT EXISTS leaderboard_rewards (
+                            id            BIGSERIAL   PRIMARY KEY,
+                            user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            rank          INTEGER     NOT NULL,
+                            xp_rewarded   INTEGER     NOT NULL,
+                            week_start    DATE        NOT NULL,
+                            rewarded_at   TIMESTAMPTZ DEFAULT NOW(),
+                            UNIQUE (user_id, week_start)
+                        );
+
+                        CREATE TABLE IF NOT EXISTS chat_sessions (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            title       VARCHAR(255) NOT NULL,
+                            is_pinned   BOOLEAN      DEFAULT FALSE,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW(),
+                            updated_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE TABLE IF NOT EXISTS chat_messages (
+                            id          BIGSERIAL    PRIMARY KEY,
+                            session_id  BIGINT       NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+                            role        VARCHAR(10)  NOT NULL,
+                            content     TEXT         NOT NULL,
+                            created_at  TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
+                        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+                    ");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error running database migrations: {ex.Message}");
+                }
+            }
 
             if (app.Environment.IsDevelopment())
             {

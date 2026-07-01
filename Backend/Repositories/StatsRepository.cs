@@ -69,7 +69,7 @@ namespace Repositories
                 .Where(g => g.UserId == userId)
                 .Select(g => (int?)g.DailyMinutesGoal)
                 .FirstOrDefaultAsync();
-            return goal ?? 20;
+            return goal ?? 90;
         }
 
         public async Task<int> GetMinutesOnDateAsync(long userId, DateOnly date)

@@ -16,12 +16,14 @@ import {
   ChevronDown, 
   Mic, 
   X,
-  Lightbulb
+  Lightbulb,
+  Plus
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
+import { toast } from '../store/notificationStore';
 
 // Static database of details for HSK words (consistent with Flashcard.jsx)
 const WORD_DETAILS_DB = {
@@ -122,11 +124,12 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
-  const { vocabList, removeWord, bulkAddCards } = useVocabularyStore();
+  const { vocabList, removeWord, bulkAddCards, createFlashcardSet } = useVocabularyStore();
   const { addXp } = useAuthStore();
 
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
+  const [deckDescription, setDeckDescription] = useState('');
   const [deckSource, setDeckSource] = useState('Tổng hợp');
   const [deckDocumentId, setDeckDocumentId] = useState(null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
@@ -152,6 +155,7 @@ export function VocabularyPage() {
     }
 
     setNewDeckName(defaultDeckName);
+    setDeckDescription('');
     setDeckSource(sourceStr);
     setDeckDocumentId(docId);
     setShowCreateDeckModal(true);
@@ -169,17 +173,17 @@ export function VocabularyPage() {
         .filter(w => selectedRows.includes(w.text))
         .map(w => w.text.split('_')[0]);
 
-      await bulkAddCards({
-        deckId: null,
-        newDeckName: newDeckName,
-        source: deckSource,
-        documentId: deckDocumentId,
-        words: selectedWordsList
-      });
+      await createFlashcardSet(
+        newDeckName.trim(),
+        deckDescription.trim() || null,
+        deckDocumentId,
+        selectedWordsList
+      );
 
       useToastStore.getState().addToast('Đã tạo bộ Flashcard thành công!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
+      navigate('/flashcards');
     } catch (err) {
       console.error(err);
       useToastStore.getState().addToast('Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
@@ -546,7 +550,13 @@ export function VocabularyPage() {
                   <GraduationCap className="w-3.5 h-3.5" />
                   <span>Ôn tập ngay</span>
                 </button>
-
+                <button
+                  onClick={handleOpenCreateDeckModal}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tạo Flashcard</span>
+                </button>
               </div>
             )}
           </div>
@@ -582,7 +592,7 @@ export function VocabularyPage() {
 
                       return (
                         <tr 
-                          key={row.text}
+                          key={row.id || row.text}
                           onMouseEnter={() => setHoveredWord(cleanWordText)}
                           onMouseLeave={() => setHoveredWord(null)}
                           className={`group hover:bg-blue-50 border-b border-slate-100 transition-colors duration-150 cursor-default ${
@@ -1107,6 +1117,17 @@ export function VocabularyPage() {
                   placeholder="Ví dụ: HSK4 Reading Lesson 19"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                   required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Mô tả (Không bắt buộc)</label>
+                <input
+                  type="text"
+                  value={deckDescription}
+                  onChange={(e) => setDeckDescription(e.target.value)}
+                  placeholder="Nhập mô tả cho bộ thẻ này..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
