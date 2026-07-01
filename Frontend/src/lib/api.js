@@ -365,3 +365,16 @@ export const deleteChatSession = async (sessionId) => {
   return response;
 };
 
+export const getCommunityMessages = async () => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/community/messages`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch community messages');
+  }
+  return await response.json();
+};
+

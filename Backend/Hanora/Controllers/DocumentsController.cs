@@ -285,7 +285,31 @@ public class DocumentsController : ControllerBase
             progress.LastReadAt = DateTime.UtcNow;
             _db.DocumentReadingProgresses.Update(progress);
         }
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
+        {
+            // Concurrency: Another request already inserted the record. Detach the failed insert and update instead.
+            if (progress != null)
+            {
+                _db.Entry(progress).State = EntityState.Detached;
+            }
+            
+            progress = await _db.DocumentReadingProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.DocumentId == id);
+                
+            if (progress != null)
+            {
+                progress.LastPage = request.LastPage;
+                progress.ProgressPercent = request.ProgressPercent;
+                progress.ReadingMinutes = request.ReadingMinutes;
+                progress.LastReadAt = DateTime.UtcNow;
+                _db.DocumentReadingProgresses.Update(progress);
+                await _db.SaveChangesAsync();
+            }
+        }
 
         int deltaMinutes = request.ReadingMinutes - oldMinutes;
         if (deltaMinutes > 0)
