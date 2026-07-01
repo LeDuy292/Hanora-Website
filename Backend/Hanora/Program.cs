@@ -73,6 +73,8 @@ namespace Hanora
             builder.Services.AddScoped<IChatRepository, ChatRepository>();
             builder.Services.AddScoped<IDeepseekChatService, DeepseekChatService>();
             builder.Services.AddScoped<IChatService, ChatService>();
+            builder.Services.AddScoped<ICommunityRepository, CommunityRepository>();
+            builder.Services.AddScoped<ICommunityService, CommunityService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -88,6 +90,20 @@ namespace Hanora
                         ValidIssuer = builder.Configuration["Jwt:Issuer"],
                         ValidAudience = builder.Configuration["Jwt:Audience"],
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+                    };
+                    
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/communityhub"))
+                            {
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        }
                     };
                 });
 
@@ -117,6 +133,7 @@ namespace Hanora
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
                 });
             builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSignalR();
 
             // Swagger with JWT support
             builder.Services.AddSwaggerGen(c =>
@@ -236,6 +253,7 @@ namespace Hanora
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<Hanora.Hubs.CommunityHub>("/communityhub");
             app.Run();
         }
     }

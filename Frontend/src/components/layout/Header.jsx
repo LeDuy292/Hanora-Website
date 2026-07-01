@@ -25,8 +25,8 @@ export function Header({ offsetTop }) {
     { to: '/vocabulary', label: 'Từ vựng' },
     { to: '/flashcards', label: 'Flashcard' },
     { to: '/reader', label: 'Dịch thuật' },
-    { to: '/pronunciation', label: 'Luyện phát âm' },
     { to: '/leaderboard', label: 'Bảng xếp hạng' },
+    { to: '/pronunciation', label: 'Luyện phát âm' },
   ];
 
   const handleLogout = () => {
