@@ -4,7 +4,7 @@ import { Bell, X, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { Header } from './Header';
 import { Footer } from './Footer';
-import { AiChatbox } from '../chat/AiChatbox';
+import { CommunityChatbox } from '../chat/CommunityChatbox';
 
 export function MainLayout({ children }) {
   const [showBanner, setShowBanner] = useState(false);
@@ -124,11 +124,10 @@ export function MainLayout({ children }) {
       </main>
 
       {/* Smart AI Learning Assistant Chatbox */}
-      {!hideChatbox && <AiChatbox />}
+      {!hideChatbox && <CommunityChatbox />}
 
       <Footer />
     </div>
   );
 }
 export default MainLayout;
-
