@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AppRoutes } from './routes/AppRoutes';
 import { useAuthStore } from './store/authStore';
-import { ToastContainer } from './components/common/ToastContainer';
+import { ToastContainer } from './components/ui/ToastContainer';
 import './styles/globals.css';
 
 function App() {

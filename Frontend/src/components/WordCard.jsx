@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { translateSentence, compareSentences } from '../lib/api';
+import { useToastStore } from '../store/toastStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { toast } from '../store/notificationStore';
 import { CHINESE_DICTIONARY } from '../utils/chineseUtils';
@@ -119,10 +120,10 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         wordType: data.wordType,
         pageNumber: pageNumber
       });
-      toast.success('Đã lưu vào sổ tay thành công!');
+      useToastStore.getState().addToast('Đã lưu vào sổ tay thành công!', 'success');
     } catch (error) {
       console.error(error);
-      toast.error('Có lỗi xảy ra khi lưu vào sổ tay.');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -136,7 +137,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       setCompareData(res);
     } catch (e) {
       console.error(e);
-      toast.error('Có lỗi xảy ra khi so sánh câu.');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi so sánh câu.', 'error');
     } finally {
       setIsLoadingCompare(false);
     }
@@ -322,25 +323,34 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   }
 
   const cleanDefinition = () => {
+    let currentDef = data.definitions;
+    if (!currentDef) return "";
+
     try {
-      const parsed = JSON.parse(data.definitions);
-      if (typeof parsed === 'string') return parsed;
-      
-      if (Array.isArray(parsed)) {
-        const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
-        if (vnDef && vnDef.meaning) return vnDef.meaning;
-        if (parsed.length > 0 && parsed[0].meaning) return parsed[0].meaning;
-        return JSON.stringify(parsed);
+      if (typeof currentDef === 'string') {
+        currentDef = JSON.parse(currentDef);
       }
-      
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.meaning) return parsed.meaning;
-        return JSON.stringify(parsed);
+      if (typeof currentDef === 'string') {
+        // Try parsing again in case of double stringification
+        currentDef = JSON.parse(currentDef);
       }
-      return String(parsed);
     } catch (e) {
-      return data.definitions;
+      // Ignore and fallback
     }
+
+    if (Array.isArray(currentDef)) {
+      const vnDef = currentDef.find(d => d.lang === 'vn' || d.lang === 'vi');
+      if (vnDef && vnDef.meaning) return vnDef.meaning;
+      if (currentDef.length > 0 && currentDef[0].meaning) return currentDef[0].meaning;
+      return JSON.stringify(currentDef);
+    }
+    
+    if (currentDef && typeof currentDef === 'object') {
+      if (currentDef.meaning) return currentDef.meaning;
+      return JSON.stringify(currentDef);
+    }
+    
+    return String(currentDef);
   };
 
   // Parse wordType — may contain multiple types separated by '/' or ','

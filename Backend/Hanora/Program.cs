@@ -40,6 +40,7 @@ namespace Hanora
             builder.Services.AddHttpClient<IOcrService, OcrService>();
             builder.Services.AddSingleton<IBackgroundTaskQueue, DefaultBackgroundTaskQueue>();
             builder.Services.AddSingleton<IChineseSegmenterService, ChineseSegmenterService>();
+            builder.Services.AddScoped<ILayoutAnalysisService, LayoutAnalysisService>();
 
             var documentWorkerCount = Math.Clamp(
                 builder.Configuration.GetValue("DocumentProcessing:WorkerCount", 2),
