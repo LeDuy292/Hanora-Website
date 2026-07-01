@@ -11,6 +11,7 @@ import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
@@ -493,10 +494,10 @@ const ReaderPage = () => {
   const handleSaveAnnotations = async () => {
     try {
       await saveDocumentAnnotations(id, JSON.stringify(annotations));
-      alert("Đã lưu toàn bộ ghi chú và nét vẽ thành công!");
+      useToastStore.getState().addToast("Đã lưu toàn bộ ghi chú và nét vẽ thành công!", "success");
     } catch (error) {
       console.error(error);
-      alert("Lỗi khi lưu ghi chú.");
+      useToastStore.getState().addToast("Lỗi khi lưu ghi chú.", "error");
     }
   };
 
@@ -506,7 +507,7 @@ const ReaderPage = () => {
       await exportDocx(id, document.title);
     } catch (error) {
       console.error(error);
-      alert("Có lỗi xảy ra khi xuất file Word (.docx).");
+      useToastStore.getState().addToast("Có lỗi xảy ra khi xuất file Word (.docx).", "error");
     }
   };
 
@@ -676,7 +677,7 @@ const ReaderPage = () => {
         documentId: id,
         documentTitle: document?.title
       });
-      alert('Đã lưu vào sổ tay từ vựng thành công!');
+      useToastStore.getState().addToast('Đã lưu vào sổ tay từ vựng thành công!', 'success');
     } catch (error) {
       console.error(error);
       try {
@@ -687,9 +688,9 @@ const ReaderPage = () => {
           documentId: id,
           documentTitle: document?.title
         });
-        alert('Đã lưu vào sổ tay thành công!');
+        useToastStore.getState().addToast('Đã lưu vào sổ tay thành công!', 'success');
       } catch (e2) {
-        alert('Lỗi khi lưu vào sổ tay.');
+        useToastStore.getState().addToast('Lỗi khi lưu vào sổ tay.', 'error');
       }
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
@@ -700,10 +701,10 @@ const ReaderPage = () => {
     if (!bubbleMenu.text) return;
     try {
       await updateServerStatus(bubbleMenu.text, "learning", 0);
-      alert('Đã lưu vào danh sách Flashcard thành công!');
+      useToastStore.getState().addToast('Đã lưu vào danh sách Flashcard thành công!', 'success');
     } catch (error) {
       console.error(error);
-      alert('Có lỗi xảy ra khi lưu Flashcard.');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu Flashcard.', 'error');
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
     }
@@ -857,8 +858,6 @@ const ReaderPage = () => {
           <button
             onClick={handleBubbleSaveToFlashcard}
             className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
-
-
           >
             + Flashcard
           </button>
@@ -893,7 +892,7 @@ const ReaderPage = () => {
           <button
             onClick={() => {
               navigator.clipboard.writeText(bubbleMenu.text);
-              alert('Đã sao chép nội dung vào bộ nhớ tạm!');
+              useToastStore.getState().addToast('Đã sao chép nội dung vào bộ nhớ tạm!', 'success');
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
             className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
@@ -1420,15 +1419,47 @@ const ReaderPage = () => {
 
                           return paragraphs.map((lines, pi) => {
                             let isHeading = false;
-                            if (lines.length > 0 && lines[0].length > 0) {
-                              const firstWord = lines[0][0].word;
-                              if (firstWord.includes('#HEADING#')) {
-                                isHeading = true;
-                                lines[0][0].word = firstWord.replace('#HEADING#', '').trim();
-                                if (!lines[0][0].word) lines[0].shift();
-                              } else if (lines[0].length > 2 && lines[0][0].word === '#' && lines[0][1].word === 'HEADING' && lines[0][2].word === '#') {
-                                isHeading = true;
-                                lines[0].splice(0, 3);
+                            let isCenter = false;
+                            let isIndent = false;
+
+                            // Robustly consume markers regardless of how segmenter splits them
+                            while (lines.length > 0) {
+                              let strippedAny = false;
+                              ['#HEADING#', '#CENTER#', '#INDENT#'].forEach(marker => {
+                                let lineText = lines[0].map(w => w.word).join('');
+                                let markerIndex = lineText.indexOf(marker);
+                                if (markerIndex !== -1) {
+                                  if (marker === '#HEADING#') isHeading = true;
+                                  if (marker === '#CENTER#') isCenter = true;
+                                  if (marker === '#INDENT#') isIndent = true;
+                                  
+                                  strippedAny = true;
+                                  let currentStrIndex = 0;
+                                  let charsToRemove = marker.length;
+                                  let charsRemoved = 0;
+                                  
+                                  for (let i = 0; i < lines[0].length; i++) {
+                                    let w = lines[0][i].word;
+                                    let newW = '';
+                                    for (let j = 0; j < w.length; j++) {
+                                      if (currentStrIndex >= markerIndex && charsRemoved < charsToRemove) {
+                                        charsRemoved++; // skip char
+                                      } else {
+                                        newW += w[j];
+                                      }
+                                      currentStrIndex++;
+                                    }
+                                    lines[0][i].word = newW;
+                                  }
+                                }
+                              });
+                              
+                              if (!strippedAny && lines[0].map(w => w.word).join('').trim() !== '') {
+                                break;
+                              }
+                              
+                              if (lines[0].map(w => w.word).join('').trim() === '') {
+                                lines.shift();
                               }
                             }
                             
@@ -1443,7 +1474,7 @@ const ReaderPage = () => {
                             return (
                             <div key={pi} className={paraClass}>
                               {lines.map((lineWords, li) => (
-                                <div key={li} className={`flex flex-wrap leading-none mb-1 ${isHeading ? 'mb-2' : ''}`}>
+                                <div key={li} className={`flex flex-wrap leading-none mb-1 ${isHeading ? 'mb-2' : ''} ${isCenter ? 'justify-center' : ''} ${(isIndent && li === 0 && !isHeading && !isCenter) ? 'pl-10' : ''}`}>
                                   {lineWords.map(({ word, absIndex }) => {
                                     const highlightColor = annotations.highlights[absIndex];
                                     const hasTextNote = annotations.textNotes[absIndex];

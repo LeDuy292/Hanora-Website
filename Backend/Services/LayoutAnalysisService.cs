@@ -28,14 +28,32 @@ public class LayoutAnalysisService : ILayoutAnalysisService
 
             var lines = page.Lines.ToList();
             
-            // Calculate median height to detect headings
-            var heights = lines.Where(l => l.Height.HasValue && l.Height > 0).Select(l => l.Height!.Value).OrderBy(h => h).ToList();
-            double medianHeight = heights.Any() ? heights[heights.Count / 2] : 10;
+            // Pre-calculate effective heights for each line using median word height
+            var lineEffectiveHeights = new Dictionary<OcrLineDto, double>();
+            foreach (var line in lines)
+            {
+                double effHeight = line.Height ?? 0;
+                if (line.Words != null && line.Words.Any(w => w.BoundingBox != null && w.BoundingBox.Height > 0))
+                {
+                    var wordHeights = line.Words.Where(w => w.BoundingBox != null && w.BoundingBox.Height > 0)
+                                                .Select(w => w.BoundingBox!.Height).OrderBy(h => h).ToList();
+                    effHeight = wordHeights[wordHeights.Count / 2]; // median word height
+                }
+                lineEffectiveHeights[line] = effHeight;
+            }
+
+            // Calculate median height across the page to detect headings
+            var validHeights = lineEffectiveHeights.Values.Where(h => h > 0).OrderBy(h => h).ToList();
+            double medianHeight = validHeights.Any() ? validHeights[validHeights.Count / 2] : 10;
             
             // Identify paragraphs based on vertical gap (assuming lines are sorted top-to-bottom)
             var currentBlock = new DocumentBlockDto();
             double? previousY = null;
             double? previousHeight = null;
+            
+            var pageMinX = lines.Where(l => l.BoundingBox != null).Min(l => (double?)l.BoundingBox!.X) ?? 0;
+            var pageMaxX = lines.Where(l => l.BoundingBox != null).Max(l => (double?)(l.BoundingBox!.X + l.BoundingBox.Width)) ?? 1000;
+            var pageWidth = pageMaxX - pageMinX > 0 ? pageMaxX - pageMinX : 1000;
 
             foreach (var line in lines)
             {
@@ -43,9 +61,10 @@ public class LayoutAnalysisService : ILayoutAnalysisService
                 string blockType = "paragraph";
                 
                 // If it's much taller than median, it's a heading
-                if (line.Height.HasValue && line.Height.Value > medianHeight * 1.3)
+                double effHeight = lineEffectiveHeights[line];
+                if (effHeight > medianHeight * 1.3)
                 {
-                    blockType = line.Height.Value > medianHeight * 1.8 ? "heading1" : "heading2";
+                    blockType = effHeight > medianHeight * 1.8 ? "heading1" : "heading2";
                     isNewBlock = true;
                 }
                 else if (previousY.HasValue && previousHeight.HasValue)
@@ -65,6 +84,28 @@ public class LayoutAnalysisService : ILayoutAnalysisService
                 {
                     blocks.Add(currentBlock);
                     currentBlock = new DocumentBlockDto();
+                }
+
+                // First line of the block determines alignment
+                if (!currentBlock.Lines.Any() && line.BoundingBox != null)
+                {
+                    double lineLeft = line.BoundingBox.X;
+                    double lineRight = line.BoundingBox.X + line.BoundingBox.Width;
+                    double leftSpace = lineLeft - pageMinX;
+                    double rightSpace = pageMaxX - lineRight;
+
+                    if (System.Math.Abs(leftSpace - rightSpace) < pageWidth * 0.1 && pageWidth - line.BoundingBox.Width > pageWidth * 0.2)
+                    {
+                        currentBlock.Alignment = "center";
+                    }
+                    else if (leftSpace > pageWidth * 0.04 && leftSpace < pageWidth * 0.3)
+                    {
+                        currentBlock.Alignment = "indent";
+                    }
+                    else
+                    {
+                        currentBlock.Alignment = "left";
+                    }
                 }
 
                 currentBlock.Type = blockType;

@@ -42,6 +42,7 @@ public class WordRefDto
 public class DocumentBlockDto
 {
     public string Type { get; set; } = "paragraph"; // "paragraph", "heading1", "heading2"
+    public string Alignment { get; set; } = "left"; // "left", "center", "indent"
     public string Text { get; set; } = string.Empty;
     
     [System.Text.Json.Serialization.JsonIgnore]

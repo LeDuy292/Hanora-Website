@@ -128,8 +128,10 @@ public class DocumentProcessingService : IDocumentProcessingService
                     var blocks = layoutService.AnalyzeLayout(pages);
                     
                     // Reconstruct text based on blocks to preserve structural layout
-                    var formattedText = string.Join("\n\n", blocks.Select(b => 
-                        (b.Type.StartsWith("heading") ? "#HEADING# " : "") + 
+                    var formattedText = string.Join("\n\n", blocks.SelectMany(p => p.Blocks).Select(b => 
+                        (b.Type.StartsWith("heading") ? "#HEADING#\n" : "") + 
+                        (b.Alignment == "center" ? "#CENTER#\n" : "") +
+                        (b.Alignment == "indent" ? "#INDENT#\n" : "") +
                         string.Join("\n", b.Lines.Select(l => l.Text))
                     ));
 

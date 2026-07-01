@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
 
 // Static database of details for HSK words (consistent with Flashcard.jsx)
@@ -159,7 +160,7 @@ export function VocabularyPage() {
   const handleCreateDeckSubmit = async (e) => {
     e.preventDefault();
     if (!newDeckName.trim()) {
-      alert('Vui lòng nhập tên bộ Flashcard.');
+      useToastStore.getState().addToast('Vui lòng nhập tên bộ Flashcard.', 'error');
       return;
     }
     setIsSavingDeck(true);
@@ -176,12 +177,12 @@ export function VocabularyPage() {
         words: selectedWordsList
       });
 
-      alert('Đã tạo bộ Flashcard thành công!');
+      useToastStore.getState().addToast('Đã tạo bộ Flashcard thành công!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra khi tạo bộ Flashcard.');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
     } finally {
       setIsSavingDeck(false);
     }
