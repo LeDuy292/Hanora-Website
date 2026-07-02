@@ -6,6 +6,8 @@ import {
   BookOpenCheck,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
   FileText,
@@ -189,9 +191,13 @@ export function AdminPage() {
   const [revenue, setRevenue] = useState(null);
   const [users, setUsers] = useState([]);
   const [searchStats, setSearchStats] = useState(null);
-  const [translations, setTranslations] = useState([]);
+  const [translations, setTranslations] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [translationKind, setTranslationKind] = useState('all');
+  const [translationQuery, setTranslationQuery] = useState('');
+  const [translationPage, setTranslationPage] = useState(1);
+  const [translationPageSize, setTranslationPageSize] = useState(8);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -214,14 +220,21 @@ export function AdminPage() {
       if (screen === 'revenue') setRevenue(await adminApi.revenue());
       if (screen === 'users') setUsers(await adminApi.users({ q: query, status: statusFilter }));
       if (screen === 'search') setSearchStats(await adminApi.searchStats());
-      if (screen === 'translations') setTranslations(await adminApi.translationApprovals());
+      if (screen === 'translations') {
+        setTranslations(await adminApi.translationApprovals({
+          kind: translationKind,
+          q: translationQuery,
+          page: translationPage,
+          pageSize: translationPageSize,
+        }));
+      }
       setError('');
     } catch (err) {
       setError(err.message || 'Không thể tải dữ liệu Admin.');
     } finally {
       setLoading(false);
     }
-  }, [loadOverview, overview, query, screen, statusFilter]);
+  }, [loadOverview, overview, query, screen, statusFilter, translationKind, translationPage, translationPageSize, translationQuery]);
 
   useEffect(() => {
     const timer = setTimeout(loadScreen, 150);
@@ -248,7 +261,12 @@ export function AdminPage() {
   const updateTranslation = async (item, status, translation) => {
     try {
       await adminApi.updateTranslationApproval(item.id, { kind: item.kind, status, translation });
-      setTranslations((current) => current.filter((row) => !(row.id === item.id && row.kind === item.kind)));
+      setTranslations(await adminApi.translationApprovals({
+        kind: translationKind,
+        q: translationQuery,
+        page: translationPage,
+        pageSize: translationPageSize,
+      }));
       await loadOverview();
       toast.success(status === 'Approved' ? 'Đã phê duyệt bản dịch.' : 'Đã từ chối bản dịch.');
     } catch (err) {
@@ -284,6 +302,23 @@ export function AdminPage() {
       {screen === 'translations' && (
         <TranslationsScreen
           items={translations}
+          kind={translationKind}
+          query={translationQuery}
+          page={translationPage}
+          pageSize={translationPageSize}
+          setKind={(value) => {
+            setTranslationKind(value);
+            setTranslationPage(1);
+          }}
+          setQuery={(value) => {
+            setTranslationQuery(value);
+            setTranslationPage(1);
+          }}
+          setPage={setTranslationPage}
+          setPageSize={(value) => {
+            setTranslationPageSize(value);
+            setTranslationPage(1);
+          }}
           loading={loading}
           onUpdate={updateTranslation}
         />
@@ -609,7 +644,37 @@ function SearchStatsScreen({ data, loading }) {
   );
 }
 
-function TranslationsScreen({ items, loading, onUpdate }) {
+function TranslationsScreen({
+  items,
+  kind,
+  query,
+  page,
+  pageSize,
+  setKind,
+  setQuery,
+  setPage,
+  setPageSize,
+  loading,
+  onUpdate,
+}) {
+  const pageData = items || {
+    items: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 1,
+    vocabularyTotal: 0,
+    sentenceTotal: 0,
+  };
+  const rows = pageData.items || [];
+  const typeOptions = [
+    { value: 'all', label: 'Tất cả', count: pageData.total },
+    { value: 'vocabulary', label: 'Từ vựng', count: pageData.vocabularyTotal },
+    { value: 'sentence', label: 'Câu ví dụ', count: pageData.sentenceTotal },
+  ];
+  const start = pageData.total === 0 ? 0 : (pageData.page - 1) * pageData.pageSize + 1;
+  const end = Math.min(pageData.page * pageData.pageSize, pageData.total);
+
   return (
     <section id="translations">
       <PageTitle
@@ -619,12 +684,94 @@ function TranslationsScreen({ items, loading, onUpdate }) {
         action={<button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white"><CheckCircle2 className="h-4 w-4" />Phê duyệt hàng loạt</button>}
       />
 
-      {loading ? <LoadingState /> : items.length === 0 ? <EmptyState icon={Languages} title="Không có bản dịch nào cần phê duyệt." /> : (
-        <div className="space-y-6">
-          {items.map((item) => (
-            <TranslationCard key={`${item.kind}-${item.id}`} item={item} onUpdate={onUpdate} />
-          ))}
+      <div className={`${CARD} mb-5 p-4`}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {typeOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setKind(option.value)}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 text-sm font-black transition ${
+                  kind === option.value
+                    ? 'border-[#abc7ff] bg-[#d5e0f8] text-[#005cb9]'
+                    : 'border-[#c1c6d6]/70 bg-white text-[#414753] hover:bg-[#ecedf7]'
+                }`}
+              >
+                {option.value === 'sentence' ? <Languages className="h-4 w-4" /> : <BookOpenCheck className="h-4 w-4" />}
+                {option.label}
+                <span className="rounded-lg bg-white/80 px-2 py-0.5 text-xs">{formatNumber(option.count)}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="relative block w-full sm:w-[320px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#717785]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-11 w-full rounded-xl border border-[#c1c6d6]/70 bg-[#f2f3fd] pl-10 pr-4 text-sm font-semibold outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+                placeholder="Tìm từ, pinyin, nghĩa, câu..."
+              />
+            </label>
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            >
+              <option value={5}>5 / trang</option>
+              <option value={8}>8 / trang</option>
+              <option value={12}>12 / trang</option>
+              <option value={20}>20 / trang</option>
+            </select>
+          </div>
         </div>
+      </div>
+
+      {loading ? <LoadingState /> : rows.length === 0 ? <EmptyState icon={Languages} title="Không có bản dịch nào cần phê duyệt." /> : (
+        <>
+          <div className="mb-4 flex flex-col gap-2 text-sm font-bold text-[#414753] sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Hiển thị {formatNumber(start)}-{formatNumber(end)} trong {formatNumber(pageData.total)} mục cần duyệt
+            </span>
+            <span className="text-xs uppercase tracking-wider text-[#717785]">
+              Trang {formatNumber(pageData.page)} / {formatNumber(pageData.totalPages)}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            {rows.map((item) => (
+              <TranslationCard key={`${item.kind}-${item.id}`} item={item} onUpdate={onUpdate} />
+            ))}
+          </div>
+
+          <div className={`${CARD} mt-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
+            <p className="text-sm font-bold text-[#414753]">
+              {formatNumber(pageData.total)} mục, chia thành {formatNumber(pageData.totalPages)} trang
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={pageData.page <= 1}
+                onClick={() => setPage(Math.max(1, pageData.page - 1))}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-black text-[#414753] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Trước
+              </button>
+              <button
+                type="button"
+                disabled={pageData.page >= pageData.totalPages}
+                onClick={() => setPage(Math.min(pageData.totalPages, pageData.page + 1))}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Sau
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </section>
   );
