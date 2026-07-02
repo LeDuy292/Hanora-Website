@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, getToken } from '../services/authService';
+import { setToken } from '../services/apiClient';
 import { statsApi } from '../services/statsService';
 import { useDocumentStore } from './documentStore';
 import { useVocabularyStore } from './vocabularyStore';
@@ -60,6 +61,9 @@ function mapUser(dto, prev = {}) {
     email: dto.email,
     name: dto.displayName || dto.username || dto.email,
     avatar: dto.avatarUrl || null,
+    role: dto.role || 'User',
+    isAdmin: dto.role === 'Admin',
+    isActive: dto.isActive ?? true,
     joinedDate: dto.createdAt
       ? new Date(dto.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
       : prev.joinedDate,

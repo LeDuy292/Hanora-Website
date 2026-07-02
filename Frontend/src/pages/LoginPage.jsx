@@ -161,7 +161,10 @@ export function LoginPage() {
   const handleGoogleCredential = async (response) => {
     setLocalError("");
     const ok = await googleLogin(response.credential);
-    if (ok) navigate(redirectTo, { replace: true });
+    if (ok) {
+      const loggedInUser = useAuthStore.getState().user;
+      navigate(loggedInUser?.role === 'Admin' ? '/admin' : redirectTo, { replace: true });
+    }
   };
 
   // Initialise Google Identity Services and render its button.
@@ -219,7 +222,10 @@ export function LoginPage() {
       ? await register(name, email, password)
       : await login(email, password);
 
-    if (ok) navigate(redirectTo, { replace: true });
+    if (ok) {
+      const loggedInUser = useAuthStore.getState().user;
+      navigate(loggedInUser?.role === 'Admin' ? '/admin' : redirectTo, { replace: true });
+    }
   };
 
   return (

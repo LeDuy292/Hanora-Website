@@ -170,6 +170,8 @@ namespace Hanora
                     context.Database.ExecuteSqlRaw(@"
                         ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
                         ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
+                        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'User';
+                        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
                         ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
@@ -231,6 +233,47 @@ namespace Hanora
                         CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
                         CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
                     ");
+
+                    var adminEmail = builder.Configuration["AdminAccount:Email"]?.Trim().ToLowerInvariant();
+                    var adminPassword = builder.Configuration["AdminAccount:Password"];
+                    if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+                    {
+                        var adminUsername = builder.Configuration["AdminAccount:Username"]?.Trim().ToLowerInvariant();
+                        if (string.IsNullOrWhiteSpace(adminUsername))
+                            adminUsername = "admin";
+
+                        var adminDisplayName = builder.Configuration["AdminAccount:DisplayName"]?.Trim();
+                        if (string.IsNullOrWhiteSpace(adminDisplayName))
+                            adminDisplayName = "Hanora Admin";
+
+                        var admin = context.Users.FirstOrDefault(u => u.Email == adminEmail);
+                        if (admin == null)
+                        {
+                            admin = new BusinessObjects.Models.User
+                            {
+                                Username = adminUsername,
+                                Email = adminEmail,
+                                DisplayName = adminDisplayName,
+                                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+                                Role = "Admin",
+                                IsActive = true,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            context.Users.Add(admin);
+                        }
+                        else
+                        {
+                            admin.Username = string.IsNullOrWhiteSpace(admin.Username) ? adminUsername : admin.Username;
+                            admin.DisplayName = adminDisplayName;
+                            admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+                            admin.Role = "Admin";
+                            admin.IsActive = true;
+                            admin.UpdatedAt = DateTime.UtcNow;
+                        }
+
+                        context.SaveChanges();
+                    }
                 }
                 catch (Exception ex)
                 {

@@ -27,6 +27,7 @@ export function Header({ offsetTop }) {
     { to: '/reader', label: 'Dịch thuật' },
     { to: '/leaderboard', label: 'Bảng xếp hạng' },
     { to: '/pronunciation', label: 'Luyện phát âm' },
+    ...(user?.role === 'Admin' ? [{ to: '/admin', label: 'Admin' }] : []),
   ];
 
   const handleLogout = () => {
