@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { MainLayout } from '../components/layout/MainLayout';
+import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAuthStore } from '../store/authStore';
 
 // Pages
@@ -17,10 +18,12 @@ import { ProfilePage } from '../pages/ProfilePage';
 import { QuizPage } from '../pages/QuizPage';
 import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
 import { LeaderboardPage } from '../pages/LeaderboardPage';
+import { AdminPage } from '../pages/AdminPage';
 
 
 export function AppRoutes() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const authenticatedHome = user?.role === 'Admin' ? '/admin' : '/dashboard';
 
   return (
     <Routes>
@@ -31,7 +34,7 @@ export function AppRoutes() {
       />
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        element={isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <LoginPage />}
       />
 
       {/* Protected Routes inside MainLayout */}
@@ -158,6 +161,17 @@ export function AppRoutes() {
             </MainLayout>
           </ProtectedRoute>
         } 
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requireAdmin>
+            <AdminLayout>
+              <AdminPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
       />
 
       {/* Fallback Redirect */}
