@@ -7,7 +7,7 @@ export const adminApi = {
 
   searchStats: () => apiRequest('/admin/search-stats', { auth: true }),
 
-  translationApprovals: () => apiRequest('/admin/translation-approvals', { auth: true }),
+  translationApprovals: (params = {}) => apiRequest(`/admin/translation-approvals${toQuery(params)}`, { auth: true }),
 
   updateTranslationApproval: (id, payload) => apiRequest(`/admin/translation-approvals/${id}`, {
     method: 'PATCH',

@@ -249,14 +249,61 @@ namespace Hanora.Controllers
         }
 
         [HttpGet("translation-approvals")]
-        public async Task<ActionResult<List<AdminTranslationApprovalDto>>> GetTranslationApprovals()
+        public async Task<ActionResult<AdminTranslationApprovalPageDto>> GetTranslationApprovals(
+            [FromQuery] string? kind,
+            [FromQuery] string? q,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 8)
         {
-            var vocabularyItems = await _db.Vocabularies
+            var normalizedKind = string.IsNullOrWhiteSpace(kind) ? "all" : kind.Trim().ToLowerInvariant();
+            if (normalizedKind is not ("all" or "vocabulary" or "sentence"))
+                normalizedKind = "all";
+
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 5, 20);
+            var takeForMerge = page * pageSize;
+
+            var vocabularyQuery = _db.Vocabularies
                 .AsNoTracking()
-                .Where(v => v.ViTranslated != true)
-                .OrderByDescending(v => v.UpdatedAt ?? v.CreatedAt)
-                .Take(30)
-                .Select(v => new AdminTranslationApprovalDto(
+                .Where(v => v.ViTranslated != true);
+
+            var sentenceQuery = _db.ExampleSentences
+                .AsNoTracking()
+                .Where(e => e.ViText == null);
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var pattern = $"%{q.Trim()}%";
+                vocabularyQuery = vocabularyQuery.Where(v =>
+                    EF.Functions.ILike(v.Word, pattern) ||
+                    EF.Functions.ILike(v.Pinyin, pattern) ||
+                    (v.HanViet != null && EF.Functions.ILike(v.HanViet, pattern)) ||
+                    EF.Functions.ILike(v.Definitions, pattern));
+
+                sentenceQuery = sentenceQuery.Where(e =>
+                    EF.Functions.ILike(e.ZhText, pattern) ||
+                    (e.EnText != null && EF.Functions.ILike(e.EnText, pattern)) ||
+                    (e.Source != null && EF.Functions.ILike(e.Source, pattern)));
+            }
+
+            var vocabularyTotal = await vocabularyQuery.CountAsync();
+            var sentenceTotal = await sentenceQuery.CountAsync();
+            var total = normalizedKind switch
+            {
+                "vocabulary" => vocabularyTotal,
+                "sentence" => sentenceTotal,
+                _ => vocabularyTotal + sentenceTotal
+            };
+
+            var vocabularyTake = normalizedKind == "sentence" ? 0 : takeForMerge;
+            var sentenceTake = normalizedKind == "vocabulary" ? 0 : takeForMerge;
+
+            var vocabularyItems = vocabularyTake == 0
+                ? new List<AdminTranslationApprovalDto>()
+                : await vocabularyQuery
+                    .OrderByDescending(v => v.UpdatedAt ?? v.CreatedAt)
+                    .Take(vocabularyTake)
+                    .Select(v => new AdminTranslationApprovalDto(
                     v.Id,
                     "vocabulary",
                     "ZH",
@@ -268,14 +315,14 @@ namespace Hanora.Controllers
                     "Hanora AI",
                     v.CreatedAt,
                     "Pending"))
-                .ToListAsync();
+                    .ToListAsync();
 
-            var sentenceItems = await _db.ExampleSentences
-                .AsNoTracking()
-                .Where(e => e.ViText == null)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(20)
-                .Select(e => new AdminTranslationApprovalDto(
+            var sentenceItems = sentenceTake == 0
+                ? new List<AdminTranslationApprovalDto>()
+                : await sentenceQuery
+                    .OrderByDescending(e => e.CreatedAt)
+                    .Take(sentenceTake)
+                    .Select(e => new AdminTranslationApprovalDto(
                     e.Id,
                     "sentence",
                     "ZH",
@@ -287,9 +334,24 @@ namespace Hanora.Controllers
                     e.Source ?? "system",
                     e.CreatedAt,
                     "Pending"))
-                .ToListAsync();
+                    .ToListAsync();
 
-            return Ok(vocabularyItems.Concat(sentenceItems).OrderByDescending(i => i.CreatedAt).Take(50).ToList());
+            var items = vocabularyItems
+                .Concat(sentenceItems)
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+            return Ok(new AdminTranslationApprovalPageDto(
+                items,
+                total,
+                page,
+                pageSize,
+                totalPages,
+                vocabularyTotal,
+                sentenceTotal));
         }
 
         [HttpPatch("translation-approvals/{id:long}")]
@@ -655,6 +717,16 @@ namespace Hanora.Controllers
     public record AdminTopWordDto(string Word, string? Pinyin, int LookupCount);
 
     public record AdminSearchUserDto(string Name, string Email, int LookupCount);
+
+    public record AdminTranslationApprovalPageDto(
+        List<AdminTranslationApprovalDto> Items,
+        int Total,
+        int Page,
+        int PageSize,
+        int TotalPages,
+        int VocabularyTotal,
+        int SentenceTotal
+    );
 
     public record AdminTranslationApprovalDto(
         long Id,
