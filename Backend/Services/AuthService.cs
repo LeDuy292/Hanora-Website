@@ -28,7 +28,7 @@ namespace Services
 
     public record AuthResult(bool Success, string? Token, UserDto? User, string? Error);
 
-    public record UserDto(long Id, string Username, string Email, string? DisplayName, string? AvatarUrl, DateTime CreatedAt);
+    public record UserDto(long Id, string Username, string Email, string? DisplayName, string? AvatarUrl, DateTime CreatedAt, string Role, bool IsActive);
 
     public class AuthService : IAuthService
     {
@@ -74,6 +74,7 @@ namespace Services
                     DisplayName = payload.Name,
                     AvatarUrl = payload.Picture,
                     PasswordHash = "google_auth",
+                    Role = "User",
                 };
                 user = await _userRepo.CreateAsync(user);
             }
@@ -95,6 +96,9 @@ namespace Services
             if (user == null || user.PasswordHash == null)
                 return new AuthResult(false, null, null, "Email hoặc mật khẩu không đúng.");
 
+            if (user.IsActive == false)
+                return new AuthResult(false, null, null, "Tai khoan da bi khoa. Vui long lien he quan tri vien.");
+
             if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
                 return new AuthResult(false, null, null, "Email hoặc mật khẩu không đúng.");
 
@@ -115,6 +119,7 @@ namespace Services
                 Email = email,
                 DisplayName = username,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                Role = "User",
             };
             user = await _userRepo.CreateAsync(user);
 
@@ -129,9 +134,12 @@ namespace Services
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(JwtRegisteredClaimNames.Name, user.DisplayName ?? user.Username),
                 new Claim("username", user.Username),
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim("role", user.Role),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
@@ -205,6 +213,6 @@ namespace Services
         }
 
         private static UserDto ToDto(User u) =>
-            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt ?? DateTime.UtcNow);
+            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt ?? DateTime.UtcNow, u.Role, u.IsActive ?? true);
     }
 }
