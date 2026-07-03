@@ -156,14 +156,16 @@ export function LoginPage() {
   );
 
   const error = localError || storeError;
-  const redirectTo = location.state?.from || "/dashboard";
+  const userRole = useAuthStore((s) => s.user?.role);
+  const redirectTo = location.state?.from || (userRole === "Admin" ? "/admin" : "/dashboard");
 
   const handleGoogleCredential = async (response) => {
     setLocalError("");
     const ok = await googleLogin(response.credential);
     if (ok) {
-      const loggedInUser = useAuthStore.getState().user;
-      navigate(loggedInUser?.role === 'Admin' ? '/admin' : redirectTo, { replace: true });
+      const updatedUserRole = useAuthStore.getState().user?.role;
+      const target = updatedUserRole === "Admin" ? "/admin" : (location.state?.from || "/dashboard");
+      navigate(target, { replace: true });
     }
   };
 
@@ -223,8 +225,9 @@ export function LoginPage() {
       : await login(email, password);
 
     if (ok) {
-      const loggedInUser = useAuthStore.getState().user;
-      navigate(loggedInUser?.role === 'Admin' ? '/admin' : redirectTo, { replace: true });
+      const updatedUserRole = useAuthStore.getState().user?.role;
+      const target = updatedUserRole === "Admin" ? "/admin" : (location.state?.from || "/dashboard");
+      navigate(target, { replace: true });
     }
   };
 

@@ -53,6 +53,7 @@ function mapStats(stats) {
  */
 function mapUser(dto, prev = {}) {
   if (!dto) return null;
+  const normalizedRole = typeof dto.role === 'string' && dto.role.toLowerCase() === 'admin' ? 'Admin' : (dto.role || 'User');
   return {
     ...DEFAULT_PROFILE,
     ...prev,
@@ -61,8 +62,8 @@ function mapUser(dto, prev = {}) {
     email: dto.email,
     name: dto.displayName || dto.username || dto.email,
     avatar: dto.avatarUrl || null,
-    role: dto.role || 'User',
-    isAdmin: dto.role === 'Admin',
+    role: normalizedRole,
+    isAdmin: normalizedRole === 'Admin',
     isActive: dto.isActive ?? true,
     joinedDate: dto.createdAt
       ? new Date(dto.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
