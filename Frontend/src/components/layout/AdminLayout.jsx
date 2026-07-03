@@ -100,19 +100,7 @@ export function AdminLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="flex h-10 w-10 items-center justify-center rounded-xl text-[#414753] transition hover:bg-[#ecedf7] hover:text-[#005cb9]">
-              <Bell className="h-5 w-5" />
-            </button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-xl text-[#414753] transition hover:bg-[#ecedf7] hover:text-[#005cb9]">
-              <Languages className="h-5 w-5" />
-            </button>
-            <NavLink
-              to="/dashboard"
-              className="hidden h-10 items-center rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-xs font-black text-[#414753] transition hover:bg-[#ecedf7] sm:inline-flex"
-            >
-              App học viên
-            </NavLink>
-            <div className="ml-1 hidden h-8 w-px bg-[#c1c6d6] sm:block" />
+
             <div className="flex items-center gap-2 rounded-xl px-2 py-1 transition hover:bg-[#ecedf7]">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#d5e0f8] text-sm font-black text-[#005cb9]">
                 {initial}

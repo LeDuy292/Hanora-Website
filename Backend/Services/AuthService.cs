@@ -131,6 +131,8 @@ namespace Services
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            var normalizedRole = user.Role?.Equals("admin", StringComparison.OrdinalIgnoreCase) == true ? "Admin" : (user.Role ?? "User");
+
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -138,8 +140,8 @@ namespace Services
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(JwtRegisteredClaimNames.Name, user.DisplayName ?? user.Username),
                 new Claim("username", user.Username),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("role", user.Role),
+                new Claim(ClaimTypes.Role, normalizedRole),
+                new Claim("role", normalizedRole),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
@@ -213,6 +215,6 @@ namespace Services
         }
 
         private static UserDto ToDto(User u) =>
-            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt ?? DateTime.UtcNow, u.Role, u.IsActive ?? true);
+            new(u.Id, u.Username, u.Email, u.DisplayName, u.AvatarUrl, u.CreatedAt ?? DateTime.UtcNow, u.Role?.Equals("admin", StringComparison.OrdinalIgnoreCase) == true ? "Admin" : (u.Role ?? "User"), u.IsActive ?? true);
     }
 }
