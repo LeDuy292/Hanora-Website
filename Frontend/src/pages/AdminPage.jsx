@@ -195,6 +195,10 @@ export function AdminPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [translationKind, setTranslationKind] = useState('all');
+  const [translationStatus, setTranslationStatus] = useState('Pending');
+  const [translationWarning, setTranslationWarning] = useState('all');
+  const [translationDateFrom, setTranslationDateFrom] = useState('');
+  const [translationDateTo, setTranslationDateTo] = useState('');
   const [translationQuery, setTranslationQuery] = useState('');
   const [translationPage, setTranslationPage] = useState(1);
   const [translationPageSize, setTranslationPageSize] = useState(8);
@@ -223,6 +227,10 @@ export function AdminPage() {
       if (screen === 'translations') {
         setTranslations(await adminApi.translationApprovals({
           kind: translationKind,
+          status: translationStatus,
+          warningType: translationWarning,
+          dateFrom: translationDateFrom,
+          dateTo: translationDateTo,
           q: translationQuery,
           page: translationPage,
           pageSize: translationPageSize,
@@ -234,7 +242,7 @@ export function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [loadOverview, overview, query, screen, statusFilter, translationKind, translationPage, translationPageSize, translationQuery]);
+  }, [loadOverview, overview, query, screen, statusFilter, translationDateFrom, translationDateTo, translationKind, translationPage, translationPageSize, translationQuery, translationStatus, translationWarning]);
 
   useEffect(() => {
     const timer = setTimeout(loadScreen, 150);
@@ -258,17 +266,21 @@ export function AdminPage() {
     }
   };
 
-  const updateTranslation = async (item, status, translation) => {
+  const updateTranslation = async (item, status, translation, adminNote) => {
     try {
-      await adminApi.updateTranslationApproval(item.id, { kind: item.kind, status, translation });
+      await adminApi.updateTranslationApproval(item.id, { kind: item.kind, status, translation, adminNote });
       setTranslations(await adminApi.translationApprovals({
         kind: translationKind,
+        status: translationStatus,
+        warningType: translationWarning,
+        dateFrom: translationDateFrom,
+        dateTo: translationDateTo,
         q: translationQuery,
         page: translationPage,
         pageSize: translationPageSize,
       }));
       await loadOverview();
-      toast.success(status === 'Approved' ? 'Đã phê duyệt bản dịch.' : 'Đã từ chối bản dịch.');
+      toast.success(status === 'Rejected' ? 'Đã từ chối bản dịch.' : 'Đã lưu kết quả kiểm duyệt.');
     } catch (err) {
       toast.error(err.message || 'Không thể cập nhật phê duyệt.');
     }
@@ -303,11 +315,31 @@ export function AdminPage() {
         <TranslationsScreen
           items={translations}
           kind={translationKind}
+          status={translationStatus}
+          warning={translationWarning}
+          dateFrom={translationDateFrom}
+          dateTo={translationDateTo}
           query={translationQuery}
           page={translationPage}
           pageSize={translationPageSize}
           setKind={(value) => {
             setTranslationKind(value);
+            setTranslationPage(1);
+          }}
+          setStatus={(value) => {
+            setTranslationStatus(value);
+            setTranslationPage(1);
+          }}
+          setWarning={(value) => {
+            setTranslationWarning(value);
+            setTranslationPage(1);
+          }}
+          setDateFrom={(value) => {
+            setTranslationDateFrom(value);
+            setTranslationPage(1);
+          }}
+          setDateTo={(value) => {
+            setTranslationDateTo(value);
             setTranslationPage(1);
           }}
           setQuery={(value) => {
@@ -647,10 +679,18 @@ function SearchStatsScreen({ data, loading }) {
 function TranslationsScreen({
   items,
   kind,
+  status,
+  warning,
+  dateFrom,
+  dateTo,
   query,
   page,
   pageSize,
   setKind,
+  setStatus,
+  setWarning,
+  setDateFrom,
+  setDateTo,
   setQuery,
   setPage,
   setPageSize,
@@ -665,12 +705,34 @@ function TranslationsScreen({
     totalPages: 1,
     vocabularyTotal: 0,
     sentenceTotal: 0,
+    pendingTotal: 0,
+    approvedTotal: 0,
+    rejectedTotal: 0,
+    correctedTotal: 0,
   };
   const rows = pageData.items || [];
   const typeOptions = [
     { value: 'all', label: 'Tất cả', count: pageData.total },
     { value: 'vocabulary', label: 'Từ vựng', count: pageData.vocabularyTotal },
     { value: 'sentence', label: 'Câu ví dụ', count: pageData.sentenceTotal },
+  ];
+  const statusOptions = [
+    { value: 'all', label: 'Mọi trạng thái', count: pageData.total },
+    { value: 'Pending', label: 'Chờ duyệt', count: pageData.pendingTotal },
+    { value: 'Approved', label: 'Đã duyệt', count: pageData.approvedTotal },
+    { value: 'Corrected', label: 'Đã chỉnh sửa', count: pageData.correctedTotal },
+    { value: 'Rejected', label: 'Từ chối', count: pageData.rejectedTotal },
+  ];
+  const warningOptions = [
+    { value: 'all', label: 'Mọi cảnh báo' },
+    { value: 'low_confidence', label: 'AI confidence thấp' },
+    { value: 'idiom', label: 'Thành ngữ' },
+    { value: 'specialized_term', label: 'Thuật ngữ' },
+    { value: 'new_word', label: 'Từ mới' },
+    { value: 'user_reported', label: 'User báo cáo' },
+    { value: 'inconsistent_ai', label: 'AI không nhất quán' },
+    { value: 'abnormal_content', label: 'Nội dung bất thường' },
+    { value: 'missing_vi_translation', label: 'Thiếu bản dịch VI' },
   ];
   const start = pageData.total === 0 ? 0 : (pageData.page - 1) * pageData.pageSize + 1;
   const end = Math.min(pageData.page * pageData.pageSize, pageData.total);
@@ -715,6 +777,38 @@ function TranslationsScreen({
                 placeholder="Tìm từ, pinyin, nghĩa, câu..."
               />
             </label>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label} ({formatNumber(option.count)})</option>
+              ))}
+            </select>
+            <select
+              value={warning}
+              onChange={(event) => setWarning(event.target.value)}
+              className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            >
+              {warningOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+              aria-label="Lọc từ ngày"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+              aria-label="Lọc đến ngày"
+            />
             <select
               value={pageSize}
               onChange={(event) => setPageSize(Number(event.target.value))}
@@ -779,53 +873,93 @@ function TranslationsScreen({
 
 function TranslationCard({ item, onUpdate }) {
   const [translation, setTranslation] = useState(item.userSuggestion || '');
+  const [adminNote, setAdminNote] = useState(item.note || '');
+  const warningLabel = {
+    low_confidence: 'AI confidence thấp',
+    idiom: 'Thành ngữ',
+    specialized_term: 'Thuật ngữ',
+    new_word: 'Từ mới',
+    user_reported: 'User báo cáo',
+    inconsistent_ai: 'AI không nhất quán',
+    abnormal_content: 'Nội dung bất thường',
+    missing_vi_translation: 'Thiếu bản dịch VI',
+  }[item.warningType] || item.warningType;
 
   return (
-    <article className={`${CARD} p-6`}>
+    <article className={`${CARD} flex h-full flex-col p-5`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#414753]">
           <span className="rounded-lg border border-[#c1c6d6]/70 bg-[#ecedf7] px-2.5 py-1">{item.sourceLanguage} -&gt; {item.targetLanguage}</span>
+          <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">{warningLabel}</span>
           <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{formatDate(item.createdAt)}</span>
-          <span>{item.requestedBy}</span>
         </div>
         <StatusBadge value={item.status} />
+      </div>
+
+      <div className="mb-4 grid grid-cols-3 gap-2 text-xs font-black text-[#414753]">
+        <div className="rounded-xl bg-[#f2f3fd] p-3">
+          <p className="text-[#717785]">Confidence</p>
+          <p className="mt-1 text-base text-[#181c22]">{item.confidenceScore != null ? `${Math.round(item.confidenceScore * 100)}%` : '--'}</p>
+        </div>
+        <div className="rounded-xl bg-[#f2f3fd] p-3">
+          <p className="text-[#717785]">Báo cáo</p>
+          <p className="mt-1 text-base text-[#181c22]">{formatNumber(item.reportCount || 0)}</p>
+        </div>
+        <div className="rounded-xl bg-[#f2f3fd] p-3">
+          <p className="text-[#717785]">Ưu tiên</p>
+          <p className="mt-1 text-base text-[#181c22]">{formatNumber(item.priority || 0)}</p>
+        </div>
       </div>
 
       <div className="mb-4">
         <p className="mb-1 text-xs font-black uppercase tracking-wider text-[#717785]">Nguồn</p>
         <p className="text-base font-black leading-7 text-[#181c22]">{item.sourceText}</p>
+        {(item.pinyin || item.wordType) && (
+          <p className="mt-2 text-xs font-bold text-[#717785]">{item.pinyin || 'Không có pinyin'} · {item.wordType || 'Chưa phân loại'}</p>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid flex-1 grid-cols-1 gap-4">
         <div className="rounded-xl border border-[#c1c6d6]/60 bg-[#ecedf7] p-4">
-          <p className="mb-2 text-xs font-black uppercase tracking-wider text-[#717785]">Bản dịch AI / hiện tại</p>
+          <p className="mb-2 text-xs font-black uppercase tracking-wider text-[#717785]">Bản dịch hiện tại</p>
           <p className="text-sm font-semibold leading-6 text-[#181c22]">{item.aiTranslation || 'Chưa có dữ liệu'}</p>
         </div>
         <label className="rounded-xl border border-[#0b74e5]/30 bg-[#d7e3ff]/25 p-4">
-          <span className="mb-2 block text-xs font-black uppercase tracking-wider text-[#005cb9]">Đề xuất phê duyệt</span>
+          <span className="mb-2 block text-xs font-black uppercase tracking-wider text-[#005cb9]">Bản dịch Admin xác nhận</span>
           <textarea
             value={translation}
             onChange={(event) => setTranslation(event.target.value)}
-            className="h-28 w-full resize-none rounded-lg border border-transparent bg-transparent p-2 text-sm font-semibold leading-6 text-[#181c22] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
-            placeholder="Nhập bản dịch..."
+            className="h-24 w-full resize-none rounded-lg border border-transparent bg-transparent p-2 text-sm font-semibold leading-6 text-[#181c22] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            placeholder="Nhập bản dịch chuẩn..."
+          />
+        </label>
+        <label className="rounded-xl border border-[#c1c6d6]/50 bg-white p-4">
+          <span className="mb-2 block text-xs font-black uppercase tracking-wider text-[#717785]">Ghi chú kiểm duyệt</span>
+          <textarea
+            value={adminNote}
+            onChange={(event) => setAdminNote(event.target.value)}
+            className="h-20 w-full resize-none rounded-lg border border-[#c1c6d6]/50 bg-[#f9f9ff] p-2 text-sm font-semibold leading-6 text-[#181c22] outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            placeholder="Lý do chỉnh sửa hoặc từ chối..."
           />
         </label>
       </div>
 
-      <div className="mt-4 rounded-xl border border-[#c1c6d6]/40 bg-[#f2f3fd] p-3 text-sm font-semibold italic text-[#414753]">
-        {item.note}
-      </div>
+      {item.aiExplanation && (
+        <div className="mt-4 rounded-xl border border-[#c1c6d6]/40 bg-[#f2f3fd] p-3 text-sm font-semibold italic text-[#414753]">
+          {item.aiExplanation}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col justify-end gap-3 border-t border-[#c1c6d6]/50 pt-4 sm:flex-row">
-        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753] transition hover:bg-[#ecedf7]">
+        <button onClick={() => onUpdate(item, 'Corrected', translation, adminNote)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753] transition hover:bg-[#ecedf7]">
           <Languages className="h-4 w-4" />
-          Chỉnh sửa
+          Lưu chỉnh sửa
         </button>
-        <button onClick={() => onUpdate(item, 'Rejected', translation)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100">
+        <button onClick={() => onUpdate(item, 'Rejected', translation, adminNote)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100">
           <X className="h-4 w-4" />
           Từ chối
         </button>
-        <button onClick={() => onUpdate(item, 'Approved', translation)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
+        <button onClick={() => onUpdate(item, 'Approved', translation, adminNote)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
           <Check className="h-4 w-4" />
           Phê duyệt
         </button>
@@ -833,7 +967,6 @@ function TranslationCard({ item, onUpdate }) {
     </article>
   );
 }
-
 function MiniList({ title, rows }) {
   return (
     <div className={`${CARD} overflow-hidden`}>
