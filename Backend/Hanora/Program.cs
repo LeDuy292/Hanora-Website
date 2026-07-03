@@ -232,6 +232,54 @@ namespace Hanora
 
                         CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
                         CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+
+                        CREATE TABLE IF NOT EXISTS translation_reviews (
+                            id                   BIGSERIAL    PRIMARY KEY,
+                            source_type          VARCHAR(40)  NOT NULL,
+                            source_entity_id     BIGINT,
+                            user_id              BIGINT       REFERENCES users(id) ON DELETE SET NULL,
+                            source_language      VARCHAR(10)  NOT NULL DEFAULT 'ZH',
+                            target_language      VARCHAR(10)  NOT NULL DEFAULT 'VI',
+                            source_text          TEXT         NOT NULL,
+                            current_translation  TEXT,
+                            proposed_translation TEXT,
+                            ai_explanation       TEXT,
+                            example_text         TEXT,
+                            pinyin               VARCHAR(255),
+                            word_type            VARCHAR(50),
+                            warning_type         VARCHAR(50)  NOT NULL DEFAULT 'new_word',
+                            confidence_score     NUMERIC(5,2),
+                            report_count         INTEGER      NOT NULL DEFAULT 0,
+                            priority             INTEGER      NOT NULL DEFAULT 0,
+                            status               VARCHAR(20)  NOT NULL DEFAULT 'Pending',
+                            admin_note           TEXT,
+                            reviewed_by          BIGINT       REFERENCES users(id) ON DELETE SET NULL,
+                            reviewed_at          TIMESTAMPTZ,
+                            created_at           TIMESTAMPTZ  DEFAULT NOW(),
+                            updated_at           TIMESTAMPTZ  DEFAULT NOW()
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_status_priority
+                            ON translation_reviews(status, priority DESC, created_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_source
+                            ON translation_reviews(source_type, source_entity_id);
+                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_warning
+                            ON translation_reviews(warning_type, created_at DESC);
+
+                        CREATE TABLE IF NOT EXISTS translation_review_history (
+                            id              BIGSERIAL   PRIMARY KEY,
+                            review_id       BIGINT      NOT NULL REFERENCES translation_reviews(id) ON DELETE CASCADE,
+                            admin_id        BIGINT      REFERENCES users(id) ON DELETE SET NULL,
+                            action          VARCHAR(40) NOT NULL,
+                            previous_status VARCHAR(20),
+                            new_status      VARCHAR(20),
+                            note            TEXT,
+                            snapshot_json   JSONB,
+                            created_at      TIMESTAMPTZ DEFAULT NOW()
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_translation_review_history_review
+                            ON translation_review_history(review_id, created_at DESC);
                     ");
 
                     var adminEmail = builder.Configuration["AdminAccount:Email"]?.Trim().ToLowerInvariant();

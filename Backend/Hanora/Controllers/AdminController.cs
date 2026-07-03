@@ -251,97 +251,91 @@ namespace Hanora.Controllers
         [HttpGet("translation-approvals")]
         public async Task<ActionResult<AdminTranslationApprovalPageDto>> GetTranslationApprovals(
             [FromQuery] string? kind,
+            [FromQuery] string? status,
+            [FromQuery] string? warningType,
             [FromQuery] string? q,
+            [FromQuery] string? dateFrom,
+            [FromQuery] string? dateTo,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 8)
         {
-            var normalizedKind = string.IsNullOrWhiteSpace(kind) ? "all" : kind.Trim().ToLowerInvariant();
-            if (normalizedKind is not ("all" or "vocabulary" or "sentence"))
-                normalizedKind = "all";
+            await EnsureTranslationReviewQueueSeeded();
+
+            var normalizedKind = NormalizeFilter(kind, "all");
+            var normalizedStatus = NormalizeFilter(status, "Pending");
+            var normalizedWarning = NormalizeFilter(warningType, "all");
 
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 5, 20);
-            var takeForMerge = page * pageSize;
 
-            var vocabularyQuery = _db.Vocabularies
-                .AsNoTracking()
-                .Where(v => v.ViTranslated != true);
+            var query = _db.TranslationReviews.AsNoTracking().AsQueryable();
 
-            var sentenceQuery = _db.ExampleSentences
-                .AsNoTracking()
-                .Where(e => e.ViText == null);
+            if (normalizedKind != "all")
+                query = query.Where(r => r.SourceType == normalizedKind);
+
+            if (normalizedStatus != "all")
+                query = query.Where(r => r.Status == normalizedStatus);
+
+            if (normalizedWarning != "all")
+                query = query.Where(r => r.WarningType == normalizedWarning);
+
+            if (TryParseUtcDate(dateFrom, out var from))
+                query = query.Where(r => r.CreatedAt >= from);
+
+            if (TryParseUtcDate(dateTo, out var to))
+            {
+                var exclusiveTo = to.AddDays(1);
+                query = query.Where(r => r.CreatedAt < exclusiveTo);
+            }
 
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var pattern = $"%{q.Trim()}%";
-                vocabularyQuery = vocabularyQuery.Where(v =>
-                    EF.Functions.ILike(v.Word, pattern) ||
-                    EF.Functions.ILike(v.Pinyin, pattern) ||
-                    (v.HanViet != null && EF.Functions.ILike(v.HanViet, pattern)) ||
-                    EF.Functions.ILike(v.Definitions, pattern));
-
-                sentenceQuery = sentenceQuery.Where(e =>
-                    EF.Functions.ILike(e.ZhText, pattern) ||
-                    (e.EnText != null && EF.Functions.ILike(e.EnText, pattern)) ||
-                    (e.Source != null && EF.Functions.ILike(e.Source, pattern)));
+                query = query.Where(r =>
+                    EF.Functions.ILike(r.SourceText, pattern) ||
+                    (r.CurrentTranslation != null && EF.Functions.ILike(r.CurrentTranslation, pattern)) ||
+                    (r.ProposedTranslation != null && EF.Functions.ILike(r.ProposedTranslation, pattern)) ||
+                    (r.Pinyin != null && EF.Functions.ILike(r.Pinyin, pattern)) ||
+                    (r.AdminNote != null && EF.Functions.ILike(r.AdminNote, pattern)));
             }
 
-            var vocabularyTotal = await vocabularyQuery.CountAsync();
-            var sentenceTotal = await sentenceQuery.CountAsync();
-            var total = normalizedKind switch
-            {
-                "vocabulary" => vocabularyTotal,
-                "sentence" => sentenceTotal,
-                _ => vocabularyTotal + sentenceTotal
-            };
+            var total = await query.CountAsync();
+            var vocabularyTotal = await query.CountAsync(r => r.SourceType == "vocabulary");
+            var sentenceTotal = await query.CountAsync(r => r.SourceType == "sentence");
+            var pendingTotal = await query.CountAsync(r => r.Status == "Pending");
+            var approvedTotal = await query.CountAsync(r => r.Status == "Approved");
+            var rejectedTotal = await query.CountAsync(r => r.Status == "Rejected");
+            var correctedTotal = await query.CountAsync(r => r.Status == "Corrected");
 
-            var vocabularyTake = normalizedKind == "sentence" ? 0 : takeForMerge;
-            var sentenceTake = normalizedKind == "vocabulary" ? 0 : takeForMerge;
-
-            var vocabularyItems = vocabularyTake == 0
-                ? new List<AdminTranslationApprovalDto>()
-                : await vocabularyQuery
-                    .OrderByDescending(v => v.UpdatedAt ?? v.CreatedAt)
-                    .Take(vocabularyTake)
-                    .Select(v => new AdminTranslationApprovalDto(
-                    v.Id,
-                    "vocabulary",
-                    "ZH",
-                    "VI",
-                    v.Word,
-                    v.Definitions,
-                    v.HanViet ?? "",
-                    v.UsageNotes ?? "Can duyet nghia tieng Viet cho tu vung.",
-                    "Hanora AI",
-                    v.CreatedAt,
-                    "Pending"))
-                    .ToListAsync();
-
-            var sentenceItems = sentenceTake == 0
-                ? new List<AdminTranslationApprovalDto>()
-                : await sentenceQuery
-                    .OrderByDescending(e => e.CreatedAt)
-                    .Take(sentenceTake)
-                    .Select(e => new AdminTranslationApprovalDto(
-                    e.Id,
-                    "sentence",
-                    "ZH",
-                    "VI",
-                    e.ZhText,
-                    e.EnText ?? "",
-                    e.ViText ?? "",
-                    "Can bo sung ban dich tieng Viet cho cau vi du.",
-                    e.Source ?? "system",
-                    e.CreatedAt,
-                    "Pending"))
-                    .ToListAsync();
-
-            var items = vocabularyItems
-                .Concat(sentenceItems)
-                .OrderByDescending(i => i.CreatedAt)
+            var items = await query
+                .OrderByDescending(r => r.Priority)
+                .ThenByDescending(r => r.ReportCount)
+                .ThenBy(r => r.ConfidenceScore ?? 1m)
+                .ThenByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .Select(r => new AdminTranslationApprovalDto(
+                    r.Id,
+                    r.SourceType,
+                    r.SourceLanguage,
+                    r.TargetLanguage,
+                    r.SourceText,
+                    r.CurrentTranslation ?? "",
+                    r.ProposedTranslation ?? r.CurrentTranslation ?? "",
+                    r.AdminNote ?? r.AiExplanation ?? "Can admin xac minh ban dich truoc khi dua vao kho hoc lieu.",
+                    r.User != null ? r.User.DisplayName ?? r.User.Username : "system",
+                    r.CreatedAt,
+                    r.Status,
+                    r.WarningType,
+                    r.ConfidenceScore,
+                    r.ReportCount,
+                    r.Priority,
+                    r.ReviewedAt,
+                    r.Pinyin,
+                    r.WordType,
+                    r.AiExplanation,
+                    r.ExampleText))
+                .ToListAsync();
 
             var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
             return Ok(new AdminTranslationApprovalPageDto(
@@ -351,41 +345,65 @@ namespace Hanora.Controllers
                 pageSize,
                 totalPages,
                 vocabularyTotal,
-                sentenceTotal));
+                sentenceTotal,
+                pendingTotal,
+                approvedTotal,
+                rejectedTotal,
+                correctedTotal));
         }
 
         [HttpPatch("translation-approvals/{id:long}")]
         public async Task<IActionResult> UpdateTranslationApproval(long id, [FromBody] AdminUpdateTranslationApprovalRequest request)
         {
-            if (request.Kind == "sentence")
+            var review = await _db.TranslationReviews.FindAsync(id);
+            if (review == null)
+                return NotFound(new { error = "Translation review not found." });
+
+            var nextStatus = NormalizeReviewStatus(request.Status);
+            if (nextStatus == null)
+                return BadRequest(new { error = "Review status khong hop le." });
+
+            var previousStatus = review.Status;
+            var proposed = string.IsNullOrWhiteSpace(request.Translation)
+                ? review.ProposedTranslation ?? review.CurrentTranslation
+                : request.Translation.Trim();
+
+            review.ProposedTranslation = proposed;
+            review.AdminNote = request.AdminNote?.Trim();
+            review.Status = nextStatus;
+            review.ReviewedBy = GetCurrentUserId();
+            review.ReviewedAt = DateTime.UtcNow;
+            review.UpdatedAt = DateTime.UtcNow;
+
+            if (nextStatus is "Approved" or "Corrected")
+                await SyncApprovedTranslation(review, proposed);
+
+            _db.TranslationReviewHistories.Add(new TranslationReviewHistory
             {
-                var sentence = await _db.ExampleSentences.FindAsync(id);
-                if (sentence == null)
-                    return NotFound(new { error = "Sentence not found." });
-
-                if (request.Status == "Approved")
-                    sentence.ViText = string.IsNullOrWhiteSpace(request.Translation) ? sentence.ViText ?? sentence.EnText : request.Translation.Trim();
-
-                await _db.SaveChangesAsync();
-                return Ok(new { success = true });
-            }
-
-            var vocab = await _db.Vocabularies.FindAsync(id);
-            if (vocab == null)
-                return NotFound(new { error = "Vocabulary not found." });
-
-            if (request.Status == "Approved")
-            {
-                if (!string.IsNullOrWhiteSpace(request.Translation))
-                    vocab.Definitions = $"[{{\"lang\":\"vi\",\"meaning\":\"{request.Translation.Trim().Replace("\"", "\\\"")}\"}}]";
-                vocab.ViTranslated = true;
-                vocab.UpdatedAt = DateTime.UtcNow;
-            }
+                ReviewId = review.Id,
+                AdminId = review.ReviewedBy,
+                Action = nextStatus,
+                PreviousStatus = previousStatus,
+                NewStatus = nextStatus,
+                Note = review.AdminNote,
+                SnapshotJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    review.SourceType,
+                    review.SourceEntityId,
+                    review.SourceText,
+                    review.CurrentTranslation,
+                    review.ProposedTranslation,
+                    review.WarningType,
+                    review.ConfidenceScore,
+                    review.ReportCount,
+                    review.Priority
+                }),
+                CreatedAt = DateTime.UtcNow
+            });
 
             await _db.SaveChangesAsync();
             return Ok(new { success = true });
         }
-
         [HttpGet("users")]
         public async Task<ActionResult<List<AdminUserRowDto>>> GetUsers([FromQuery] string? q, [FromQuery] string? role, [FromQuery] string? status)
         {
@@ -665,6 +683,157 @@ namespace Hanora.Controllers
                 .ToList();
         }
 
+        private async Task EnsureTranslationReviewQueueSeeded()
+        {
+            var existingVocabularyIds = await _db.TranslationReviews
+                .AsNoTracking()
+                .Where(r => r.SourceType == "vocabulary" && r.SourceEntityId != null)
+                .Select(r => r.SourceEntityId!.Value)
+                .ToListAsync();
+
+            var vocabularySeeds = await _db.Vocabularies
+                .AsNoTracking()
+                .Where(v => v.ViTranslated != true && !existingVocabularyIds.Contains(v.Id))
+                .OrderByDescending(v => v.UpdatedAt ?? v.CreatedAt)
+                .Take(250)
+                .Select(v => new
+                {
+                    v.Id,
+                    v.Word,
+                    v.Definitions,
+                    v.HanViet,
+                    v.UsageNotes,
+                    v.ExampleSentences,
+                    v.Pinyin,
+                    v.WordType,
+                    v.CreatedAt
+                })
+                .ToListAsync();
+
+            var vocabularyItems = vocabularySeeds.Select(v =>
+            {
+                var hasHanViet = !string.IsNullOrWhiteSpace(v.HanViet);
+                return new TranslationReview
+                {
+                    SourceType = "vocabulary",
+                    SourceEntityId = v.Id,
+                    SourceText = v.Word,
+                    CurrentTranslation = v.Definitions,
+                    ProposedTranslation = v.HanViet,
+                    AiExplanation = v.UsageNotes,
+                    ExampleText = v.ExampleSentences,
+                    Pinyin = v.Pinyin,
+                    WordType = v.WordType?.ToString(),
+                    WarningType = hasHanViet ? "missing_vi_translation" : "new_word",
+                    ConfidenceScore = hasHanViet ? 0.76m : 0.68m,
+                    Priority = hasHanViet ? 2 : 4,
+                    Status = "Pending",
+                    CreatedAt = v.CreatedAt ?? DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+            }).ToList();
+
+            var existingSentenceIds = await _db.TranslationReviews
+                .AsNoTracking()
+                .Where(r => r.SourceType == "sentence" && r.SourceEntityId != null)
+                .Select(r => r.SourceEntityId!.Value)
+                .ToListAsync();
+
+            var sentenceSeeds = await _db.ExampleSentences
+                .AsNoTracking()
+                .Where(e => e.ViText == null && !existingSentenceIds.Contains(e.Id))
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(250)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.ZhText,
+                    e.EnText,
+                    e.ViText,
+                    e.CreatedAt
+                })
+                .ToListAsync();
+
+            var sentenceItems = sentenceSeeds.Select(e => new TranslationReview
+            {
+                SourceType = "sentence",
+                SourceEntityId = e.Id,
+                SourceText = e.ZhText,
+                CurrentTranslation = e.EnText,
+                ProposedTranslation = e.ViText,
+                AiExplanation = "Cau vi du chua co ban dich tieng Viet.",
+                WarningType = "missing_vi_translation",
+                ConfidenceScore = 0.74m,
+                Priority = 2,
+                Status = "Pending",
+                CreatedAt = e.CreatedAt ?? DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }).ToList();
+
+            if (vocabularyItems.Count == 0 && sentenceItems.Count == 0)
+                return;
+
+            _db.TranslationReviews.AddRange(vocabularyItems.Concat(sentenceItems));
+            await _db.SaveChangesAsync();
+        }
+
+        private async Task SyncApprovedTranslation(TranslationReview review, string? translation)
+        {
+            if (string.IsNullOrWhiteSpace(translation) || review.SourceEntityId == null)
+                return;
+
+            if (review.SourceType == "sentence")
+            {
+                var sentence = await _db.ExampleSentences.FindAsync(review.SourceEntityId.Value);
+                if (sentence != null)
+                    sentence.ViText = translation.Trim();
+                return;
+            }
+
+            if (review.SourceType == "vocabulary")
+            {
+                var vocab = await _db.Vocabularies.FindAsync(review.SourceEntityId.Value);
+                if (vocab == null)
+                    return;
+
+                vocab.Definitions = BuildVietnameseDefinitionJson(translation.Trim());
+                if (!string.IsNullOrWhiteSpace(review.Pinyin))
+                    vocab.Pinyin = review.Pinyin.Trim();
+                if (!string.IsNullOrWhiteSpace(review.AiExplanation))
+                    vocab.UsageNotes = review.AiExplanation.Trim();
+                vocab.ViTranslated = true;
+                vocab.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        private static string BuildVietnameseDefinitionJson(string meaning)
+        {
+            return System.Text.Json.JsonSerializer.Serialize(new[] { new { lang = "vi", meaning } });
+        }
+
+        private static string NormalizeFilter(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string? NormalizeReviewStatus(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+                return null;
+
+            var normalized = status.Trim();
+            return normalized is "Pending" or "Approved" or "Rejected" or "Corrected" ? normalized : null;
+        }
+
+        private static bool TryParseUtcDate(string? value, out DateTime date)
+        {
+            date = default;
+            if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+                return false;
+
+            date = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+            return true;
+        }
         private long? GetCurrentUserId()
         {
             var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -725,7 +894,11 @@ namespace Hanora.Controllers
         int PageSize,
         int TotalPages,
         int VocabularyTotal,
-        int SentenceTotal
+        int SentenceTotal,
+        int PendingTotal,
+        int ApprovedTotal,
+        int RejectedTotal,
+        int CorrectedTotal
     );
 
     public record AdminTranslationApprovalDto(
@@ -739,9 +912,17 @@ namespace Hanora.Controllers
         string Note,
         string RequestedBy,
         DateTime? CreatedAt,
-        string Status
+        string Status,
+        string WarningType,
+        decimal? ConfidenceScore,
+        int ReportCount,
+        int Priority,
+        DateTime? ReviewedAt,
+        string? Pinyin,
+        string? WordType,
+        string? AiExplanation,
+        string? ExampleText
     );
-
     public record AdminOverviewStatsDto(
         int TotalUsers,
         int ActiveUsers,
@@ -824,5 +1005,5 @@ namespace Hanora.Controllers
 
     public record AdminUpdateReportRequest(string Status);
 
-    public record AdminUpdateTranslationApprovalRequest(string Kind, string Status, string? Translation);
+    public record AdminUpdateTranslationApprovalRequest(string? Kind, string Status, string? Translation, string? AdminNote);
 }
