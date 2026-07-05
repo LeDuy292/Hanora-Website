@@ -1,11 +1,46 @@
 import { getToken } from '../services/apiClient';
+import { validateUploadFile } from '../utils/uploadRules';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5187/api';
 
-export const uploadDocument = async (file) => {
+async function readApiError(response, fallback) {
+  const errorData = await response.json().catch(() => ({}));
+  return errorData.error || errorData.message || fallback;
+}
+
+function uploadToPresignedUrl(presignedUrl, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('PUT', presignedUrl);
+    request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && typeof onProgress === 'function') {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress?.(100);
+        resolve();
+      } else {
+        reject(new Error('Không thể tải tệp lên hệ thống lưu trữ.'));
+      }
+    };
+    request.onerror = () => reject(new Error('Kết nối tải tệp bị gián đoạn.'));
+    request.send(file);
+  });
+}
+
+export const uploadDocument = async (file, options = {}) => {
+  const validationError = validateUploadFile(file);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
   const token = getToken();
 
-  // 1. Get Presigned URL
   const presignedResponse = await fetch(`${API_BASE_URL}/documents/presigned-url`, {
     method: 'POST',
     headers: {
@@ -14,30 +49,19 @@ export const uploadDocument = async (file) => {
     },
     body: JSON.stringify({
       fileName: file.name,
-      contentType: file.type || 'application/octet-stream'
+      contentType: file.type || 'application/octet-stream',
+      fileSizeBytes: file.size
     })
   });
 
   if (!presignedResponse.ok) {
-    throw new Error('Failed to get presigned URL');
+    throw new Error(await readApiError(presignedResponse, 'Không thể chuẩn bị tải tài liệu.'));
   }
 
   const { presignedUrl, fileUrl } = await presignedResponse.json();
 
-  // 2. Upload file directly to S3
-  const uploadResponse = await fetch(presignedUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': file.type || 'application/octet-stream'
-    },
-    body: file
-  });
+  await uploadToPresignedUrl(presignedUrl, file, options.onProgress);
 
-  if (!uploadResponse.ok) {
-    throw new Error('Failed to upload file to S3');
-  }
-
-  // 3. Register document in the backend
   const registerResponse = await fetch(`${API_BASE_URL}/documents/register`, {
     method: 'POST',
     headers: {
@@ -45,7 +69,7 @@ export const uploadDocument = async (file) => {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify({
-      fileUrl: fileUrl,
+      fileUrl,
       originalFilename: file.name,
       contentType: file.type || 'application/octet-stream',
       fileSizeBytes: file.size
@@ -53,12 +77,11 @@ export const uploadDocument = async (file) => {
   });
 
   if (!registerResponse.ok) {
-    throw new Error('Failed to register document');
+    throw new Error(await readApiError(registerResponse, 'Không thể đăng ký tài liệu.'));
   }
 
   return await registerResponse.json();
 };
-
 export const getDocument = async (id) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
@@ -377,4 +400,3 @@ export const getCommunityMessages = async () => {
   }
   return await response.json();
 };
-

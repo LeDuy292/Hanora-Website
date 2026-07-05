@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { formatFileSize, UPLOAD_RULE_TEXT, validateUploadFile } from '../../utils/uploadRules';
 
 export function UploadZone({ onFileSelect }) {
   const [isDragActive, setIsDragActive] = useState(false);
@@ -18,19 +19,9 @@ export function UploadZone({ onFileSelect }) {
   };
 
   const validateFile = (file) => {
-    if (!file) return false;
-    
-    // Check extension (support .txt and .pdf)
-    const fileExtension = file.name.split('.').pop().toLowerCase();
-    if (fileExtension !== 'txt' && fileExtension !== 'pdf') {
-      setError('Chỉ hỗ trợ tệp tài liệu dạng văn bản (.txt) hoặc tài liệu PDF (.pdf).');
-      setSelectedFile(null);
-      return false;
-    }
-    
-    // Check size limit (max 5MB to keep client-side rendering fast)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Tệp tin quá lớn. Dung lượng tối đa được phép là 5MB.');
+    const validationError = validateUploadFile(file);
+    if (validationError) {
+      setError(validationError);
       setSelectedFile(null);
       return false;
     }
@@ -84,7 +75,7 @@ export function UploadZone({ onFileSelect }) {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".txt,.pdf"
+          accept=".pdf,.docx,.jpg,.jpeg,.png"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -97,7 +88,7 @@ export function UploadZone({ onFileSelect }) {
             <div>
               <p className="text-sm font-bold text-slate-800">{selectedFile.name}</p>
               <p className="text-xs text-slate-400 font-bold mt-0.5">
-                {(selectedFile.size / 1024).toFixed(1)} KB
+                {formatFileSize(selectedFile.size)}
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 mt-1">
@@ -116,7 +107,7 @@ export function UploadZone({ onFileSelect }) {
               </p>
             </div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 block">
-              Hỗ trợ định dạng .txt, .pdf lên đến 5MB
+              {UPLOAD_RULE_TEXT}
             </span>
           </div>
         )}

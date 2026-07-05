@@ -173,6 +173,7 @@ namespace Hanora
                         ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'User';
                         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
                         ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
+                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS ocr_json_url TEXT;
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
                         ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
