@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { CommunityChatbox } from '../chat/CommunityChatbox';
+import { MobileBottomNav } from './MobileBottomNav';
 
 export function MainLayout({ children }) {
   const [showBanner, setShowBanner] = useState(false);
@@ -117,7 +118,7 @@ export function MainLayout({ children }) {
       <Header offsetTop={displayBanner} />
 
       {/* Main Content Pane */}
-      <main className={`flex-grow ${displayBanner ? 'pt-36' : 'pt-28'} pb-16 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-[95%] px-6 relative z-10 transition-all duration-300`}>
+      <main className={`flex-grow ${displayBanner ? 'pt-32 md:pt-36' : 'pt-24 md:pt-28'} pb-28 lg:pb-16 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-full sm:w-[96%] px-3 sm:px-5 lg:px-6 relative z-10 transition-all duration-300`}>
         <div key={location.pathname} className="page-transition">
           {children}
         </div>
@@ -125,6 +126,8 @@ export function MainLayout({ children }) {
 
       {/* Smart AI Learning Assistant Chatbox */}
       {!hideChatbox && <CommunityChatbox />}
+
+      {user && <MobileBottomNav />}
 
       <Footer />
     </div>

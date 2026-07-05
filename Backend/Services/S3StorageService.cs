@@ -59,7 +59,7 @@ public class S3StorageService : IS3StorageService
         return response.ResponseStream;
     }
 
-    public async Task<(string PresignedUrl, string FileUrl)> GeneratePreSignedUrlAsync(string fileName, string contentType, string folderPath = "Hanora")
+    public (string PresignedUrl, string FileUrl) GeneratePreSignedUrl(string fileName, string contentType, string folderPath = "Hanora")
     {
         var fileExtension = Path.GetExtension(fileName);
         var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
