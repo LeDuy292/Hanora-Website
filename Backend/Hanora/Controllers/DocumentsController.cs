@@ -14,9 +14,30 @@ namespace Hanora.Controllers;
 [Authorize]
 public class DocumentsController : ControllerBase
 {
+    private const long DefaultMaxUploadSizeBytes = 5 * 1024 * 1024;
+
+    private static readonly HashSet<string> DefaultAllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf",
+        ".docx",
+        ".jpg",
+        ".jpeg",
+        ".png"
+    };
+
+    private static readonly Dictionary<string, string[]> DefaultAllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".pdf"] = ["application/pdf"],
+        [".docx"] = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        [".jpg"] = ["image/jpeg"],
+        [".jpeg"] = ["image/jpeg"],
+        [".png"] = ["image/png"]
+    };
+
     private readonly IDocumentProcessingService _documentProcessingService;
     private readonly IDocumentRepository _documentRepository;
     private readonly IS3StorageService _s3StorageService;
+    private readonly IConfiguration _configuration;
 
     private readonly DataAccessObjects.AppDbContext _db;
     private readonly IStatsService _statsService;
@@ -25,12 +46,14 @@ public class DocumentsController : ControllerBase
         IDocumentProcessingService documentProcessingService,
         IDocumentRepository documentRepository,
         IS3StorageService s3StorageService,
+        IConfiguration configuration,
         DataAccessObjects.AppDbContext db,
         IStatsService statsService)
     {
         _documentProcessingService = documentProcessingService;
         _documentRepository = documentRepository;
         _s3StorageService = s3StorageService;
+        _configuration = configuration;
         _db = db;
         _statsService = statsService;
     }
@@ -39,6 +62,7 @@ public class DocumentsController : ControllerBase
     {
         public string FileName { get; set; } = string.Empty;
         public string ContentType { get; set; } = string.Empty;
+        public long FileSizeBytes { get; set; }
     }
 
     public class RegisterDocumentDto
@@ -50,14 +74,20 @@ public class DocumentsController : ControllerBase
     }
 
     [HttpPost("presigned-url")]
-    public async Task<IActionResult> GetPresignedUrl([FromBody] PresignedUrlRequestDto request)
+    public IActionResult GetPresignedUrl([FromBody] PresignedUrlRequestDto request)
     {
         if (string.IsNullOrWhiteSpace(request.FileName) || string.IsNullOrWhiteSpace(request.ContentType))
         {
-            return BadRequest("FileName and ContentType are required.");
+            return BadRequest(new { error = "FileName and ContentType are required." });
         }
 
-        var result = await _s3StorageService.GeneratePreSignedUrlAsync(request.FileName, request.ContentType);
+        var validationError = ValidateUploadMetadata(request.FileName, request.ContentType, request.FileSizeBytes);
+        if (validationError != null)
+        {
+            return BadRequest(new { error = validationError });
+        }
+
+        var result = _s3StorageService.GeneratePreSignedUrl(request.FileName, request.ContentType);
 
         return Ok(new
         {
@@ -71,7 +101,13 @@ public class DocumentsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.FileUrl) || string.IsNullOrWhiteSpace(request.OriginalFilename))
         {
-            return BadRequest("FileUrl and OriginalFilename are required.");
+            return BadRequest(new { error = "FileUrl and OriginalFilename are required." });
+        }
+
+        var validationError = ValidateUploadMetadata(request.OriginalFilename, request.ContentType, request.FileSizeBytes);
+        if (validationError != null)
+        {
+            return BadRequest(new { error = validationError });
         }
 
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -102,13 +138,18 @@ public class DocumentsController : ControllerBase
     {
         if (file == null || file.Length == 0)
         {
-            return BadRequest("No file uploaded.");
+            return BadRequest(new { error = "No file uploaded." });
         }
 
-        const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
-        if (file.Length > MaxFileSize)
+        var validationError = ValidateUploadMetadata(file.FileName, file.ContentType, file.Length);
+        if (validationError != null)
         {
-            return BadRequest("File size exceeds the 5MB limit.");
+            return BadRequest(new { error = validationError });
+        }
+
+        if (!await HasValidFileSignatureAsync(file))
+        {
+            return BadRequest(new { error = BuildUploadErrorMessage("Nội dung tệp không khớp với định dạng được hỗ trợ.") });
         }
 
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -127,6 +168,95 @@ public class DocumentsController : ControllerBase
             Message = "Document is being processed in the background."
         });
     }
+    private string? ValidateUploadMetadata(string fileName, string contentType, long fileSizeBytes)
+    {
+        if (fileSizeBytes <= 0)
+        {
+            return BuildUploadErrorMessage("Tệp tải lên không hợp lệ hoặc đang rỗng.");
+        }
+
+        var maxSize = GetMaxUploadSizeBytes();
+        if (fileSizeBytes > maxSize)
+        {
+            return BuildUploadErrorMessage($"Tệp bạn chọn có dung lượng {FormatFileSize(fileSizeBytes)}.");
+        }
+
+        var extension = Path.GetExtension(fileName);
+        var allowedExtensions = GetAllowedExtensions();
+        if (string.IsNullOrWhiteSpace(extension) || !allowedExtensions.Contains(extension))
+        {
+            return BuildUploadErrorMessage("Định dạng tệp không được hỗ trợ.");
+        }
+
+        if (!IsAllowedContentType(extension, contentType))
+        {
+            return BuildUploadErrorMessage("MIME Type của tệp không hợp lệ.");
+        }
+
+        return null;
+    }
+
+    private async Task<bool> HasValidFileSignatureAsync(IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var header = new byte[Math.Min(file.Length, 8)];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAsync(header);
+
+        return extension switch
+        {
+            ".pdf" => read >= 4 && header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46,
+            ".docx" => read >= 4 && header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04,
+            ".jpg" or ".jpeg" => read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+            ".png" => read >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47
+                && header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A,
+            _ => false
+        };
+    }
+
+    private long GetMaxUploadSizeBytes()
+    {
+        return _configuration.GetValue<long?>("DocumentUpload:MaxFileSizeBytes") ?? DefaultMaxUploadSizeBytes;
+    }
+
+    private HashSet<string> GetAllowedExtensions()
+    {
+        var configured = _configuration.GetSection("DocumentUpload:AllowedExtensions").Get<string[]>();
+        return configured is { Length: > 0 }
+            ? new HashSet<string>(configured.Select(e => e.StartsWith('.') ? e : $".{e}"), StringComparer.OrdinalIgnoreCase)
+            : DefaultAllowedExtensions;
+    }
+
+    private bool IsAllowedContentType(string extension, string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return false;
+        }
+
+        var normalizedExtension = extension.ToLowerInvariant();
+        var configured = _configuration
+            .GetSection($"DocumentUpload:AllowedContentTypes:{normalizedExtension}")
+            .Get<string[]>();
+        var allowed = configured is { Length: > 0 }
+            ? configured
+            : DefaultAllowedContentTypes.GetValueOrDefault(normalizedExtension, []);
+
+        return allowed.Any(type => string.Equals(type, contentType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string BuildUploadErrorMessage(string reason)
+    {
+        var extensions = string.Join(", ", GetAllowedExtensions().Select(e => e.TrimStart('.').ToUpperInvariant()).OrderBy(e => e));
+        return $"{reason} Hanora chỉ hỗ trợ tải lên các tệp {extensions} với dung lượng tối đa {FormatFileSize(GetMaxUploadSizeBytes())}.";
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        return bytes >= 1024 * 1024
+            ? $"{bytes / 1024d / 1024d:0.#} MB"
+            : $"{bytes / 1024d:0.#} KB";
+    }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetDocument(long id)
@@ -137,19 +267,23 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
+        var isFailed = document.Status == DocumentStatus.Failed;
+
         return Ok(new
         {
             document.Id,
             document.Title,
             document.FileUrl,
             document.Status,
-            document.ExtractedText
+            ExtractedText = isFailed ? null : document.ExtractedText,
+            ProcessingError = isFailed ? document.ExtractedText : null
         });
     }
 
     [HttpGet("my-documents")]
     public async Task<IActionResult> GetMyDocuments()
     {
+
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!long.TryParse(userIdString, out long userId))
         {
@@ -346,6 +480,7 @@ public class DocumentsController : ControllerBase
     [HttpGet("all-highlights")]
     public async Task<IActionResult> GetAllHighlights()
     {
+
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!long.TryParse(userIdString, out long userId))
         {
@@ -464,7 +599,7 @@ public class DocumentsController : ControllerBase
                     try { segments = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(documentEntity.ExtractedText) ?? new System.Collections.Generic.List<string>(); } catch { }
                 }
 
-                AnnotationsDto docAnnotations = null;
+                AnnotationsDto? docAnnotations = null;
                 if (!string.IsNullOrEmpty(documentEntity.AnnotationsJson))
                 {
                     try {
@@ -516,8 +651,8 @@ public class DocumentsController : ControllerBase
                         if (string.IsNullOrEmpty(text) && !text.Contains("\n")) continue;
 
                         Xceed.Document.NET.Highlight highlightColor = Xceed.Document.NET.Highlight.none;
-                        string textNote = null;
-                        string stickyNote = null;
+                        string? textNote = null;
+                        string? stickyNote = null;
 
                         if (docAnnotations != null)
                         {
@@ -739,8 +874,9 @@ public class DocumentsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteDocument(long id)
         {
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!long.TryParse(userIdString, out long userId))
+
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId))
             {
                 userId = 1; 
             }

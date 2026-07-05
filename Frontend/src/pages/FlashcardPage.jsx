@@ -662,16 +662,16 @@ export function FlashcardPage() {
   // RENDER 1: Deck Manager Dashboard
   if (activeDeck === null) {
     return (
-      <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
+      <div className="px-3 py-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5 sm:space-y-8 font-sans">
         {/* Dashboard Header */}
-        <div className="flex justify-between items-center bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Flashcard của tôi</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">Flashcard của tôi</h1>
             <p className="text-slate-500 text-sm mt-1">Quản lý và ôn tập từ vựng cá nhân hóa theo phương pháp SRS</p>
           </div>
           <button 
             onClick={() => navigate('/vocabulary')}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-6 rounded-2xl transition shadow-md hover:shadow-lg text-sm select-none"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-5 sm:px-6 rounded-2xl transition shadow-md hover:shadow-lg text-sm select-none"
           >
             <Plus className="w-4 h-4" />
             <span>Tạo bộ mới từ Sổ tay</span>
@@ -679,35 +679,35 @@ export function FlashcardPage() {
         </div>
 
         {/* Dashboard Stats Panel */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tổng bộ thẻ</span>
             <span className="text-3xl font-black text-slate-800 mt-1">{dashboardStats.totalDecks}</span>
           </div>
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tổng số từ</span>
             <span className="text-3xl font-black text-slate-800 mt-1">{dashboardStats.totalWords}</span>
           </div>
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Đã thuộc</span>
             <span className="text-3xl font-black text-emerald-600 mt-1">{dashboardStats.masteredWords}</span>
           </div>
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Đang học</span>
             <span className="text-3xl font-black text-blue-600 mt-1">{dashboardStats.learningWords}</span>
           </div>
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cần ôn tập</span>
             <span className="text-3xl font-black text-amber-600 mt-1">{dashboardStats.dueForReview}</span>
           </div>
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-center items-center text-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tích lũy XP</span>
             <span className="text-3xl font-black text-purple-600 mt-1">+{dashboardStats.totalXp} XP</span>
           </div>
         </div>
 
         {/* Search, Filter, Sort Toolbar */}
-        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
           <div className="relative w-full md:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input 
@@ -719,13 +719,13 @@ export function FlashcardPage() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full md:w-auto">
             <div className="flex items-center gap-2">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <select 
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none"
+                className="min-h-[44px] w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none"
               >
                 <option value="">Tất cả trạng thái</option>
                 <option value="learning">Đang học</option>
@@ -739,7 +739,7 @@ export function FlashcardPage() {
             <select 
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none ml-auto md:ml-0"
+              className="min-h-[44px] w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none ml-0"
             >
               <option value="created_desc">Ngày tạo (Mới nhất)</option>
               <option value="created_asc">Ngày tạo (Cũ nhất)</option>
@@ -767,11 +767,11 @@ export function FlashcardPage() {
               <p className="text-slate-400 text-xs mt-1">Hãy thử tìm kiếm từ khóa khác hoặc tạo bộ mới từ sổ tay từ vựng.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
               {customDecks.map((deck) => (
                 <div 
                   key={deck.id} 
-                  className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between gap-5 relative overflow-hidden group"
+                  className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between gap-5 relative overflow-hidden group"
                 >
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">

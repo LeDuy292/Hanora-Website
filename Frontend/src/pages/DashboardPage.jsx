@@ -181,9 +181,9 @@ export function DashboardPage() {
 
   if (loading && !data) {
     return (
-      <div className="space-y-8 page-transition">
+      <div className="space-y-5 sm:space-y-8 page-transition">
         <div className="h-32 bg-white border border-slate-100 rounded-3xl animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-white border border-slate-100 rounded-2xl animate-pulse" />
           ))}
@@ -194,7 +194,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 page-transition">
+    <div className="space-y-5 sm:space-y-8 page-transition">
       {error && (
         <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold rounded-2xl">
           {error}
@@ -203,14 +203,14 @@ export function DashboardPage() {
 
       {/* Top Welcome / XP Progress Milestone Header Card */}
       {user && (
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-8 bg-white border border-slate-100 rounded-3xl gap-6 relative overflow-hidden shadow-sm">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-4 sm:p-6 lg:p-8 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl gap-5 sm:gap-6 relative overflow-hidden shadow-sm">
           <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="space-y-3 flex-grow max-w-2xl">
             <span className="text-blue-600 text-xs font-extrabold uppercase tracking-widest block">
               Bảng điều khiển học tập
             </span>
-            <h2 className="text-2xl font-extrabold font-display text-slate-800">
+            <h2 className="text-xl sm:text-2xl font-extrabold font-display text-slate-800">
               Chào mừng trở lại, {user.name}!
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -246,7 +246,7 @@ export function DashboardPage() {
       )}
 
       {/* Grid: Stat Summary Blocks */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 
         {/* Streak card */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
@@ -295,10 +295,10 @@ export function DashboardPage() {
       </div>
 
       {/* Grid: SVG Goal Ring (left) vs Streak Calendar (right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
 
         {/* SVG Goal Ring */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
+        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
           <div className="w-full flex justify-between items-start border-b border-slate-50 pb-3 text-left">
             <div className="flex-grow">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -510,7 +510,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
         {/* SRS quick study widget */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 space-y-4.5 shadow-sm">
+        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4.5 shadow-sm">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-3">
             <Layers className="w-4 h-4 text-amber-500" /> Ôn tập thông minh SRS
           </h3>
@@ -542,7 +542,7 @@ export function DashboardPage() {
         </div>
 
         {/* Vocabulary notebook distribution (per document) */}
-        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-5 shadow-sm">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Bookmark className="w-4 h-4" style={{ color: '#2563eb' }} />
@@ -585,10 +585,10 @@ export function DashboardPage() {
       </div>
 
       {/* Grid: Vocabulary Growth SVG Line Chart vs Recent Documents */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
 
         {/* Vocabulary Growth SVG Line Chart */}
-        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blue-600" />
@@ -740,7 +740,7 @@ export function DashboardPage() {
         </div>
 
         {/* Recent Documents Grid List */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 space-y-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-5 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-blue-500" />
@@ -817,7 +817,7 @@ export function DashboardPage() {
       </div>
 
       {/* Expanded Trophy Room / Achievements block */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-6 shadow-sm">
+      <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-6 shadow-sm">
         <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -835,7 +835,7 @@ export function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {achievements.map((achievement) => {
             const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
             const progressText = achievement.target > 0

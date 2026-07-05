@@ -48,10 +48,18 @@ public class OcrService : IOcrService
                     return (text, pages, null);
                 }
 
-                _logger.LogInformation("PDF seems to be scanned or contains unmapped CJK fonts. Rejecting.");
-                return (null, null, "File PDF có định dạng chữ bất thường hoặc quá mờ.");
-            }
+                _logger.LogInformation("PDF text extraction yielded little CJK text. Falling back to Azure OCR.");
+                var (ocrText, ocrPages, ocrError) = await ExtractWithAzureOcrLayoutAsync(memoryStream.ToArray());
+                var ocrChineseCount = System.Text.RegularExpressions.Regex.Matches(ocrText ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
 
+                if (string.IsNullOrWhiteSpace(ocrError) && !string.IsNullOrWhiteSpace(ocrText) && ocrChineseCount > 10)
+                {
+                    return (ocrText, ocrPages, null);
+                }
+
+                _logger.LogInformation("PDF OCR fallback failed or yielded little Chinese text. Error: {Error}", ocrError);
+                return (null, null, "File PDF có định dạng chữ bất thường, là bản scan quá mờ hoặc không nhận diện được văn bản tiếng Trung.");
+            }
             if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
                 var (text, pages, ocrError) = await ExtractWithAzureOcrLayoutAsync(memoryStream.ToArray());

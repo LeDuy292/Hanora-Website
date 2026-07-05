@@ -53,7 +53,7 @@ export function CommunityChatbox() {
       {/* Floating Chat Bubble Toggle Button */}
       <button
         onClick={toggleChatbox}
-        className={`fixed bottom-6 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shadow-lg hover:shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-300 group`}
+        className={`fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-50 p-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shadow-lg hover:shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-300 group lg:bottom-6 lg:right-6`}
         title="Nhắn tin cộng đồng"
       >
         {isOpen ? (
@@ -71,7 +71,7 @@ export function CommunityChatbox() {
 
       {/* Main Chat Panel Container */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-[360px] sm:w-[410px] h-[540px] sm:h-[610px] bg-white/95 backdrop-blur-md border border-slate-200/60 shadow-2xl rounded-2xl z-50 flex flex-col overflow-hidden animate-fade-in animate-slide-up">
+        <div className="fixed inset-x-3 bottom-[calc(10rem+env(safe-area-inset-bottom))] h-[min(68vh,560px)] bg-white/95 backdrop-blur-md border border-slate-200/60 shadow-2xl rounded-2xl z-50 flex flex-col overflow-hidden animate-fade-in animate-slide-up sm:inset-x-auto sm:right-6 sm:w-[410px] sm:h-[610px] lg:bottom-24">
           
           {/* Header Bar */}
           <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between shrink-0 shadow-sm">
