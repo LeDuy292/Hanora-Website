@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookMarked, 
@@ -27,96 +27,96 @@ import { toast } from '../store/notificationStore';
 
 // Static database of details for HSK words (consistent with Flashcard.jsx)
 const WORD_DETAILS_DB = {
-  "学习": {
-    translation: "Học tập; nghiên cứu",
-    exampleChinese: "我喜欢学习汉语。",
-    examplePinyin: "Wǒ xǐhuan xuéxí Hànyǔ.",
-    exampleVietnamese: "Tôi thích học tiếng Trung.",
-    context: "Trong giao tiếp, “学习” thường đi với các môn học hoặc kỹ năng cụ thể."
+  "å­¦ä¹ ": {
+    translation: "Há»c táº­p; nghiÃªn cá»©u",
+    exampleChinese: "æˆ‘å–œæ¬¢å­¦ä¹ æ±‰è¯­ã€‚",
+    examplePinyin: "WÇ’ xÇhuan xuÃ©xÃ­ HÃ nyÇ”.",
+    exampleVietnamese: "TÃ´i thÃ­ch há»c tiáº¿ng Trung.",
+    context: "Trong giao tiáº¿p, â€œå­¦ä¹ â€ thÆ°á»ng Ä‘i vá»›i cÃ¡c mÃ´n há»c hoáº·c ká»¹ nÄƒng cá»¥ thá»ƒ."
   },
-  "喜欢": {
-    translation: "Thích; ưa thích",
-    exampleChinese: "我不喜欢喝茶。",
-    examplePinyin: "Wǒ bù xǐhuan hē chá.",
-    exampleVietnamese: "Tôi không thích uống trà.",
-    context: "Biểu đạt sở thích cá nhân đối với người, đồ vật hoặc hành động."
+  "å–œæ¬¢": {
+    translation: "ThÃ­ch; Æ°a thÃ­ch",
+    exampleChinese: "æˆ‘ä¸å–œæ¬¢å–èŒ¶ã€‚",
+    examplePinyin: "WÇ’ bÃ¹ xÇhuan hÄ“ chÃ¡.",
+    exampleVietnamese: "TÃ´i khÃ´ng thÃ­ch uá»‘ng trÃ .",
+    context: "Biá»ƒu Ä‘áº¡t sá»Ÿ thÃ­ch cÃ¡ nhÃ¢n Ä‘á»‘i vá»›i ngÆ°á»i, Ä‘á»“ váº­t hoáº·c hÃ nh Ä‘á»™ng."
   },
-  "咖啡": {
-    translation: "Cà phê",
-    exampleChinese: "我喝了一杯热咖啡。",
-    examplePinyin: "Wǒ hēle yī bēi rè kāfēi.",
-    exampleVietnamese: "Tôi đã uống một cốc cà phê nóng.",
-    context: "Từ mượn phiên âm từ tiếng Anh 'coffee' trong tiếng Trung."
+  "å’–å•¡": {
+    translation: "CÃ  phÃª",
+    exampleChinese: "æˆ‘å–äº†ä¸€æ¯çƒ­å’–å•¡ã€‚",
+    examplePinyin: "WÇ’ hÄ“le yÄ« bÄ“i rÃ¨ kÄfÄ“i.",
+    exampleVietnamese: "TÃ´i Ä‘Ã£ uá»‘ng má»™t cá»‘c cÃ  phÃª nÃ³ng.",
+    context: "Tá»« mÆ°á»£n phiÃªn Ã¢m tá»« tiáº¿ng Anh 'coffee' trong tiáº¿ng Trung."
   },
-  "将军": {
-    translation: "Tướng quân",
-    exampleChinese: "这位将军在战场上表现得非常勇敢。",
-    examplePinyin: "Zhè wèi jiāngjūn zài zhànchǎng shàng biǎoxiàn de fēicháng yǒnggǎn.",
-    exampleVietnamese: "Vị tướng quân này đã thể hiện rất dũng cảm trên chiến trường.",
-    context: "Chỉ người chỉ huy quân đội, có vai trò quan trọng trong việc lãnh đạo chiến lược."
+  "å°†å†›": {
+    translation: "TÆ°á»›ng quÃ¢n",
+    exampleChinese: "è¿™ä½å°†å†›åœ¨æˆ˜åœºä¸Šè¡¨çŽ°å¾—éžå¸¸å‹‡æ•¢ã€‚",
+    examplePinyin: "ZhÃ¨ wÃ¨i jiÄngjÅ«n zÃ i zhÃ nchÇŽng shÃ ng biÇŽoxiÃ n de fÄ“ichÃ¡ng yÇ’nggÇŽn.",
+    exampleVietnamese: "Vá»‹ tÆ°á»›ng quÃ¢n nÃ y Ä‘Ã£ thá»ƒ hiá»‡n ráº¥t dÅ©ng cáº£m trÃªn chiáº¿n trÆ°á»ng.",
+    context: "Chá»‰ ngÆ°á»i chá»‰ huy quÃ¢n Ä‘á»™i, cÃ³ vai trÃ² quan trá»ng trong viá»‡c lÃ£nh Ä‘áº¡o chiáº¿n lÆ°á»£c."
   },
-  "重要": {
-    translation: "Quan trọng",
-    exampleChinese: "这件事对他非常重要。",
-    examplePinyin: "Zhè jiàn shì duì wǒ fēicháng zhòngyào.",
-    exampleVietnamese: "Việc này đối với tôi vô cùng quan trọng.",
-    context: "Tính từ dùng để nhấn mạnh tính chất chủ chốt, thiết yếu của vấn đề."
+  "é‡è¦": {
+    translation: "Quan trá»ng",
+    exampleChinese: "è¿™ä»¶äº‹å¯¹ä»–éžå¸¸é‡è¦ã€‚",
+    examplePinyin: "ZhÃ¨ jiÃ n shÃ¬ duÃ¬ wÇ’ fÄ“ichÃ¡ng zhÃ²ngyÃ o.",
+    exampleVietnamese: "Viá»‡c nÃ y Ä‘á»‘i vá»›i tÃ´i vÃ´ cÃ¹ng quan trá»ng.",
+    context: "TÃ­nh tá»« dÃ¹ng Ä‘á»ƒ nháº¥n máº¡nh tÃ­nh cháº¥t chá»§ chá»‘t, thiáº¿t yáº¿u cá»§a váº¥n Ä‘á»."
   },
-  "士兵": {
-    translation: "Binh lính",
-    exampleChinese: "士兵们正在接受严格的训练。",
-    examplePinyin: "Shìbīngmen zhèngzài jiēshòu yángé de xùnliàn.",
-    exampleVietnamese: "Các binh lính đang nhận được sự huấn luyện nghiêm khắc.",
-    context: "Chỉ quân lính hoặc chiến sĩ trong đơn vị quân đội."
+  "å£«å…µ": {
+    translation: "Binh lÃ­nh",
+    exampleChinese: "å£«å…µä»¬æ­£åœ¨æŽ¥å—ä¸¥æ ¼çš„è®­ç»ƒã€‚",
+    examplePinyin: "ShÃ¬bÄ«ngmen zhÃ¨ngzÃ i jiÄ“shÃ²u yÃ¡ngÃ© de xÃ¹nliÃ n.",
+    exampleVietnamese: "CÃ¡c binh lÃ­nh Ä‘ang nháº­n Ä‘Æ°á»£c sá»± huáº¥n luyá»‡n nghiÃªm kháº¯c.",
+    context: "Chá»‰ quÃ¢n lÃ­nh hoáº·c chiáº¿n sÄ© trong Ä‘Æ¡n vá»‹ quÃ¢n Ä‘á»™i."
   },
-  "进攻": {
-    translation: "Tiến công",
-    exampleChinese: "军队向敌人的阵地发起进攻。",
-    examplePinyin: "Jūnduì xiàng dírén de zhèndì fāqǐ jìngōng.",
-    exampleVietnamese: "Quân đội phát động tiến công về phía trận địa của quân địch.",
-    context: "Hành động tấn công chủ động trong quân sự hoặc các cuộc thi đấu."
+  "è¿›æ”»": {
+    translation: "Tiáº¿n cÃ´ng",
+    exampleChinese: "å†›é˜Ÿå‘æ•Œäººçš„é˜µåœ°å‘èµ·è¿›æ”»ã€‚",
+    examplePinyin: "JÅ«nduÃ¬ xiÃ ng dÃ­rÃ©n de zhÃ¨ndÃ¬ fÄqÇ jÃ¬ngÅng.",
+    exampleVietnamese: "QuÃ¢n Ä‘á»™i phÃ¡t Ä‘á»™ng tiáº¿n cÃ´ng vá» phÃ­a tráº­n Ä‘á»‹a cá»§a quÃ¢n Ä‘á»‹ch.",
+    context: "HÃ nh Ä‘á»™ng táº¥n cÃ´ng chá»§ Ä‘á»™ng trong quÃ¢n sá»± hoáº·c cÃ¡c cuá»™c thi Ä‘áº¥u."
   },
-  "撤退": {
-    translation: "Rút lui",
-    exampleChinese: "为了保存实力，部队决定撤退。",
-    examplePinyin: "Wèile bǎocún shílì, bùduì juédìng chètui.",
-    exampleVietnamese: "Để bảo toàn thực lực, bộ đội quyết định rút lui.",
-    context: "Rút quân hoặc lùi lại tránh giao tranh trực tiếp để chuẩn bị kế hoạch khác."
+  "æ’¤é€€": {
+    translation: "RÃºt lui",
+    exampleChinese: "ä¸ºäº†ä¿å­˜å®žåŠ›ï¼Œéƒ¨é˜Ÿå†³å®šæ’¤é€€ã€‚",
+    examplePinyin: "WÃ¨ile bÇŽocÃºn shÃ­lÃ¬, bÃ¹duÃ¬ juÃ©dÃ¬ng chÃ¨tui.",
+    exampleVietnamese: "Äá»ƒ báº£o toÃ n thá»±c lá»±c, bá»™ Ä‘á»™i quyáº¿t Ä‘á»‹nh rÃºt lui.",
+    context: "RÃºt quÃ¢n hoáº·c lÃ¹i láº¡i trÃ¡nh giao tranh trá»±c tiáº¿p Ä‘á»ƒ chuáº©n bá»‹ káº¿ hoáº¡ch khÃ¡c."
   },
-  "战斗": {
-    translation: "Chiến đấu",
-    exampleChinese: "他们在一场激烈的战斗中获得了胜利。",
-    examplePinyin: "Tāmen zài yī chǎng jīliè de zhàndòu zhōng huòdéle shènglì.",
-    exampleVietnamese: "Họ đã giành chiến thắng trong một trận chiến đấu kịch liệt.",
-    context: "Hoạt động giao tranh quân sự hoặc nỗ lực vượt qua khó khăn."
+  "æˆ˜æ–—": {
+    translation: "Chiáº¿n Ä‘áº¥u",
+    exampleChinese: "ä»–ä»¬åœ¨ä¸€åœºæ¿€çƒˆçš„æˆ˜æ–—ä¸­èŽ·å¾—äº†èƒœåˆ©ã€‚",
+    examplePinyin: "TÄmen zÃ i yÄ« chÇŽng jÄ«liÃ¨ de zhÃ ndÃ²u zhÅng huÃ²dÃ©le shÃ¨nglÃ¬.",
+    exampleVietnamese: "Há» Ä‘Ã£ giÃ nh chiáº¿n tháº¯ng trong má»™t tráº­n chiáº¿n Ä‘áº¥u ká»‹ch liá»‡t.",
+    context: "Hoáº¡t Ä‘á»™ng giao tranh quÃ¢n sá»± hoáº·c ná»— lá»±c vÆ°á»£t qua khÃ³ khÄƒn."
   },
-  "策略": {
-    translation: "Chiến lược / Sách lược",
-    exampleChinese: "我们需要制定新的商业策略。",
-    examplePinyin: "Wǒmen xūyào zhìdìng xīn de shāngyè cèlüè.",
-    exampleVietnamese: "Chúng ta cần hoạch định chiến lược kinh doanh mới.",
-    context: "Phương pháp hoặc kế hoạch dài hạn hướng tới đạt mục tiêu cụ thể."
+  "ç­–ç•¥": {
+    translation: "Chiáº¿n lÆ°á»£c / SÃ¡ch lÆ°á»£c",
+    exampleChinese: "æˆ‘ä»¬éœ€è¦åˆ¶å®šæ–°çš„å•†ä¸šç­–ç•¥ã€‚",
+    examplePinyin: "WÇ’men xÅ«yÃ o zhÃ¬dÃ¬ng xÄ«n de shÄngyÃ¨ cÃ¨lÃ¼Ã¨.",
+    exampleVietnamese: "ChÃºng ta cáº§n hoáº¡ch Ä‘á»‹nh chiáº¿n lÆ°á»£c kinh doanh má»›i.",
+    context: "PhÆ°Æ¡ng phÃ¡p hoáº·c káº¿ hoáº¡ch dÃ i háº¡n hÆ°á»›ng tá»›i Ä‘áº¡t má»¥c tiÃªu cá»¥ thá»ƒ."
   },
-  "指挥": {
-    translation: "Chỉ huy / Điều khiển",
-    exampleChinese: "他在音乐会上指挥乐队演出。",
-    examplePinyin: "Tā zài yīnyuèhuì shàng zhǐhuī yuèduì yǎnchū.",
-    exampleVietnamese: "Anh ấy chỉ huy ban nhạc biểu diễn trong buổi hòa nhạc.",
-    context: "Lãnh đạo, điều động người khác làm việc hoặc điều khiển nhạc kịch, giao thông."
+  "æŒ‡æŒ¥": {
+    translation: "Chá»‰ huy / Äiá»u khiá»ƒn",
+    exampleChinese: "ä»–åœ¨éŸ³ä¹ä¼šä¸ŠæŒ‡æŒ¥ä¹é˜Ÿæ¼”å‡ºã€‚",
+    examplePinyin: "TÄ zÃ i yÄ«nyuÃ¨huÃ¬ shÃ ng zhÇhuÄ« yuÃ¨duÃ¬ yÇŽnchÅ«.",
+    exampleVietnamese: "Anh áº¥y chá»‰ huy ban nháº¡c biá»ƒu diá»…n trong buá»•i hÃ²a nháº¡c.",
+    context: "LÃ£nh Ä‘áº¡o, Ä‘iá»u Ä‘á»™ng ngÆ°á»i khÃ¡c lÃ m viá»‡c hoáº·c Ä‘iá»u khiá»ƒn nháº¡c ká»‹ch, giao thÃ´ng."
   },
-  "胜利": {
-    translation: "Chiến thắng",
-    exampleChinese: "坚持到底就是胜利。",
-    examplePinyin: "Jiānchí dàodǐ jiùshì shènglì.",
-    exampleVietnamese: "Kiên trì đến cùng chính là chiến thắng.",
-    context: "Đạt được mục đích hoặc vượt qua đối thủ trong đấu tranh."
+  "èƒœåˆ©": {
+    translation: "Chiáº¿n tháº¯ng",
+    exampleChinese: "åšæŒåˆ°åº•å°±æ˜¯èƒœåˆ©ã€‚",
+    examplePinyin: "JiÄnchÃ­ dÃ odÇ jiÃ¹shÃ¬ shÃ¨nglÃ¬.",
+    exampleVietnamese: "KiÃªn trÃ¬ Ä‘áº¿n cÃ¹ng chÃ­nh lÃ  chiáº¿n tháº¯ng.",
+    context: "Äáº¡t Ä‘Æ°á»£c má»¥c Ä‘Ã­ch hoáº·c vÆ°á»£t qua Ä‘á»‘i thá»§ trong Ä‘áº¥u tranh."
   },
-  "防御": {
-    translation: "Phòng thủ / Phòng ngự",
-    exampleChinese: "修筑城墙是为了防御敌人的侵略。",
-    examplePinyin: "Xiūzhù chéngqiáng shì wèile fángyù dírén de qīnlüè.",
-    exampleVietnamese: "Xây dựng tường thành là để phòng ngự sự xâm lược của quân địch.",
-    context: "Hành động chống đỡ, bảo vệ trước đòn tấn công của đối thủ."
+  "é˜²å¾¡": {
+    translation: "PhÃ²ng thá»§ / PhÃ²ng ngá»±",
+    exampleChinese: "ä¿®ç­‘åŸŽå¢™æ˜¯ä¸ºäº†é˜²å¾¡æ•Œäººçš„ä¾µç•¥ã€‚",
+    examplePinyin: "XiÅ«zhÃ¹ chÃ©ngqiÃ¡ng shÃ¬ wÃ¨ile fÃ¡ngyÃ¹ dÃ­rÃ©n de qÄ«nlÃ¼Ã¨.",
+    exampleVietnamese: "XÃ¢y dá»±ng tÆ°á»ng thÃ nh lÃ  Ä‘á»ƒ phÃ²ng ngá»± sá»± xÃ¢m lÆ°á»£c cá»§a quÃ¢n Ä‘á»‹ch.",
+    context: "HÃ nh Ä‘á»™ng chá»‘ng Ä‘á»¡, báº£o vá»‡ trÆ°á»›c Ä‘Ã²n táº¥n cÃ´ng cá»§a Ä‘á»‘i thá»§."
   }
 };
 
@@ -130,7 +130,7 @@ export function VocabularyPage() {
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
   const [deckDescription, setDeckDescription] = useState('');
-  const [deckSource, setDeckSource] = useState('Tổng hợp');
+  const [deckSource, setDeckSource] = useState('Tá»•ng há»£p');
   const [deckDocumentId, setDeckDocumentId] = useState(null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
@@ -141,9 +141,9 @@ export function VocabularyPage() {
     const firstWord = selectedWordsList[0];
     const allSameSource = selectedWordsList.every(w => w.source === firstWord.source && w.documentId === firstWord.documentId);
     
-    let sourceStr = 'Tổng hợp';
+    let sourceStr = 'Tá»•ng há»£p';
     let docId = null;
-    let defaultDeckName = 'Bộ học tập tự tạo';
+    let defaultDeckName;
 
     if (allSameSource && firstWord.documentId) {
       sourceStr = firstWord.source;
@@ -151,7 +151,7 @@ export function VocabularyPage() {
       const cleanDocTitle = firstWord.source.replace(/\.[^/.]+$/, "");
       defaultDeckName = `${cleanDocTitle} - Lesson ${new Date().toLocaleDateString('vi-VN')}`;
     } else {
-      defaultDeckName = `Bộ từ vựng tổng hợp - ${new Date().toLocaleDateString('vi-VN')}`;
+      defaultDeckName = `Bá»™ tá»« vá»±ng tá»•ng há»£p - ${new Date().toLocaleDateString('vi-VN')}`;
     }
 
     setNewDeckName(defaultDeckName);
@@ -164,7 +164,7 @@ export function VocabularyPage() {
   const handleCreateDeckSubmit = async (e) => {
     e.preventDefault();
     if (!newDeckName.trim()) {
-      useToastStore.getState().addToast('Vui lòng nhập tên bộ Flashcard.', 'error');
+      useToastStore.getState().addToast('Vui lÃ²ng nháº­p tÃªn bá»™ Flashcard.', 'error');
       return;
     }
     setIsSavingDeck(true);
@@ -180,13 +180,13 @@ export function VocabularyPage() {
         selectedWordsList
       );
 
-      useToastStore.getState().addToast('Đã tạo bộ Flashcard thành công!', 'success');
+      useToastStore.getState().addToast('ÄÃ£ táº¡o bá»™ Flashcard thÃ nh cÃ´ng!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
       navigate('/flashcards');
     } catch (err) {
       console.error(err);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
+      useToastStore.getState().addToast('CÃ³ lá»—i xáº£y ra khi táº¡o bá»™ Flashcard.', 'error');
     } finally {
       setIsSavingDeck(false);
     }
@@ -207,7 +207,7 @@ export function VocabularyPage() {
   }, []);
 
   // Selected source filter tab at the top
-  const [selectedSourceTab, setSelectedSourceTab] = useState('Tất cả');
+  const [selectedSourceTab, setSelectedSourceTab] = useState('Táº¥t cáº£');
 
   // Filter and search selectors
   const [sourceFilter, setSourceFilter] = useState('');
@@ -240,9 +240,9 @@ export function VocabularyPage() {
       
       return {
         text: w.text,
-        pinyin: w.pinyin || "pīnyīn",
-        translation: w.translation || "nghĩa",
-        source: w.documentTitle || "Chưa xác định",
+        pinyin: w.pinyin || "pÄ«nyÄ«n",
+        translation: w.translation || "nghÄ©a",
+        source: w.documentTitle || "ChÆ°a xÃ¡c Ä‘á»‹nh",
         documentId: w.documentId,
         dateAdded: w.dateAdded || new Date().toISOString().split('T')[0],
         difficulty: w.difficulty || "medium",
@@ -256,7 +256,7 @@ export function VocabularyPage() {
   const filteredVocabulary = useMemo(() => {
     return fullVocabularyDataset.filter(item => {
       // 1. Top Source Tab filter
-      if (selectedSourceTab !== 'Tất cả' && item.source !== selectedSourceTab) {
+      if (selectedSourceTab !== 'Táº¥t cáº£' && item.source !== selectedSourceTab) {
         return false;
       }
       // 2. Select Source filter dropdown
@@ -374,11 +374,11 @@ export function VocabularyPage() {
     }
     // Fallback template
     return {
-      translation: "Chưa cập nhật chi tiết ngữ cảnh.",
-      exampleChinese: `我们一起用“${cleanText}”写句子吧。`,
-      examplePinyin: `Wǒmen yīqǐ yòng "${cleanText}" xiě jùzi ba.`,
-      exampleVietnamese: `Chúng ta hãy cùng viết câu với từ "${cleanText}" nhé.`,
-      context: `Từ vựng "${cleanText}" được sử dụng phổ biến trong cuộc sống và học tập.`
+      translation: "ChÆ°a cáº­p nháº­t chi tiáº¿t ngá»¯ cáº£nh.",
+      exampleChinese: `æˆ‘ä»¬ä¸€èµ·ç”¨â€œ${cleanText}â€å†™å¥å­å§ã€‚`,
+      examplePinyin: `WÇ’men yÄ«qÇ yÃ²ng "${cleanText}" xiÄ› jÃ¹zi ba.`,
+      exampleVietnamese: `ChÃºng ta hÃ£y cÃ¹ng viáº¿t cÃ¢u vá»›i tá»« "${cleanText}" nhÃ©.`,
+      context: `Tá»« vá»±ng "${cleanText}" Ä‘Æ°á»£c sá»­ dá»¥ng phá»• biáº¿n trong cuá»™c sá»‘ng vÃ  há»c táº­p.`
     };
   };
 
@@ -389,11 +389,11 @@ export function VocabularyPage() {
         return 'bg-pink-50 text-pink-700 border-pink-100';
       case 'SBT HSK 5 (2)':
         return 'bg-blue-50 text-blue-700 border-blue-100';
-      case 'Sách logistic':
+      case 'SÃ¡ch logistic':
         return 'bg-teal-50 text-teal-700 border-teal-100';
-      case 'Đề Hanban':
+      case 'Äá» Hanban':
         return 'bg-purple-50 text-purple-700 border-purple-100';
-      case 'Sách khởi nghiệp':
+      case 'SÃ¡ch khá»Ÿi nghiá»‡p':
         return 'bg-amber-50 text-amber-700 border-amber-100';
       default:
         return 'bg-slate-50 text-slate-700 border-slate-100';
@@ -441,14 +441,14 @@ export function VocabularyPage() {
             
             {/* Left: Filters */}
             <div className="flex flex-wrap items-center gap-3">
-              {/* Nguồn tài liệu */}
+              {/* Nguá»“n tÃ i liá»‡u */}
               <div className="relative">
                 <select
                   value={sourceFilter}
                   onChange={(e) => setSourceFilter(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[160px]"
                 >
-                  <option value="">Nguồn tài liệu</option>
+                  <option value="">Nguá»“n tÃ i liá»‡u</option>
                   {documentsList.map(doc => (
                     <option key={doc.id} value={doc.title}>{doc.title}</option>
                   ))}
@@ -456,23 +456,23 @@ export function VocabularyPage() {
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* Đã học */}
+              {/* ÄÃ£ há»c */}
               <div className="relative">
                 <select
                   value={learningFilter}
                   onChange={(e) => setLearningFilter(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[150px]"
                 >
-                  <option value="">Tất cả trạng thái</option>
-                  <option value="known">Đã biết ({learningStats.known})</option>
-                  <option value="learning">Đang học ({learningStats.learning})</option>
-                  <option value="not_started">Chưa học ({learningStats.notStarted})</option>
-                  <option value="unreviewed">Chưa ôn tập ({learningStats.unreviewed})</option>
+                  <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
+                  <option value="known">ÄÃ£ biáº¿t ({learningStats.known})</option>
+                  <option value="learning">Äang há»c ({learningStats.learning})</option>
+                  <option value="not_started">ChÆ°a há»c ({learningStats.notStarted})</option>
+                  <option value="unreviewed">ChÆ°a Ã´n táº­p ({learningStats.unreviewed})</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* Yêu thích (Starred) Toggle Button */}
+              {/* YÃªu thÃ­ch (Starred) Toggle Button */}
               <button
                 onClick={() => setStarredFilter(!starredFilter)}
                 className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${
@@ -482,7 +482,7 @@ export function VocabularyPage() {
                 }`}
               >
                 <Star className={`w-3.5 h-3.5 ${starredFilter ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
-                <span>Yêu thích</span>
+                <span>YÃªu thÃ­ch</span>
               </button>
             </div>
 
@@ -491,7 +491,7 @@ export function VocabularyPage() {
               <div className="relative flex-grow lg:w-64">
                 <input
                   type="text"
-                  placeholder="Tìm từ vựng..."
+                  placeholder="TÃ¬m tá»« vá»±ng..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-slate-400"
@@ -509,7 +509,7 @@ export function VocabularyPage() {
                     setSearchQuery('');
                   }}
                   className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-100 flex items-center justify-center transition-colors shrink-0"
-                  title="Xóa bộ lọc"
+                  title="XÃ³a bá»™ lá»c"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -523,11 +523,11 @@ export function VocabularyPage() {
 
           {/* Total Row Count Indicator */}
           <div className="flex justify-between items-center text-xs font-bold text-slate-500 px-1 font-sans">
-            <span>Tổng số: <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> từ vựng</span>
+            <span>Tá»•ng sá»‘: <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> tá»« vá»±ng</span>
             {selectedRows.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-blue-600 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-lg">
-                  Đang chọn: {selectedRows.length} từ
+                  Äang chá»n: {selectedRows.length} tá»«
                 </span>
                 <button
                   onClick={() => {
@@ -548,14 +548,14 @@ export function VocabularyPage() {
                   className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
                 >
                   <GraduationCap className="w-3.5 h-3.5" />
-                  <span>Ôn tập ngay</span>
+                  <span>Ã”n táº­p ngay</span>
                 </button>
                 <button
                   onClick={handleOpenCreateDeckModal}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Tạo Flashcard</span>
+                  <span>Táº¡o Flashcard</span>
                 </button>
               </div>
             )}
@@ -575,24 +575,24 @@ export function VocabularyPage() {
                         className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4 shadow-sm"
                       />
                     </th>
-                    <th className="py-4.5 px-4 font-black w-[20%]">Từ vựng</th>
+                    <th className="py-4.5 px-4 font-black w-[20%]">Tá»« vá»±ng</th>
                     <th className="py-4.5 px-4 font-black w-[18%]">Pinyin</th>
-                    <th className="py-4.5 px-4 font-black w-[25%]">Nghĩa</th>
-                    <th className="py-4.5 px-4 font-black w-[18%]">Nguồn tài liệu</th>
-                    <th className="py-4.5 px-4 font-black w-[13%]">Ngày học</th>
-                    <th className="py-4.5 px-4 font-black text-center w-[12%]">Thao tác</th>
+                    <th className="py-4.5 px-4 font-black w-[25%]">NghÄ©a</th>
+                    <th className="py-4.5 px-4 font-black w-[18%]">Nguá»“n tÃ i liá»‡u</th>
+                    <th className="py-4.5 px-4 font-black w-[13%]">NgÃ y há»c</th>
+                    <th className="py-4.5 px-4 font-black text-center w-[12%]">Thao tÃ¡c</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedData.length > 0 ? (
-                    paginatedData.map((row) => {
+                    paginatedData.map((row, index) => {
                       const isRowSelected = selectedRows.includes(row.text);
                       const isStarred = localStarred[row.text] || (vocabList.find(v => v.text === row.text)?.starred);
                       const cleanWordText = row.text.split('_')[0]; // Extract display word
 
                       return (
                         <tr 
-                          key={row.id || row.text}
+                          key={row.id ?? `${row.text}-${currentPage}-${index}`}
                           onMouseEnter={() => setHoveredWord(cleanWordText)}
                           onMouseLeave={() => setHoveredWord(null)}
                           className={`group hover:bg-blue-50 border-b border-slate-100 transition-colors duration-150 cursor-default ${
@@ -609,11 +609,11 @@ export function VocabularyPage() {
                           </td>
                           <td className="py-4 px-4 font-display font-extrabold text-base text-slate-800">
                             <div className="flex items-center gap-2">
-                              <span className="group-hover:text-blue-600 transition-colors" title={`Từ vựng: ${cleanWordText}`}>{cleanWordText}</span>
+                              <span className="group-hover:text-blue-600 transition-colors" title={`Tá»« vá»±ng: ${cleanWordText}`}>{cleanWordText}</span>
                               <button 
                                 onClick={(e) => speakWord(e, row.text)}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-inner border border-slate-100"
-                                title="Nghe phát âm"
+                                title="Nghe phÃ¡t Ã¢m"
                               >
                                 <Volume2 className="w-3.5 h-3.5" />
                               </button>
@@ -654,7 +654,7 @@ export function VocabularyPage() {
                               <button 
                                 onClick={() => toggleStar(row.text)}
                                 className="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Yêu thích"
+                                title="YÃªu thÃ­ch"
                               >
                                 <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
                               </button>
@@ -663,7 +663,7 @@ export function VocabularyPage() {
                               <button 
                                 onClick={() => setDetailWord(row)}
                                 className="p-1.5 text-slate-400 hover:text-blue-650 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Xem chi tiết"
+                                title="Xem chi tiáº¿t"
                               >
                                 <FileText className="w-4 h-4" />
                               </button>
@@ -671,7 +671,7 @@ export function VocabularyPage() {
                               {/* More action menu */}
                               <button 
                                 className="p-1.5 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Thao tác khác"
+                                title="Thao tÃ¡c khÃ¡c"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
@@ -683,7 +683,7 @@ export function VocabularyPage() {
                   ) : (
                     <tr>
                       <td colSpan="7" className="py-12 text-center text-slate-400 text-xs font-semibold">
-                        Không tìm thấy từ vựng nào khớp với bộ lọc của bạn.
+                        KhÃ´ng tÃ¬m tháº¥y tá»« vá»±ng nÃ o khá»›p vá»›i bá»™ lá»c cá»§a báº¡n.
                       </td>
                     </tr>
                   )}
@@ -779,16 +779,16 @@ export function VocabularyPage() {
         {/* Right Sidebar Area */}
         <div className="space-y-6 lg:col-span-1">
           
-          {/* 1. TỔNG QUAN CIRCULAR CHART CARD */}
+          {/* 1. Tá»”NG QUAN CIRCULAR CHART CARD */}
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 font-sans">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-extrabold text-slate-800">Tổng quan</h3>
+              <h3 className="text-base font-extrabold text-slate-800">Tá»•ng quan</h3>
               <button 
                 onClick={() => navigate('/dashboard')}
                 className="text-xs font-bold text-blue-650 hover:text-blue-700 flex items-center gap-1 transition-colors"
               >
-                <span>Xem chi tiết</span>
-                <span>→</span>
+                <span>Xem chi tiáº¿t</span>
+                <span>â†’</span>
               </button>
             </div>
 
@@ -850,7 +850,7 @@ export function VocabularyPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
                   <span className="text-lg font-black text-slate-800 font-display">{learningStats.total}</span>
-                  <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tổng từ vựng</span>
+                  <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tá»•ng tá»« vá»±ng</span>
                 </div>
               </div>
 
@@ -858,19 +858,19 @@ export function VocabularyPage() {
               <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] font-semibold text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="truncate">Đã biết: <span className="font-extrabold text-slate-800">{learningStats.known}</span></span>
+                  <span className="truncate">ÄÃ£ biáº¿t: <span className="font-extrabold text-slate-800">{learningStats.known}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                  <span className="truncate">Đang học: <span className="font-extrabold text-slate-800">{learningStats.learning}</span></span>
+                  <span className="truncate">Äang há»c: <span className="font-extrabold text-slate-800">{learningStats.learning}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-                  <span className="truncate">Chưa học: <span className="font-extrabold text-slate-800">{learningStats.notStarted}</span></span>
+                  <span className="truncate">ChÆ°a há»c: <span className="font-extrabold text-slate-800">{learningStats.notStarted}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span className="truncate">Chưa ôn tập: <span className="font-extrabold text-slate-800">{learningStats.unreviewed}</span></span>
+                  <span className="truncate">ChÆ°a Ã´n táº­p: <span className="font-extrabold text-slate-800">{learningStats.unreviewed}</span></span>
                 </div>
               </div>
             </div>
@@ -881,15 +881,15 @@ export function VocabularyPage() {
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] border border-transparent"
             >
               <GraduationCap className="w-4.5 h-4.5" />
-              <span>Ôn tập ngay</span>
+              <span>Ã”n táº­p ngay</span>
             </button>
           </div>
 
-          {/* 2. TỪ VỰNG THEO NGUỒN TÀI LIỆU (PROGRESS BARS WIDGET) */}
+          {/* 2. Tá»ª Vá»°NG THEO NGUá»’N TÃ€I LIá»†U (PROGRESS BARS WIDGET) */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4.5 font-sans">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-800">Từ vựng theo nguồn tài liệu</h3>
-              <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Phân bố số lượng từ vựng đã lưu</p>
+              <h3 className="text-sm font-extrabold text-slate-800">Tá»« vá»±ng theo nguá»“n tÃ i liá»‡u</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">PhÃ¢n bá»‘ sá»‘ lÆ°á»£ng tá»« vá»±ng Ä‘Ã£ lÆ°u</p>
             </div>
 
             <div className="space-y-3.5">
@@ -929,9 +929,9 @@ export function VocabularyPage() {
             </div>
           </div>
 
-          {/* 3. CÔNG CỤ HỌC TẬP (LINKS BOX) */}
+          {/* 3. CÃ”NG Cá»¤ Há»ŒC Táº¬P (LINKS BOX) */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4 font-sans">
-            <h3 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-2">Công cụ học tập</h3>
+            <h3 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-2">CÃ´ng cá»¥ há»c táº­p</h3>
 
             <div className="space-y-2 text-xs">
               {/* Flashcards */}
@@ -945,13 +945,13 @@ export function VocabularyPage() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors">Flashcards</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Ôn tập bằng thẻ ghi nhớ</p>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Ã”n táº­p báº±ng tháº» ghi nhá»›</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
 
-              {/* Luyện nói */}
+              {/* Luyá»‡n nÃ³i */}
               <div 
                 onClick={() => navigate('/pronunciation')}
                 className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-blue-200/50 hover:bg-slate-50 flex items-center justify-between cursor-pointer group transition-all"
@@ -961,14 +961,14 @@ export function VocabularyPage() {
                     <Mic className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-slate-800 group-hover:text-emerald-600 transition-colors">Luyện nói</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Luyện phát âm từ vựng</p>
+                    <h4 className="font-extrabold text-slate-800 group-hover:text-emerald-600 transition-colors">Luyá»‡n nÃ³i</h4>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Luyá»‡n phÃ¡t Ã¢m tá»« vá»±ng</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
 
-              {/* Ôn tập thông minh */}
+              {/* Ã”n táº­p thÃ´ng minh */}
               <div 
                 onClick={() => navigate('/flashcards', { state: { startSrs: true } })}
                 className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-blue-200/50 hover:bg-slate-50 flex items-center justify-between cursor-pointer group transition-all"
@@ -978,8 +978,8 @@ export function VocabularyPage() {
                     <BookMarked className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-slate-800 group-hover:text-purple-600 transition-colors">Ôn tập thông minh</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Hệ thống gợi ý ôn tập</p>
+                    <h4 className="font-extrabold text-slate-800 group-hover:text-purple-600 transition-colors">Ã”n táº­p thÃ´ng minh</h4>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Há»‡ thá»‘ng gá»£i Ã½ Ã´n táº­p</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -1004,7 +1004,7 @@ export function VocabularyPage() {
               <button 
                 onClick={() => setDetailWord(null)}
                 className="text-slate-400 hover:text-slate-600 absolute top-5 right-5 p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
-                title="Đóng chi tiết"
+                title="ÄÃ³ng chi tiáº¿t"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1012,13 +1012,13 @@ export function VocabularyPage() {
               {/* HSK Badge & Top row */}
               <div className="flex justify-between items-center pr-8 border-b border-slate-100 pb-3">
                 <span className="text-xs font-black px-3 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-100">
-                  Nguồn: {detailWord.source}
+                  Nguá»“n: {detailWord.source}
                 </span>
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => toggleStar(detailWord.text)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors"
-                    title="Đánh dấu từ"
+                    title="ÄÃ¡nh dáº¥u tá»«"
                   >
                     <Star className={`w-5 h-5 ${isStarred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
                   </button>
@@ -1036,7 +1036,7 @@ export function VocabularyPage() {
                 <button
                   onClick={(e) => speakWord(e, detailWord.text)}
                   className="p-2 text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100/70 rounded-full transition-colors shadow-sm ml-auto"
-                  title="Nghe phát âm"
+                  title="Nghe phÃ¡t Ã¢m"
                 >
                   <Volume2 className="w-5 h-5" />
                 </button>
@@ -1044,7 +1044,7 @@ export function VocabularyPage() {
 
               {/* Translation box */}
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Nghĩa</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">NghÄ©a</span>
                 <div className="bg-blue-50/20 border border-slate-150 rounded-2xl p-4 shadow-inner">
                   <p className="text-blue-650 font-black text-base select-text">
                     {(() => {
@@ -1069,7 +1069,7 @@ export function VocabularyPage() {
 
               {/* Examples block */}
               <div className="space-y-1.5 select-text">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Ví dụ</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">VÃ­ dá»¥</span>
                 <div className="space-y-1 pl-1">
                   <p className="text-sm font-bold text-slate-800 leading-normal">{details.exampleChinese}</p>
                   <p className="text-xs text-slate-450 font-semibold">{details.examplePinyin}</p>
@@ -1079,7 +1079,7 @@ export function VocabularyPage() {
 
               {/* Usage context card */}
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Ngữ cảnh</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Ngá»¯ cáº£nh</span>
                 <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex gap-3 shadow-inner">
                   <Lightbulb className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-slate-600 font-medium leading-relaxed select-text">
@@ -1098,41 +1098,41 @@ export function VocabularyPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col space-y-4 text-slate-700">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-800">Tạo bộ Flashcard mới</h3>
+              <h3 className="text-base font-extrabold text-slate-800">Táº¡o bá»™ Flashcard má»›i</h3>
               <button 
                 onClick={() => setShowCreateDeckModal(false)}
                 className="text-slate-400 hover:text-slate-650 transition-colors font-bold text-sm"
               >
-                Đóng
+                ÄÃ³ng
               </button>
             </div>
             
             <form onSubmit={handleCreateDeckSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Tên bộ Flashcard</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">TÃªn bá»™ Flashcard</label>
                 <input
                   type="text"
                   value={newDeckName}
                   onChange={(e) => setNewDeckName(e.target.value)}
-                  placeholder="Ví dụ: HSK4 Reading Lesson 19"
+                  placeholder="VÃ­ dá»¥: HSK4 Reading Lesson 19"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Mô tả (Không bắt buộc)</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">MÃ´ táº£ (KhÃ´ng báº¯t buá»™c)</label>
                 <input
                   type="text"
                   value={deckDescription}
                   onChange={(e) => setDeckDescription(e.target.value)}
-                  placeholder="Nhập mô tả cho bộ thẻ này..."
+                  placeholder="Nháº­p mÃ´ táº£ cho bá»™ tháº» nÃ y..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Nguồn tài liệu</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Nguá»“n tÃ i liá»‡u</label>
                 <input
                   type="text"
                   value={deckSource}
@@ -1142,7 +1142,7 @@ export function VocabularyPage() {
               </div>
 
               <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-700">Số từ:</span>
+                <span className="font-bold text-slate-700">Sá»‘ tá»«:</span>
                 <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-extrabold">{selectedRows.length}</span>
               </div>
               
@@ -1152,14 +1152,14 @@ export function VocabularyPage() {
                   onClick={() => setShowCreateDeckModal(false)}
                   className="flex-1 py-2.5 border border-slate-200 text-slate-500 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
                 >
-                  Hủy
+                  Há»§y
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingDeck}
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
                 >
-                  {isSavingDeck ? 'Đang tạo...' : 'Tạo'}
+                  {isSavingDeck ? 'Äang táº¡o...' : 'Táº¡o'}
                 </button>
               </div>
             </form>
