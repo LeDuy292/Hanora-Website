@@ -279,11 +279,11 @@ export function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-8 w-full page-transition text-slate-700">
+    <div className="mx-auto w-full max-w-6xl space-y-6 page-transition text-slate-700 sm:space-y-8">
       
       {/* Toast Alert */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3.5 rounded-2xl shadow-xl border animate-slide-up ${
+        <div className={`fixed inset-x-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-50 flex items-center gap-2 rounded-2xl border px-4 py-3.5 shadow-xl animate-slide-up sm:inset-x-auto sm:right-6 sm:bottom-6 sm:px-5 ${
           toast.type === 'success' 
             ? 'bg-emerald-50 border-emerald-100 text-emerald-850' 
             : 'bg-amber-50 border-amber-100 text-amber-900'
@@ -298,41 +298,41 @@ export function ProfilePage() {
       )}
 
       {/* Top Section Grid (Account vs Profile Card) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12 lg:gap-8">
         
         {/* Left Side: Account Form Info */}
-        <div className="lg:col-span-8 bg-white border-2 border-slate-200 rounded-3xl p-8 shadow-md flex flex-col gap-6">
-          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+        <div className="order-2 flex flex-col gap-5 rounded-[1.75rem] border border-white/80 bg-white/90 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 backdrop-blur-xl sm:p-6 lg:order-1 lg:col-span-8 lg:p-8">
+          <div className="flex items-start gap-3 border-b border-slate-200/80 pb-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Account</h3>
+              <h3 className="text-base font-extrabold text-slate-900">Account</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Thông tin tài khoản chính của bạn</p>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-200/80">
             {/* Full Name Row */}
             <div 
               onClick={() => {
                 setEditForm(prev => ({ ...prev, name: fullName }));
                 setActiveModal('edit_profile');
               }}
-              className="py-4 flex items-center justify-between hover:bg-slate-50/50 px-2 rounded-xl transition-all cursor-pointer group"
+              className="group flex cursor-pointer flex-col gap-2 rounded-2xl px-3 py-4 transition-all hover:bg-blue-50/60 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-xs font-bold text-slate-500">Full Name</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Full Name</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-800 font-sans">{fullName || "Chưa thiết lập"}</span>
+                <span className="max-w-full break-words text-sm font-bold text-slate-900">{fullName || "Chưa thiết lập"}</span>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
             {/* Email Address Row (Non-editable) */}
-            <div className="py-4 flex items-center justify-between px-2 rounded-xl transition-all">
-              <span className="text-xs font-bold text-slate-500">Email Address</span>
+            <div className="flex flex-col gap-2 rounded-2xl px-3 py-4 transition-all sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Email Address</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-800 font-sans">{emailAddress}</span>
+                <span className="max-w-full break-words text-sm font-bold text-slate-900">{emailAddress}</span>
                 <Lock className="w-3.5 h-3.5 text-slate-300" />
               </div>
             </div>
@@ -343,25 +343,25 @@ export function ProfilePage() {
                 setEditForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
                 setActiveModal('change_password');
               }}
-              className="py-4 flex items-center justify-between hover:bg-slate-50/50 px-2 rounded-xl transition-all cursor-pointer group"
+              className="group flex cursor-pointer flex-col gap-2 rounded-2xl px-3 py-4 transition-all hover:bg-blue-50/60 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-xs font-bold text-slate-500">Password</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Password</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-800 font-sans">********</span>
+                <span className="max-w-full break-words text-sm font-bold text-slate-900">********</span>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
             {/* Joined Date Row */}
-            <div className="py-4 flex items-center justify-between px-2">
-              <span className="text-xs font-bold text-slate-500">Joined Date</span>
-              <span className="text-xs font-semibold text-slate-800 font-sans">{user.joinedDate || "March 15, 2024"}</span>
+            <div className="flex flex-col gap-2 px-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Joined Date</span>
+              <span className="max-w-full break-words text-sm font-bold text-slate-900">{user.joinedDate || "March 15, 2024"}</span>
             </div>
           </div>
         </div>
 
         {/* Right Side: Quick Profile Display Card */}
-        <div className="lg:col-span-4 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-md flex flex-col items-center justify-between text-center gap-6">
+        <div className="order-1 flex flex-col items-center justify-between gap-5 overflow-hidden rounded-[1.75rem] border border-blue-100 bg-gradient-to-b from-white to-blue-50/70 p-5 text-center shadow-[0_24px_70px_rgba(37,99,235,0.12)] ring-1 ring-white/80 sm:p-6 lg:order-2 lg:col-span-4">
           <div className="flex flex-col items-center gap-3.5">
             {/* Avatar Circle Container */}
             <div className="relative group">
@@ -376,7 +376,7 @@ export function ProfilePage() {
                 <img 
                   src={user.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"} 
                   alt={fullName}
-                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md group-hover:opacity-80 transition-opacity"
+                  className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-xl shadow-blue-900/10 transition-opacity group-hover:opacity-85 sm:h-28 sm:w-28"
                 />
                 <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -391,13 +391,13 @@ export function ProfilePage() {
 
             {/* Profile Info Text */}
             <div className="space-y-1">
-              <h2 className="text-base font-extrabold text-slate-800">{fullName}</h2>
+              <h2 className="text-lg font-extrabold text-slate-900">{fullName}</h2>
               {user.isPro && (
                 <div className="inline-flex items-center justify-center bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full select-none">
                   Pro Member
                 </div>
               )}
-              <p className="text-[10px] text-slate-400 font-bold block pt-1 font-sans">{emailAddress}</p>
+              <p className="block max-w-full break-all pt-1 text-xs font-bold text-slate-500">{emailAddress}</p>
             </div>
           </div>
 
@@ -408,7 +408,7 @@ export function ProfilePage() {
                 setEditForm(prev => ({ ...prev, name: fullName }));
                 setActiveModal('edit_profile');
               }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-650 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-all select-none active:scale-[0.98]"
+              className="flex min-h-11 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] sm:justify-start"
             >
               <User className="w-4 h-4 text-slate-400" />
               <span>Edit Profile</span>
@@ -419,7 +419,7 @@ export function ProfilePage() {
                 setEditForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
                 setActiveModal('change_password');
               }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-650 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-all select-none active:scale-[0.98]"
+              className="flex min-h-11 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] sm:justify-start"
             >
               <Lock className="w-4 h-4 text-slate-400" />
               <span>Change Password</span>

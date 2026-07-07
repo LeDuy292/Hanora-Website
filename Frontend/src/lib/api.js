@@ -1,4 +1,4 @@
-﻿import { getToken } from '../services/apiClient';
+import { getToken } from '../services/apiClient';
 import { validateUploadFile } from '../utils/uploadRules';
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -30,10 +30,10 @@ function uploadToPresignedUrl(presignedUrl, file, onProgress) {
         onProgress?.(100);
         resolve();
       } else {
-        reject(new Error('KhÃ´ng thá»ƒ táº£i tá»‡p lÃªn há»‡ thá»‘ng lÆ°u trá»¯.'));
+        reject(new Error('Không thể tải tệp lên hệ thống lưu trữ.'));
       }
     };
-    request.onerror = () => reject(new Error('Káº¿t ná»‘i táº£i tá»‡p bá»‹ giÃ¡n Ä‘oáº¡n.'));
+    request.onerror = () => reject(new Error('Kết nối tải tệp bị gián đoạn.'));
     request.send(file);
   });
 }
@@ -60,7 +60,7 @@ export const uploadDocument = async (file, options = {}) => {
   });
 
   if (!presignedResponse.ok) {
-    throw new Error(await readApiError(presignedResponse, 'KhÃ´ng thá»ƒ chuáº©n bá»‹ táº£i tÃ i liá»‡u.'));
+    throw new Error(await readApiError(presignedResponse, 'Không thể chuẩn bị tải tài liệu.'));
   }
 
   const { presignedUrl, fileUrl } = await presignedResponse.json();
@@ -82,7 +82,7 @@ export const uploadDocument = async (file, options = {}) => {
   });
 
   if (!registerResponse.ok) {
-    throw new Error(await readApiError(registerResponse, 'KhÃ´ng thá»ƒ Ä‘Äƒng kÃ½ tÃ i liá»‡u.'));
+    throw new Error(await readApiError(registerResponse, 'Không thể đăng ký tài liệu.'));
   }
 
   return await registerResponse.json();

@@ -1051,3 +1051,225 @@
     min-height: 330px;
   }
 }
+
+
+/* Hanora mobile flashcard responsive polish */
+.flashcard-area-wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .flashcard-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 0.75rem 0.75rem 1.25rem;
+  }
+
+  .flashcard-area-wrapper {
+    overflow: visible;
+  }
+
+  .flashcard-main {
+    max-width: min(100%, 430px);
+    margin-inline: auto;
+  }
+
+  .flashcard-inner {
+    height: clamp(440px, 66vh, 560px);
+    min-height: 440px;
+  }
+
+  .flashcard-face {
+    justify-content: flex-start;
+    border-radius: 1.5rem;
+    padding: 1rem;
+  }
+
+  .flashcard-front {
+    gap: 0;
+  }
+
+  .card-header {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    align-self: stretch;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .card-header-left {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .hsk-badge,
+  .pos-badge {
+    display: inline-flex;
+    min-height: 34px;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.55rem;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+    font-size: 0.68rem;
+  }
+
+  .favorite-btn {
+    min-height: 38px;
+    width: 100%;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    white-space: normal;
+    line-height: 1.15;
+    font-size: 0.68rem;
+  }
+
+  .card-content-center {
+    flex: 1;
+    min-height: 0;
+    justify-content: center;
+    gap: 0.85rem;
+    padding-top: 0.25rem;
+  }
+
+  .main-character {
+    max-width: 100%;
+    font-size: clamp(4.75rem, 30vw, 7rem);
+    line-height: 0.92;
+    overflow-wrap: anywhere;
+  }
+
+  .main-pinyin {
+    max-width: 100%;
+    font-size: clamp(1.4rem, 8vw, 2rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .audio-btn {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .front-footer,
+  .back-footer {
+    margin-top: 0.75rem !important;
+    padding-top: 0.75rem !important;
+  }
+
+  .touch-indicator {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .progress-section {
+    margin-bottom: 1rem;
+  }
+
+  .progress-info {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .progress-text,
+  .time-remaining {
+    font-size: 0.75rem;
+  }
+
+  .nav-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.65rem;
+    border-radius: 1.25rem;
+    overflow: visible;
+  }
+
+  .nav-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    width: 100%;
+  }
+
+  .nav-group:nth-child(2) {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-btn {
+    min-height: 46px;
+    justify-content: center;
+    padding: 0.7rem 0.5rem;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.15;
+    font-size: 0.75rem;
+  }
+
+  .known-quick-btn {
+    width: 100%;
+  }
+
+  .flashcard-back {
+    padding: 1rem !important;
+  }
+
+  .back-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .back-title-group {
+    gap: 0.5rem !important;
+  }
+
+  .back-title-group h2 {
+    font-size: clamp(2.5rem, 17vw, 4rem) !important;
+  }
+
+  .back-card-meta {
+    position: static;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .flashcard-inner {
+    height: clamp(455px, 70vh, 590px);
+    min-height: 455px;
+  }
+
+  .main-character {
+    font-size: clamp(4.35rem, 29vw, 6.4rem);
+  }
+
+  .nav-btn {
+    font-size: 0.7rem;
+  }
+}
