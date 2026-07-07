@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Thin fetch wrapper around the Hanora backend API.
  * Automatically attaches the JWT bearer token and parses JSON / error envelopes.
  */
@@ -46,7 +46,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = false, hea
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error('KhÃ´ng thá»ƒ káº¿t ná»‘i tá»›i mÃ¡y chá»§. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i máº¡ng.');
+    throw new Error('Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng.');
   }
 
   // 204 No Content
@@ -66,7 +66,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = false, hea
     const message =
       (data && typeof data === 'object' && data.error) ||
       (typeof data === 'string' && data) ||
-      'ÄÃ£ cÃ³ lá»—i xáº£y ra. Vui lÃ²ng thá»­ láº¡i.';
+      'Đã có lỗi xảy ra. Vui lòng thử lại.';
     throw new Error(message);
   }
 
