@@ -108,17 +108,28 @@ namespace Hanora
                 });
 
             builder.Services.AddAuthorization();
+            // CORS - allow local dev plus configured deployed frontend origins.
+            var configuredCorsOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
 
-            // CORS — allow React dev server
+            var allowedCorsOrigins = new[]
+                {
+                    "http://localhost:5173",
+                    "http://localhost:3000",
+                    "https://hanora-website.vercel.app"
+                }
+                .Concat(configuredCorsOrigins)
+                .Where(origin => !string.IsNullOrWhiteSpace(origin))
+                .Select(origin => origin.Trim().TrimEnd('/'))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("FrontendPolicy", policy =>
                 {
-                    policy.WithOrigins(
-                            "http://localhost:5173",
-                            "http://localhost:3000",
-                            "https://hanora-website.vercel.app"
-                        )
+                    policy.WithOrigins(allowedCorsOrigins)
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials()
