@@ -1,9 +1,14 @@
-/**
+﻿/**
  * Thin fetch wrapper around the Hanora backend API.
  * Automatically attaches the JWT bearer token and parses JSON / error envelopes.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5187/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const isLocalApiBaseUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/?$/i.test(configuredApiBaseUrl || '');
+
+export const API_BASE_URL = configuredApiBaseUrl && (import.meta.env.DEV || !isLocalApiBaseUrl)
+  ? configuredApiBaseUrl
+  : (import.meta.env.DEV ? 'http://localhost:5187/api' : '/api');
 
 const TOKEN_KEY = 'hanora-token';
 
@@ -41,7 +46,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = false, hea
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error('Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng.');
+    throw new Error('KhÃ´ng thá»ƒ káº¿t ná»‘i tá»›i mÃ¡y chá»§. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i máº¡ng.');
   }
 
   // 204 No Content
@@ -61,7 +66,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = false, hea
     const message =
       (data && typeof data === 'object' && data.error) ||
       (typeof data === 'string' && data) ||
-      'Đã có lỗi xảy ra. Vui lòng thử lại.';
+      'ÄÃ£ cÃ³ lá»—i xáº£y ra. Vui lÃ²ng thá»­ láº¡i.';
     throw new Error(message);
   }
 

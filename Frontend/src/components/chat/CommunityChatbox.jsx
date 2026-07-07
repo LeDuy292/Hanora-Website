@@ -1,48 +1,49 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Users, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Send, X, Users, Loader2 } from 'lucide-react';
 import { useCommunityChatStore } from '../../store/communityChatStore';
 import { useAuthStore } from '../../store/authStore';
-import { getToken } from '../../services/apiClient';
 
 export function CommunityChatbox() {
-  const { 
-    isOpen, toggleChatbox, messages, isConnected, 
-    isLoadingHistory, connectHub, disconnectHub, 
-    fetchHistory, sendMessage 
+  const {
+    isOpen,
+    toggleChatbox,
+    messages,
+    isConnected,
+    isConnecting,
+    connectionError,
+    isLoadingHistory,
+    connectHub,
+    disconnectHub,
+    fetchHistory,
+    sendMessage,
   } = useCommunityChatStore();
   const { user } = useAuthStore();
-  
+
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
-  // Connection & Fetch History on open
   useEffect(() => {
     if (isOpen && user) {
-      const token = getToken();
-      connectHub(token);
+      connectHub();
       fetchHistory();
     }
   }, [isOpen, user, connectHub, fetchHistory]);
 
-  // Disconnect on unmount
   useEffect(() => {
     return () => {
       disconnectHub();
     };
   }, [disconnectHub]);
 
-  // Auto-scroll
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || !isConnected) return;
 
-    await sendMessage(input);
+    await sendMessage(input.trim());
     setInput('');
   };
 
@@ -50,92 +51,93 @@ export function CommunityChatbox() {
 
   return (
     <>
-      {/* Floating Chat Bubble Toggle Button */}
       <button
         onClick={toggleChatbox}
-        className={`fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-50 p-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shadow-lg hover:shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-300 group lg:bottom-6 lg:right-6`}
+        className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-50 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 p-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-indigo-500/30 active:scale-95 lg:bottom-6 lg:right-6"
         title="Nhắn tin cộng đồng"
       >
         {isOpen ? (
-          <X className="w-6 h-6 rotate-90 transition-transform duration-300" />
+          <X className="h-6 w-6 rotate-90 transition-transform duration-300" />
         ) : (
           <div className="relative">
-            <Users className="w-6 h-6 transition-transform duration-300 group-hover:rotate-6" />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-200 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-400"></span>
+            <Users className="h-6 w-6 transition-transform duration-300" />
+            <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-200 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" />
             </span>
           </div>
         )}
       </button>
 
-      {/* Main Chat Panel Container */}
       {isOpen && (
-        <div className="fixed inset-x-3 bottom-[calc(10rem+env(safe-area-inset-bottom))] h-[min(68vh,560px)] bg-white/95 backdrop-blur-md border border-slate-200/60 shadow-2xl rounded-2xl z-50 flex flex-col overflow-hidden animate-fade-in animate-slide-up sm:inset-x-auto sm:right-6 sm:w-[410px] sm:h-[610px] lg:bottom-24">
-          
-          {/* Header Bar */}
-          <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div className="fixed inset-x-3 bottom-[calc(10rem+env(safe-area-inset-bottom))] z-50 flex h-[min(68vh,560px)] flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white/95 shadow-2xl backdrop-blur-md animate-fade-in animate-slide-up sm:inset-x-auto sm:right-6 sm:h-[610px] sm:w-[410px] lg:bottom-24">
+          <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white shadow-sm">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-indigo-100" />
+              <Users className="h-5 w-5 text-indigo-100" />
               <div>
                 <h3 className="text-sm font-bold tracking-wide">Nhắn tin cộng đồng</h3>
-                <span className="text-[10px] text-blue-100 flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></span>
-                  {isConnected ? 'Đã kết nối' : 'Đang kết nối...'}
+                <span className="flex items-center gap-1 text-[10px] text-blue-100">
+                  <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-400' : isConnecting ? 'bg-amber-300' : 'bg-red-400'}`} />
+                  {isConnected ? 'Đã kết nối' : isConnecting ? 'Đang kết nối...' : 'Chưa kết nối'}
                 </span>
               </div>
             </div>
-            
+
             <button
               onClick={toggleChatbox}
-              className="p-1 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-colors"
+              className="rounded-lg p-1 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Đóng chat cộng đồng"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+          <div className="flex-grow space-y-4 overflow-y-auto bg-slate-50/50 p-4">
             {isLoadingHistory ? (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              </div>
+            ) : connectionError ? (
+              <div className="flex h-full select-none flex-col items-center justify-center px-6 py-10 text-center text-red-500">
+                <Users className="mb-3 h-10 w-10 text-red-300" />
+                <p className="mb-1 text-xs font-bold text-red-700">Không thể kết nối chat</p>
+                <p className="max-w-[280px] text-[11px] leading-relaxed">{connectionError}</p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-slate-400 py-10 px-6 text-center select-none h-full">
-                <Users className="w-10 h-10 mb-3 text-indigo-400/70" />
-                <p className="text-xs font-bold text-slate-700 mb-1">Phòng chat trống</p>
-                <p className="text-[11px] leading-relaxed max-w-[280px]">
+              <div className="flex h-full select-none flex-col items-center justify-center px-6 py-10 text-center text-slate-400">
+                <Users className="mb-3 h-10 w-10 text-indigo-400/70" />
+                <p className="mb-1 text-xs font-bold text-slate-700">Phòng chat trống</p>
+                <p className="max-w-[280px] text-[11px] leading-relaxed">
                   Hãy là người đầu tiên gửi tin nhắn vào cộng đồng!
                 </p>
               </div>
             ) : (
               messages.map((msg, idx) => {
                 const isMe = msg.senderId === user.id;
-                
-                // Optional: show sender name if it's not 'me' and different from previous
                 const showName = !isMe && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
+                const messageKey = msg.id ?? `${msg.senderId}-${msg.createdAt}-${idx}`;
 
                 return (
-                  <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div key={messageKey} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {showName && (
-                      <span className="text-[10px] font-bold text-slate-500 mb-1 ml-1">{msg.senderName}</span>
+                      <span className="mb-1 ml-1 text-[10px] font-bold text-slate-500">{msg.senderName}</span>
                     )}
                     <div className="flex items-end gap-1.5">
                       {!isMe && showName && msg.senderAvatarUrl && (
-                        <img src={msg.senderAvatarUrl} alt={msg.senderName} className="w-6 h-6 rounded-full border border-slate-200" />
+                        <img src={msg.senderAvatarUrl} alt={msg.senderName} className="h-6 w-6 rounded-full border border-slate-200" />
                       )}
                       {!isMe && showName && !msg.senderAvatarUrl && (
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                          {msg.senderName.charAt(0).toUpperCase()}
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-600">
+                          {msg.senderName?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                       )}
-                      {/* Spacer if consecutive message from same non-me user */}
-                      {!isMe && !showName && <div className="w-6 h-6" />}
-                      
+                      {!isMe && !showName && <div className="h-6 w-6" />}
+
                       <div
-                        className={`max-w-[240px] sm:max-w-[280px] rounded-2xl px-3.5 py-2 text-[13px] shadow-sm leading-relaxed border transition-all ${
+                        className={`max-w-[240px] rounded-2xl border px-3.5 py-2 text-[13px] leading-relaxed shadow-sm transition-all sm:max-w-[280px] ${
                           isMe
-                            ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-transparent rounded-br-sm font-medium'
-                            : 'bg-white text-slate-800 border-slate-200/70 rounded-bl-sm'
+                            ? 'rounded-br-sm border-transparent bg-gradient-to-br from-blue-600 to-indigo-600 font-medium text-white'
+                            : 'rounded-bl-sm border-slate-200/70 bg-white text-slate-800'
                         }`}
                       >
                         {msg.content}
@@ -148,29 +150,25 @@ export function CommunityChatbox() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Text Form */}
-          <form
-            onSubmit={handleSend}
-            className="p-3 bg-white border-t border-slate-150 flex items-center gap-2 shrink-0 shadow-inner"
-          >
+          <form onSubmit={handleSend} className="flex shrink-0 items-center gap-2 border-t border-slate-150 bg-white p-3 shadow-inner">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Nhắn với cộng đồng..."
-              className="flex-grow bg-slate-100 border border-slate-200/80 rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500 focus:bg-white transition-all text-slate-800"
+              className="flex-grow rounded-xl border border-slate-200/80 bg-slate-100 px-4 py-2 text-xs text-slate-800 outline-none transition-all focus:border-indigo-500 focus:bg-white"
               disabled={!isConnected}
             />
             <button
               type="submit"
               disabled={!input.trim() || !isConnected}
-              className={`p-2 rounded-xl text-white transition-all ${
+              className={`rounded-xl p-2 text-white transition-all ${
                 input.trim() && isConnected
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 shadow-md'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md hover:from-blue-500 hover:to-indigo-500 active:scale-95'
+                  : 'cursor-not-allowed bg-slate-200 text-slate-400'
               }`}
             >
-              <Send className="w-4 h-4" />
+              <Send className="h-4 w-4" />
             </button>
           </form>
         </div>
