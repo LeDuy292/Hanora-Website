@@ -138,7 +138,15 @@ public class DocumentProcessingService : IDocumentProcessingService
                     var segments = _segmenterService.SegmentPreservingStructure(formattedText);
                     doc.ExtractedText = JsonSerializer.Serialize(segments);
 
-                    var layoutJson = JsonSerializer.Serialize(blocks, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    var ocrPayload = new
+                    {
+                        Version = 1,
+                        Source = "hanora-layout-ocr",
+                        Pages = pages,
+                        Blocks = blocks
+                    };
+
+                    var layoutJson = JsonSerializer.Serialize(ocrPayload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                     var layoutBytes = Encoding.UTF8.GetBytes(layoutJson);
                     var layoutFileName = $"{Guid.NewGuid()}_layout.json";
                     var layoutUrl = await s3Service.UploadBytesAsync(layoutBytes, layoutFileName, "application/json");

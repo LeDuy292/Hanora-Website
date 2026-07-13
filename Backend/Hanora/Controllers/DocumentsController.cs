@@ -269,15 +269,47 @@ public class DocumentsController : ControllerBase
 
         var isFailed = document.Status == DocumentStatus.Failed;
 
+        var fileType = GetDocumentFileType(document.OriginalFilename);
+
         return Ok(new
         {
             document.Id,
             document.Title,
+            document.OriginalFilename,
             document.FileUrl,
+            document.OcrJsonUrl,
+            document.PageCount,
             document.Status,
+            FileType = fileType,
+            ContentType = GetDocumentContentType(fileType),
             ExtractedText = isFailed ? null : document.ExtractedText,
             ProcessingError = isFailed ? document.ExtractedText : null
         });
+    }
+
+    private static string GetDocumentFileType(string? fileName)
+    {
+        var extension = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
+        return extension switch
+        {
+            ".pdf" => "pdf",
+            ".png" or ".jpg" or ".jpeg" or ".webp" => "image",
+            ".docx" => "docx",
+            ".txt" => "text",
+            _ => "unknown"
+        };
+    }
+
+    private static string GetDocumentContentType(string fileType)
+    {
+        return fileType switch
+        {
+            "pdf" => "application/pdf",
+            "image" => "image/*",
+            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text" => "text/plain",
+            _ => "application/octet-stream"
+        };
     }
 
     [HttpGet("my-documents")]
