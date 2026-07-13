@@ -48,8 +48,8 @@ public class OcrService : IOcrService
                     return (text, pages, null);
                 }
 
-                _logger.LogInformation("PDF text extraction yielded little CJK text. Falling back to Azure OCR.");
-                var (ocrText, ocrPages, ocrError) = await ExtractWithAzureOcrLayoutAsync(memoryStream.ToArray());
+                _logger.LogInformation("PDF text extraction yielded little CJK text. Falling back to Azure Read OCR.");
+                var (ocrText, ocrPages, ocrError) = await ExtractPdfWithAzureReadLayoutAsync(memoryStream.ToArray());
                 var ocrChineseCount = System.Text.RegularExpressions.Regex.Matches(ocrText ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
 
                 if (string.IsNullOrWhiteSpace(ocrError) && !string.IsNullOrWhiteSpace(ocrText) && ocrChineseCount > 10)
@@ -57,8 +57,18 @@ public class OcrService : IOcrService
                     return (ocrText, ocrPages, null);
                 }
 
-                _logger.LogInformation("PDF OCR fallback failed or yielded little Chinese text. Error: {Error}", ocrError);
-                return (null, null, "File PDF có định dạng chữ bất thường, là bản scan quá mờ hoặc không nhận diện được văn bản tiếng Trung.");
+                if (string.IsNullOrWhiteSpace(ocrError) && !string.IsNullOrWhiteSpace(ocrText))
+                {
+                    return (ocrText, ocrPages, null);
+                }
+
+                if (!string.IsNullOrWhiteSpace(text) || pages.Any())
+                {
+                    return (text, pages, null);
+                }
+
+                _logger.LogInformation("PDF OCR produced no readable text. Accepting original PDF for visual reading. Error: {Error}", ocrError);
+                return (string.Empty, new List<Services.DTOs.PageLinesDto>(), null);
             }
             if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
@@ -66,13 +76,14 @@ public class OcrService : IOcrService
 
                 if (!string.IsNullOrEmpty(ocrError))
                 {
-                    return (null, null, $"Azure OCR Error: {ocrError}");
+                    _logger.LogInformation("Image OCR failed. Accepting original image for visual reading. Error: {Error}", ocrError);
+                    return (string.Empty, new List<Services.DTOs.PageLinesDto>(), null);
                 }
 
                 if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 5)
                 {
-                    _logger.LogInformation("Azure OCR extraction failed or yielded little text. Rejecting image.");
-                    return (null, null, "Ảnh quá mờ không thể dịch thuật được.");
+                    _logger.LogInformation("Image OCR yielded little text. Accepting original image for visual reading.");
+                    return (text ?? string.Empty, pages ?? new List<Services.DTOs.PageLinesDto>(), null);
                 }
 
                 return (text, pages, null);
@@ -101,7 +112,7 @@ public class OcrService : IOcrService
             using var document = PdfDocument.Open(fileStream);
             foreach (var page in document.GetPages())
             {
-                var pageDto = new Services.DTOs.PageLinesDto { PageNumber = page.Number };
+                var pageDto = new Services.DTOs.PageLinesDto { PageNumber = page.Number, Width = page.Width, Height = page.Height, Unit = "point", Angle = 0 };
                 var words = page.GetWords().ToList();
                 
                 // Group words by approximate Y coordinate (line)
@@ -126,7 +137,7 @@ public class OcrService : IOcrService
                         BoundingBox = new Services.DTOs.BoundingBoxDto
                         {
                             X = minX,
-                            Y = minY,
+                            Y = page.Height - maxY,
                             Width = maxX - minX,
                             Height = maxY - minY
                         },
@@ -136,7 +147,7 @@ public class OcrService : IOcrService
                             BoundingBox = new Services.DTOs.BoundingBoxDto
                             {
                                 X = w.BoundingBox.Left,
-                                Y = w.BoundingBox.Bottom,
+                                Y = page.Height - w.BoundingBox.Top,
                                 Width = w.BoundingBox.Width,
                                 Height = w.BoundingBox.Height
                             }
@@ -158,6 +169,168 @@ public class OcrService : IOcrService
         return pagesDto;
     }
 
+
+    private async Task<(string? text, List<Services.DTOs.PageLinesDto>? pages, string? errorMessage)> ExtractPdfWithAzureReadLayoutAsync(byte[] bytes)
+    {
+        try
+        {
+            var endpoint = _config["AzureComputerVision:Endpoint"]?.Trim().TrimEnd('/')
+                ?? throw new InvalidOperationException("AzureComputerVision:Endpoint is not configured.");
+            var key = _config["AzureComputerVision:Key"]?.Trim()
+                ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
+
+            var requestUrl = $"{endpoint}/vision/v3.2/read/analyze";
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", key);
+            request.Content = new ByteArrayContent(bytes);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+
+            var response = await _httpClient.SendAsync(request);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Azure Read API error: {StatusCode} {Body}", response.StatusCode, responseBody);
+                return (null, null, $"Azure Read API Error ({(int)response.StatusCode}): {responseBody}");
+            }
+
+            if (!response.Headers.TryGetValues("Operation-Location", out var locations))
+            {
+                return (null, null, "Azure Read API did not return an Operation-Location header.");
+            }
+
+            var operationUrl = locations.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(operationUrl))
+            {
+                return (null, null, "Azure Read API returned an empty Operation-Location header.");
+            }
+
+            for (var attempt = 0; attempt < 40; attempt++)
+            {
+                await Task.Delay(attempt < 8 ? 750 : 1500);
+
+                using var pollRequest = new HttpRequestMessage(HttpMethod.Get, operationUrl);
+                pollRequest.Headers.Add("Ocp-Apim-Subscription-Key", key);
+                var pollResponse = await _httpClient.SendAsync(pollRequest);
+                var pollBody = await pollResponse.Content.ReadAsStringAsync();
+
+                if (!pollResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Azure Read API polling error: {StatusCode} {Body}", pollResponse.StatusCode, pollBody);
+                    return (null, null, $"Azure Read polling error ({(int)pollResponse.StatusCode}): {pollBody}");
+                }
+
+                using var doc = JsonDocument.Parse(pollBody);
+                var status = doc.RootElement.GetProperty("status").GetString();
+
+                if (string.Equals(status, "failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (null, null, "Azure Read API failed to analyze the PDF.");
+                }
+
+                if (!string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!doc.RootElement.TryGetProperty("analyzeResult", out var analyzeResult)
+                    || !analyzeResult.TryGetProperty("readResults", out var readResults))
+                {
+                    return (string.Empty, new List<Services.DTOs.PageLinesDto>(), null);
+                }
+
+                var textBuilder = new StringBuilder();
+                var pagesDto = new List<Services.DTOs.PageLinesDto>();
+
+                foreach (var page in readResults.EnumerateArray())
+                {
+                    var pageDto = new Services.DTOs.PageLinesDto
+                    {
+                        PageNumber = page.TryGetProperty("page", out var pageNumber) ? pageNumber.GetInt32() : pagesDto.Count + 1,
+                        Width = page.TryGetProperty("width", out var width) ? width.GetDouble() : null,
+                        Height = page.TryGetProperty("height", out var height) ? height.GetDouble() : null,
+                        Unit = page.TryGetProperty("unit", out var unit) ? unit.GetString() ?? "pixel" : "pixel",
+                        Angle = page.TryGetProperty("angle", out var angle) ? angle.GetDouble() : null
+                    };
+
+                    if (!page.TryGetProperty("lines", out var lines))
+                    {
+                        pagesDto.Add(pageDto);
+                        continue;
+                    }
+
+                    foreach (var line in lines.EnumerateArray())
+                    {
+                        var lineText = line.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? string.Empty : string.Empty;
+                        if (!string.IsNullOrWhiteSpace(lineText)) textBuilder.AppendLine(lineText);
+
+                        var lineDto = new Services.DTOs.OcrLineDto
+                        {
+                            Text = lineText,
+                            BoundingBox = TryGetAzureReadBox(line)
+                        };
+
+                        if (line.TryGetProperty("words", out var words))
+                        {
+                            foreach (var word in words.EnumerateArray())
+                            {
+                                lineDto.Words.Add(new Services.DTOs.OcrWordDto
+                                {
+                                    Text = word.TryGetProperty("text", out var wordText) ? wordText.GetString() ?? string.Empty : string.Empty,
+                                    BoundingBox = TryGetAzureReadBox(word)
+                                });
+                            }
+                        }
+
+                        pageDto.Lines.Add(lineDto);
+                    }
+
+                    pagesDto.Add(pageDto);
+                }
+
+                return (textBuilder.ToString().Trim(), pagesDto, null);
+            }
+
+            return (null, null, "Azure Read API timed out while analyzing the PDF.");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Azure Read API request failed.");
+            return (null, null, $"Azure Read API Error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            var fullError = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+            _logger.LogWarning(ex, "Azure Read OCR failed to extract PDF text.");
+            return (null, null, fullError);
+        }
+    }
+
+    private static Services.DTOs.BoundingBoxDto? TryGetAzureReadBox(JsonElement element)
+    {
+        if (!element.TryGetProperty("boundingBox", out var box) || box.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var values = box.EnumerateArray().Select(v => v.GetDouble()).ToArray();
+        if (values.Length < 8) return null;
+
+        var xs = new[] { values[0], values[2], values[4], values[6] };
+        var ys = new[] { values[1], values[3], values[5], values[7] };
+        var minX = xs.Min();
+        var maxX = xs.Max();
+        var minY = ys.Min();
+        var maxY = ys.Max();
+
+        return new Services.DTOs.BoundingBoxDto
+        {
+            X = minX,
+            Y = minY,
+            Width = maxX - minX,
+            Height = maxY - minY
+        };
+    }
 
     private async Task<(string? text, List<Services.DTOs.PageLinesDto>? pages, string? errorMessage)> ExtractWithAzureOcrLayoutAsync(byte[] bytes)
     {
@@ -190,7 +363,7 @@ public class OcrService : IOcrService
 
             var textBuilder = new StringBuilder();
             var pagesDto = new List<Services.DTOs.PageLinesDto>();
-            var pageDto = new Services.DTOs.PageLinesDto { PageNumber = 1 };
+            var pageDto = new Services.DTOs.PageLinesDto { PageNumber = 1, Unit = "pixel", Angle = 0 };
 
             foreach (var block in blocks.EnumerateArray())
             {
