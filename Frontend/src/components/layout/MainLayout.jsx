@@ -73,6 +73,7 @@ export function MainLayout({ children }) {
   };
 
   const isFlashcardPage = location.pathname === '/flashcards';
+  const isReaderPage = location.pathname.startsWith('/reader');
   const displayBanner = showBanner && !isFlashcardPage;
 
   const hideChatbox = 
@@ -118,7 +119,7 @@ export function MainLayout({ children }) {
       <Header offsetTop={displayBanner} />
 
       {/* Main Content Pane */}
-      <main className={`flex-grow ${displayBanner ? 'pt-32 md:pt-36' : 'pt-24 md:pt-28'} pb-28 lg:pb-16 max-w-[1600px] 2xl:max-w-[1800px] mx-auto w-full sm:w-[96%] px-3 sm:px-5 lg:px-6 relative z-10 transition-all duration-300`}>
+      <main className={`flex-grow ${displayBanner ? 'pt-32 md:pt-36' : 'pt-24 md:pt-28'} pb-28 lg:pb-16 mx-auto relative z-10 transition-all duration-300 ${isReaderPage ? 'w-full max-w-none px-1 sm:px-2 lg:px-3' : 'max-w-[1600px] 2xl:max-w-[1800px] w-full sm:w-[96%] px-3 sm:px-5 lg:px-6'}`}>
         <div key={location.pathname} className="page-transition">
           {children}
         </div>

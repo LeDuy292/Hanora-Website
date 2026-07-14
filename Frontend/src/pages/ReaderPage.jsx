@@ -1136,36 +1136,36 @@ const ReaderPage = () => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
     if (!selectedText) {
+      if (showVisualReader && (ignoreNextWordClickRef.current || bubbleMenu.visible)) return;
       setBubbleMenu(prev => ({ ...prev, visible: false }));
       return;
     }
 
-        if (/^[，。！？；：、（）[\]{}""''\s]+$/.test(selectedText)) return;
+    if (/^[\uFF0C\u3002\uFF01\uFF1F\uFF1B\uFF1A\u3001\uFF08\uFF09[\]{}""''\s]+$/u.test(selectedText)) return;
 
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const spans = readerContainerRef.current?.querySelectorAll('[data-abs-index]');
       if (!spans) return;
 
-      let startIdx = -1;
-      let endIdx = -1;
-
+      const selectedIndexes = [];
       spans.forEach(span => {
-        if (selection.containsNode(span, true)) {
+        const intersects = typeof range.intersectsNode === 'function'
+          ? range.intersectsNode(span)
+          : selection.containsNode(span, true);
+        if (intersects || selection.containsNode(span, true)) {
           const idx = Number(span.getAttribute('data-abs-index'));
-          if (startIdx === -1) {
-            startIdx = idx;
-          }
-          endIdx = idx;
+          if (Number.isFinite(idx)) selectedIndexes.push(idx);
         }
       });
 
-      if (startIdx !== -1 && endIdx !== -1) {
+      if (selectedIndexes.length > 0) {
+        const startIdx = Math.min(...selectedIndexes);
+        const endIdx = Math.max(...selectedIndexes);
         if (activeTool === 'highlight') {
           createHighlightRange(startIdx, endIdx, activeColor, selectedText);
           selection.removeAllRanges();
         } else {
-          // Normal selection -> show bubble context menu
           const rect = range.getBoundingClientRect();
           setBubbleMenu({
             visible: true,
@@ -1714,7 +1714,7 @@ const ReaderPage = () => {
 
       {/* Top modern Workspace Toolbar */}
       {readMode !== 'focus' && (
-        <div className={`${activeTheme.toolbar} px-3 sm:px-4 lg:px-6 py-3 sm:py-4 flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch xl:items-center justify-between shrink-0 shadow-sm transition-colors duration-250`}>
+        <div className={`${activeTheme.toolbar} px-2 sm:px-3 lg:px-4 py-2.5 sm:py-3 flex flex-col xl:flex-row gap-2 sm:gap-3 items-stretch xl:items-center justify-between shrink-0 shadow-sm transition-colors duration-250`}>
           {/* Document selection section */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <span className={`font-bold text-xs tracking-wider uppercase ml-1 shrink-0 ${activeTheme.textMuted}`}>Tài liệu đang học:</span>
@@ -1851,55 +1851,6 @@ const ReaderPage = () => {
               <span className={`w-2 h-2 rounded-full ${showPinyin ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`} />
             </button>
 
-            {/* Font family switcher */}
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5">
-              <button
-                onClick={() => setFontMode('sans')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${fontMode === 'sans' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
-                  }`}
-                title="Font Không chân (Sans-Serif)"
-              >
-                Sans
-              </button>
-              <button
-                onClick={() => setFontMode('serif')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all font-serif ${fontMode === 'serif' ? 'bg-slate-100 text-slate-800 animate-in' : 'text-slate-505 hover:text-slate-800'
-                  }`}
-                title="Font Có chân (Serif)"
-              >
-                Serif
-              </button>
-              <button
-                onClick={() => setFontMode('kaiti')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${fontMode === 'kaiti' ? 'bg-slate-100 text-slate-800' : 'text-slate-505 hover:text-slate-800'
-                  }`}
-                style={{ fontFamily: '"KaiTi", "STKaiti", "楷体", serif' }}
-                title="Font Thư pháp (Kaiti 楷体)"
-              >
-                楷体
-              </button>
-
-            </div>
-
-            {/* Font size adjustments */}
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5">
-              <button
-                onClick={() => setFontSize(Math.max(16, fontSize - 2))}
-                className="px-3 py-1.5 hover:bg-slate-50 rounded-lg text-slate-600 font-bold transition-colors"
-                title="Giảm kích thước chữ"
-              >
-                A-
-              </button>
-              <span className="px-2.5 text-xs font-black text-slate-850">{fontSize}px</span>
-              <button
-                onClick={() => setFontSize(Math.min(48, fontSize + 2))}
-                className="px-3 py-1.5 hover:bg-slate-50 rounded-lg text-slate-600 font-bold transition-colors"
-                title="Tăng kích thước chữ"
-              >
-                A+
-              </button>
-            </div>
-
             {/* Fullscreen Button */}
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5">
               <button
@@ -1924,13 +1875,13 @@ const ReaderPage = () => {
       )}
 
       {/* Main Workspace Workspace Layout Grid */}
-      <div className="flex flex-col lg:flex-row flex-1 p-2 sm:p-4 md:p-6 gap-3 sm:gap-6 overflow-visible lg:overflow-hidden h-auto lg:h-[calc(100vh-175px)]">
+      <div className="flex flex-col lg:flex-row flex-1 p-1 sm:p-2 md:p-3 gap-2 sm:gap-3 overflow-visible lg:overflow-hidden h-auto lg:h-[calc(100vh-145px)]">
 
         {/* Left pane: A4 Smart Reader Area */}
         <div
           className={`h-full flex flex-col transition-all duration-300 ease-in-out ${!isSidebarOpen
               ? 'w-full'
-              : 'w-full lg:w-[65%]'
+              : 'w-full lg:w-[72%]'
             }`}
         >
           <div className={`flex flex-col flex-1 rounded-2xl sm:rounded-3xl overflow-hidden relative border transition-colors duration-250 ${activeTheme.sheet} bg-white`}>
@@ -1953,7 +1904,7 @@ const ReaderPage = () => {
             {document && (
               <>
                 {/* Canvas Drawing Tools */}
-                <div className={`px-2 sm:px-5 py-2.5 sm:py-3 flex flex-col 2xl:flex-row 2xl:items-center gap-2.5 sm:gap-3 shrink-0 ${activeTheme.toolbar}`}>
+                <div className={`px-2 sm:px-3 py-2 flex flex-col 2xl:flex-row 2xl:items-center gap-2 shrink-0 ${activeTheme.toolbar}`}>
                   <div className="w-full 2xl:w-auto overflow-x-auto scrollbar-thin">
                     <div className="inline-flex min-w-max items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-sm">
                     {/* Pointer */}
@@ -2207,7 +2158,7 @@ const ReaderPage = () => {
                             >Tải tài liệu khác</button>
                           </div>
                         ) : showVisualReader ? (
-                          <div className="h-full min-h-[64vh]">
+                          <div className="h-full min-h-[70vh]">
                             <VisualDocumentReader
                               documentId={document.id || document.Id || id}
                               fileUrl={document.fileUrl || document.FileUrl}
@@ -2447,7 +2398,7 @@ const ReaderPage = () => {
         {document && (
           <div
             className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-50 ${isSidebarOpen
-                ? 'fixed inset-y-0 right-0 w-[min(92vw,420px)] sm:w-[420px] lg:static lg:w-[35%] lg:h-full translate-x-0'
+                ? 'fixed inset-y-0 right-0 w-[min(92vw,420px)] sm:w-[420px] lg:static lg:w-[28%] lg:h-full translate-x-0'
                 : 'fixed inset-y-0 right-0 w-[min(92vw,420px)] sm:w-[420px] lg:hidden translate-x-full lg:translate-x-0'
               }`}
           >
