@@ -82,7 +82,7 @@ const PdfVisualReader = ({
   const [pdfDoc, setPdfDoc] = useState(null);
   const [totalPages, setTotalPages] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
-  const [scale, setScale] = useState(1.35);
+  const [scale, setScale] = useState(1.55);
   const [ocrPages, setOcrPages] = useState([]);
   const [isLoadingOcr, setIsLoadingOcr] = useState(Boolean(ocrJsonUrl));
 
@@ -420,7 +420,7 @@ const PdfVisualReader = ({
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-auto bg-slate-100/50 p-1 pb-16 sm:p-2">
+      <div className="relative flex-1 overflow-auto bg-slate-100/50 p-0.5 pb-14 sm:p-1">
         {!pdfDoc && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
@@ -428,7 +428,7 @@ const PdfVisualReader = ({
           </div>
         )}
 
-        <div className="relative mx-auto w-fit rounded-md bg-white shadow-lg ring-1 ring-slate-900/10 transition-transform duration-200">
+        <div className="relative mx-auto w-fit max-w-full rounded-md bg-white shadow-lg ring-1 ring-slate-900/10 transition-transform duration-200">
           <canvas ref={canvasRef} className="block rounded-md" />
           <div ref={textLayerRef} className="textLayer absolute inset-0 z-10 overflow-hidden rounded-md leading-none opacity-100" style={{ color: 'transparent' }} />
           <canvas
