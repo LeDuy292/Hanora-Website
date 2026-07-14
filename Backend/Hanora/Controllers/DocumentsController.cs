@@ -6,6 +6,8 @@ using Repositories;
 using Services;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Text.Json;
 
 namespace Hanora.Controllers;
 
@@ -38,6 +40,7 @@ public class DocumentsController : ControllerBase
     private readonly IDocumentRepository _documentRepository;
     private readonly IS3StorageService _s3StorageService;
     private readonly IConfiguration _configuration;
+    private readonly IOcrService _ocrService;
 
     private readonly DataAccessObjects.AppDbContext _db;
     private readonly IStatsService _statsService;
@@ -47,6 +50,7 @@ public class DocumentsController : ControllerBase
         IDocumentRepository documentRepository,
         IS3StorageService s3StorageService,
         IConfiguration configuration,
+        IOcrService ocrService,
         DataAccessObjects.AppDbContext db,
         IStatsService statsService)
     {
@@ -54,6 +58,7 @@ public class DocumentsController : ControllerBase
         _documentRepository = documentRepository;
         _s3StorageService = s3StorageService;
         _configuration = configuration;
+        _ocrService = ocrService;
         _db = db;
         _statsService = statsService;
     }
@@ -903,6 +908,85 @@ public class DocumentsController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/ocr-page/{pageNumber:int}")]
+    public async Task<IActionResult> GenerateOcrPage(long id, int pageNumber)
+    {
+        if (pageNumber < 1)
+        {
+            return BadRequest(new { error = "S? trang kh?ng h?p l?." });
+        }
+
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!long.TryParse(userIdString, out long userId))
+        {
+            userId = 1;
+        }
+
+        var document = await _db.Documents.FirstOrDefaultAsync(d => d.Id == id && d.UserId == userId);
+        if (document == null)
+        {
+            return NotFound(new { error = "T?i li?u kh?ng t?n t?i ho?c kh?ng thu?c quy?n s? h?u c?a b?n." });
+        }
+
+        var fileName = document.OriginalFilename ?? document.Title ?? string.Empty;
+        if (!fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "Ch? h? tr? OCR theo trang cho file PDF." });
+        }
+
+        using var fileStream = await _s3StorageService.DownloadFileAsync(document.FileUrl);
+        var (page, errorMessage) = await _ocrService.ExtractPdfPageLayoutAsync(fileStream, pageNumber);
+        if (!string.IsNullOrWhiteSpace(errorMessage) || page == null)
+        {
+            return StatusCode(502, new { error = errorMessage ?? "Kh?ng th? OCR trang n?y." });
+        }
+
+        var pages = await LoadExistingOcrPagesAsync(document.OcrJsonUrl);
+        pages.RemoveAll(p => p.PageNumber == pageNumber);
+        pages.Add(page);
+        pages = pages.OrderBy(p => p.PageNumber).ToList();
+
+        var ocrPayload = new
+        {
+            Version = 1,
+            Source = "hanora-layout-ocr",
+            Pages = pages
+        };
+
+        var layoutJson = JsonSerializer.Serialize(ocrPayload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var layoutBytes = Encoding.UTF8.GetBytes(layoutJson);
+        var layoutFileName = $"{Guid.NewGuid()}_layout.json";
+        var layoutUrl = await _s3StorageService.UploadBytesAsync(layoutBytes, layoutFileName, "application/json");
+
+        document.OcrJsonUrl = layoutUrl;
+        document.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { page, ocrJsonUrl = layoutUrl });
+    }
+
+    private async Task<List<Services.DTOs.PageLinesDto>> LoadExistingOcrPagesAsync(string? ocrJsonUrl)
+    {
+        if (string.IsNullOrWhiteSpace(ocrJsonUrl))
+        {
+            return new List<Services.DTOs.PageLinesDto>();
+        }
+
+        try
+        {
+            using var stream = await _s3StorageService.DownloadFileAsync(ocrJsonUrl);
+            var payload = await JsonSerializer.DeserializeAsync<OcrLayoutPayloadDto>(stream, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            return payload?.Pages ?? new List<Services.DTOs.PageLinesDto>();
+        }
+        catch
+        {
+            return new List<Services.DTOs.PageLinesDto>();
+        }
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteDocument(long id)
         {
@@ -951,6 +1035,11 @@ public class DocumentsController : ControllerBase
             return Ok(new { message = "Xóa tài liệu thành công." });
         }
     }
+
+public class OcrLayoutPayloadDto
+{
+    public List<Services.DTOs.PageLinesDto> Pages { get; set; } = new();
+}
 
 public class SaveAnnotationsRequest
 {

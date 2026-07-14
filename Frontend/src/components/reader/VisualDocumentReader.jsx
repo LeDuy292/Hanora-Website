@@ -251,6 +251,7 @@ const ImageOcrReader = ({
 };
 
 const VisualDocumentReader = ({
+  documentId,
   fileUrl,
   fileType,
   ocrJsonUrl,
@@ -279,6 +280,7 @@ const VisualDocumentReader = ({
   if (fileType === 'pdf') {
     return (
       <PdfVisualReader
+        documentId={documentId}
         fileUrl={fileUrl}
         onWordClick={onWordClick}
         ocrJsonUrl={ocrJsonUrl}

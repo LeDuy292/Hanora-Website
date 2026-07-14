@@ -2,6 +2,7 @@
 import { Loader2 } from 'lucide-react';
 import { segmentChineseText } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
+import { generateDocumentOcrPage } from '../../lib/api';
 
 const normalizePages = (payload) => {
   if (!payload) return [];
@@ -43,7 +44,19 @@ const getWords = (page) => {
   }).filter((word) => word.text && word.box);
 };
 
+const getPageIdentity = (page, index) => {
+  const explicit = valueOf(page, 'pageNumber', 'PageNumber', valueOf(page, 'page', 'Page', index + 1));
+  const numeric = Number(explicit);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : index + 1;
+};
+
+const withPageIdentity = (page, pageNumber) => ({
+  ...page,
+  pageNumber: Number(valueOf(page, 'pageNumber', 'PageNumber', pageNumber)) || pageNumber,
+});
+
 const PdfVisualReader = ({
+  documentId,
   fileUrl,
   ocrJsonUrl,
   currentPage = 1,
@@ -76,12 +89,46 @@ const PdfVisualReader = ({
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
   const renderTaskRef = useRef(null);
+  const requestedOcrPagesRef = useRef(new Set());
 
   const pageNumber = Math.max(1, Math.min(Number(currentPage) || 1, totalPages || Number(currentPage) || 1));
-  const ocrPage = useMemo(
-    () => ocrPages.find((page) => Number(valueOf(page, 'pageNumber', 'PageNumber', 1)) === pageNumber),
-    [ocrPages, pageNumber]
-  );
+  const ocrPage = useMemo(() => {
+    if (!ocrPages.length) return null;
+
+    return ocrPages.find((page, index) => getPageIdentity(page, index) === pageNumber) || null;
+  }, [ocrPages, pageNumber]);
+
+  const hasOcrPageForCurrentPage = useMemo(() => (
+    ocrPages.some((page, index) => getPageIdentity(page, index) === pageNumber)
+  ), [ocrPages, pageNumber]);
+
+  useEffect(() => {
+    requestedOcrPagesRef.current.clear();
+  }, [documentId, fileUrl]);
+
+  useEffect(() => {
+    if (!documentId || !pdfDoc || isLoadingOcr || hasOcrPageForCurrentPage || pageNumber < 1) return;
+    if (requestedOcrPagesRef.current.has(pageNumber)) return;
+
+    requestedOcrPagesRef.current.add(pageNumber);
+    generateDocumentOcrPage(documentId, pageNumber)
+      .then((result) => {
+        const page = result?.page || result?.Page;
+        if (!page) {
+          requestedOcrPagesRef.current.delete(pageNumber);
+          return;
+        }
+        const identifiedPage = withPageIdentity(page, pageNumber);
+        setOcrPages((prev) => {
+          const withoutPage = prev.filter((item, index) => getPageIdentity(item, index) !== pageNumber);
+          return [...withoutPage, identifiedPage].sort((a, b) => getPageIdentity(a, 0) - getPageIdentity(b, 0));
+        });
+      })
+      .catch((error) => {
+        requestedOcrPagesRef.current.delete(pageNumber);
+        console.warn('Cannot generate OCR for PDF page ' + pageNumber + '.', error);
+      });
+  }, [documentId, pdfDoc, isLoadingOcr, hasOcrPageForCurrentPage, pageNumber]);
 
   useEffect(() => {
     let isMounted = true;
@@ -166,27 +213,27 @@ const PdfVisualReader = ({
     const hasStickyNote = annotations?.stickyNotes?.[absIndex];
 
     wordSpan.dataset.absIndex = String(absIndex);
+    wordSpan.dataset.pageNumber = String(pageNumber);
     wordSpan.classList.add('hanora-pdf-token');
     wordSpan.style.cursor = 'pointer';
     wordSpan.style.borderRadius = '3px';
-    wordSpan.style.transition = 'background 150ms ease, box-shadow 150ms ease';
+    wordSpan.style.transition = 'background 150ms ease, box-shadow 150ms ease, outline 150ms ease';
 
     const rangeStart = selectionRange ? Math.min(selectionRange.start, selectionRange.end) : -1;
     const rangeEnd = selectionRange ? Math.max(selectionRange.start, selectionRange.end) : -1;
     const isSelecting = absIndex >= rangeStart && absIndex <= rangeEnd;
 
     if (highlightColor) {
-      wordSpan.style.backgroundColor = `${highlightColor}66`;
-      wordSpan.style.boxShadow = 'none';
-    }
-    else if (isSelecting) {
+      wordSpan.style.backgroundColor = `${highlightColor}73`;
+      wordSpan.style.boxShadow = 'inset 0 -0.08em 0 rgba(15, 23, 42, 0.08)';
+    } else if (isSelecting) {
       wordSpan.style.backgroundColor = 'rgba(37, 99, 235, 0.24)';
       wordSpan.style.outline = '1px solid rgba(37, 99, 235, 0.28)';
     }
 
     if (hasTextNote || hasStickyNote) {
       const noteBadge = document.createElement('span');
-      noteBadge.textContent = hasStickyNote ? '\uD83D\uDCCC' : '\uD83D\uDCA1';
+      noteBadge.textContent = hasStickyNote ? '📌' : '💡';
       noteBadge.className = 'hanora-note-badge';
       noteBadge.title = hasStickyNote || hasTextNote || '';
       wordSpan.appendChild(noteBadge);
@@ -277,7 +324,6 @@ const PdfVisualReader = ({
     let cancelled = false;
 
     const renderPage = async () => {
-      if (isRendering) return;
       setIsRendering(true);
 
       try {
@@ -287,9 +333,16 @@ const PdfVisualReader = ({
         const textLayerDiv = textLayerRef.current;
         if (!canvas || !textLayerDiv) return;
 
+        textLayerDiv.innerHTML = '';
         const context = canvas.getContext('2d', { willReadFrequently: true });
         canvas.height = viewport.height;
         canvas.width = viewport.width;
+
+        if (drawingCanvasRef?.current) {
+          drawingCanvasRef.current.height = viewport.height;
+          drawingCanvasRef.current.width = viewport.width;
+          drawingCanvasRef.current.dataset.pageNumber = String(pageNumber);
+        }
 
         if (renderTaskRef.current) {
           renderTaskRef.current.cancel();
@@ -328,7 +381,10 @@ const PdfVisualReader = ({
     };
 
     renderPage();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      renderTaskRef.current?.cancel?.();
+    };
   }, [pdfDoc, pageNumber, scale, showPinyin, activeTool, annotations, ocrPage]);
 
   const goToPage = (nextPage) => {
@@ -338,7 +394,7 @@ const PdfVisualReader = ({
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
-      <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center justify-between gap-8 rounded-full border border-slate-200/60 bg-white/90 px-5 py-2.5 shadow-lg shadow-slate-200/40 backdrop-blur-md">
+      <div className="absolute bottom-6 left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center justify-between gap-4 rounded-full border border-slate-200/60 bg-white/90 px-4 py-2.5 shadow-lg shadow-slate-200/40 backdrop-blur-md sm:gap-8 sm:px-5">
         <div className="flex items-center gap-1">
           <button onClick={() => setScale(Math.max(0.5, scale - 0.2))} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Thu nhỏ">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" /></svg>
@@ -377,6 +433,7 @@ const PdfVisualReader = ({
           <div ref={textLayerRef} className="textLayer absolute inset-0 z-10 overflow-hidden rounded-md leading-none opacity-100" style={{ color: 'transparent' }} />
           <canvas
             ref={drawingCanvasRef}
+            data-page-number={pageNumber}
             className={`absolute inset-0 z-30 h-full w-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
             style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
             onPointerDown={onDrawingPointerDown}

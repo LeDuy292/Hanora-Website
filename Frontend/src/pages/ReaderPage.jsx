@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
@@ -28,11 +28,11 @@ import {
 
 const HIGHLIGHT_COLORS = [
   { id: 'yellow', name: 'Vàng (Từ mới)', value: '#fef08a' },
-  { id: 'green', name: 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
+    { id: 'green', name: 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
   { id: 'blue', name: 'Xanh dương (Quan trọng)', value: '#bfdbfe' },
-  { id: 'purple', name: 'Tím (Ngữ pháp)', value: '#e9d5ff' },
+    { id: 'purple', name: 'Tím (Ngữ pháp)', value: '#e9d5ff' },
   { id: 'pink', name: 'Hồng (Thành ngữ)', value: '#fbcfe8' },
-  { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
+    { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
 ];
 
 const DRAWING_COLORS = [
@@ -62,8 +62,8 @@ const PEN_STYLES = [
 const NOTE_CATEGORIES = [
   { id: 'text', name: 'Ghi chú văn bản', icon: '📝', prefix: '[Text] ' },
   { id: 'vocab', name: 'Ghi chú từ vựng', icon: '📖', prefix: '[Vocabulary] ' },
-  { id: 'grammar', name: 'Ghi chú ngữ pháp', icon: '💡', prefix: '[Grammar] ' },
-  { id: 'personal', name: 'Nhận xét cá nhân', icon: '👤', prefix: '[Personal] ' }
+    { id: 'grammar', name: 'Ghi chú ngữ pháp', icon: '💡', prefix: '[Grammar] ' },
+    { id: 'personal', name: 'Nhận xét cá nhân', icon: '👤', prefix: '[Personal] ' }
 ];
 
 const EMPTY_ANNOTATIONS = {
@@ -106,10 +106,10 @@ const parseNoteContent = (noteStr) => {
     return { text: noteStr.slice('[Vocabulary] '.length), category: 'vocab', icon: '📖', label: 'Ghi chú từ vựng' };
   }
   if (noteStr.startsWith('[Grammar] ')) {
-    return { text: noteStr.slice('[Grammar] '.length), category: 'grammar', icon: '💡', label: 'Ghi chú ngữ pháp' };
+        return { text: noteStr.slice('[Grammar] '.length), category: 'grammar', icon: '💡', label: 'Ghi chú ngữ pháp' };
   }
   if (noteStr.startsWith('[Personal] ')) {
-    return { text: noteStr.slice('[Personal] '.length), category: 'personal', icon: '👤', label: 'Nhận xét cá nhân' };
+        return { text: noteStr.slice('[Personal] '.length), category: 'personal', icon: '👤', label: 'Nhận xét cá nhân' };
   }
   if (noteStr.startsWith('[Text] ')) {
     return { text: noteStr.slice('[Text] '.length), category: 'text', icon: '📝', label: 'Ghi chú văn bản' };
@@ -124,7 +124,7 @@ const ReaderPage = () => {
   const [documentError, setDocumentError] = useState('');
   const [segments, setSegments] = useState([]);
   const WORDS_PER_PAGE = 500;
-  const totalPages = Math.ceil(segments.length / WORDS_PER_PAGE) || 1;
+  const textTotalPages = Math.ceil(segments.length / WORDS_PER_PAGE) || 1;
   const [selectedWord, setSelectedWord] = useState(null);
   const [vocabData, setVocabData] = useState(null);
   const [isLoadingVocab, setIsLoadingVocab] = useState(false);
@@ -134,6 +134,9 @@ const ReaderPage = () => {
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [documentsList, setDocumentsList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const visualDocumentType = getVisualDocumentType(document);
+  const visualOcrJsonUrl = document?.ocrJsonUrl || document?.OcrJsonUrl || null;
+  const showVisualReader = Boolean(visualDocumentType);
   const readerContainerRef = useRef(null);
   const navigate = useNavigate();
 
@@ -202,6 +205,7 @@ const ReaderPage = () => {
   });
 
   const canvasRef = useRef(null);
+  const drawingPageRef = useRef(1);
   const longPressTimerRef = useRef(null);
   const visualSelectionRef = useRef(null);
   const ignoreNextWordClickRef = useRef(false);
@@ -244,13 +248,13 @@ const ReaderPage = () => {
         const status = String(doc.status || '').toLowerCase();
         if (status === 'failed' || doc.status === 2) {
           setSegments([]);
-          setDocumentError(doc.processingError || doc.extractedText || 'Không thể xử lý tài liệu này. Vui lòng thử tài liệu rõ hơn hoặc định dạng khác.');
+                    setDocumentError(doc.processingError || doc.extractedText || 'Không thể xử lý tài liệu này. Vui lòng thử tài liệu rõ hơn hoặc định dạng khác.');
           return;
         }
 
         if ((status === 'processing' || doc.status === 0) && !doc.extractedText) {
           setSegments([]);
-          setDocumentError('Tài liệu đang được xử lý OCR. Vui lòng chờ trong giây lát rồi tải lại trang.');
+                    setDocumentError('Tài liệu đang được xử lý OCR. Vui lòng chờ trong giây lát rồi tải lại trang.');
           return;
         }
 
@@ -318,13 +322,14 @@ const ReaderPage = () => {
   }, []);
 
   const handleDeleteDocument = async (docId, title) => {
+    const safeTitle = title || 'tài liệu';
+
     toast.confirm(
-      `Bạn có chắc chắn muốn xóa tài liệu "${title}" không? Hành động này sẽ xóa tất cả ghi chú, vẽ vẽ, và các dữ liệu liên quan.`,
+      `Bạn có chắc chắn muốn xóa tài liệu "${safeTitle}" không? Hành động này sẽ xóa tất cả ghi chú, nét vẽ và dữ liệu liên quan.`,
       async () => {
         try {
           await deleteDocument(docId);
-          toast.success('\u0058\u00f3a t\u00e0i li\u1ec7u th\u00e0nh c\u00f4ng!');
-          // Refresh the documents list
+          toast.success('Xóa tài liệu thành công!');
           const docs = await getMyDocuments();
           setDocumentsList(docs);
 
@@ -341,15 +346,15 @@ const ReaderPage = () => {
           }
         } catch (error) {
           console.error(error);
-          toast.error(error.message || '\u004b h\u00f4ng th\u1ec3 x\u00f3a t\u00e0i li\u1ec7u.');
+          toast.error(error.message || 'Không thể xóa tài liệu.');
         }
       },
-      '\u0058\u00f3a t\u00e0i li\u1ec7u'
+      'Xóa tài liệu'
     );
   };
 
   const currentPageRef = useRef(currentPage);
-  const totalPagesRef = useRef(totalPages);
+  const textTotalPagesRef = useRef(textTotalPages);
   const readingSecondsRef = useRef(readingSeconds);
 
   useEffect(() => {
@@ -357,8 +362,8 @@ const ReaderPage = () => {
   }, [currentPage]);
 
   useEffect(() => {
-    totalPagesRef.current = totalPages;
-  }, [totalPages]);
+    textTotalPagesRef.current = textTotalPages;
+  }, [textTotalPages]);
 
   useEffect(() => {
     readingSecondsRef.current = readingSeconds;
@@ -367,7 +372,7 @@ const ReaderPage = () => {
   const saveReadingProgress = async () => {
     if (!document?.id || String(document.status || '').toLowerCase() === 'failed' || document.status === 2) return;
     const currPage = currentPageRef.current;
-    const totPages = totalPagesRef.current;
+    const totPages = Math.max(currPage, textTotalPagesRef.current || 1);
     const sec = readingSecondsRef.current;
     try {
       await apiRequest(`/documents/${document.id}/progress`, {
@@ -520,9 +525,19 @@ const ReaderPage = () => {
   }, [annotations.pencilStrokes, currentPage, currentStroke, activeTool, penColor, penWidth, penStyle]);
 
   // Pointer events for Canvas Pencil / Eraser
+  const getCanvasPageFromEvent = (event) => Number(event?.currentTarget?.dataset?.pageNumber) || drawingPageRef.current || currentPage;
+
+  const getCanvasFromEvent = (event) => event?.currentTarget || canvasRef.current;
+
   const handlePointerDown = (e) => {
-    const canvas = canvasRef.current;
+    const canvas = getCanvasFromEvent(e);
     if (!canvas) return;
+
+    const pageForEvent = getCanvasPageFromEvent(e);
+    drawingPageRef.current = pageForEvent;
+    if (pageForEvent !== currentPage) setCurrentPage(pageForEvent);
+    canvasRef.current = canvas;
+
     const rect = canvas.getBoundingClientRect();
     const xPercent = (e.clientX - rect.left) / rect.width;
     const yPercent = (e.clientY - rect.top) / rect.height;
@@ -544,14 +559,16 @@ const ReaderPage = () => {
       }
 
       setIsDrawing(true);
-      eraseStrokesNear(xPercent, yPercent);
+      eraseStrokesNear(xPercent, yPercent, pageForEvent, canvas);
     }
   };
 
   const handlePointerMove = (e) => {
     if (!isDrawing) return;
-    const canvas = canvasRef.current;
+    const canvas = getCanvasFromEvent(e);
     if (!canvas) return;
+    canvasRef.current = canvas;
+
     const rect = canvas.getBoundingClientRect();
     const xPercent = (e.clientX - rect.left) / rect.width;
     const yPercent = (e.clientY - rect.top) / rect.height;
@@ -559,12 +576,13 @@ const ReaderPage = () => {
     if (activeTool === 'pencil') {
       setCurrentStroke(prev => [...prev, { x: xPercent, y: yPercent }]);
     } else if (activeTool === 'eraser') {
-      eraseStrokesNear(xPercent, yPercent);
+      eraseStrokesNear(xPercent, yPercent, drawingPageRef.current || getCanvasPageFromEvent(e), canvas);
     }
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e) => {
     if (!isDrawing) return;
+    const pageForStroke = drawingPageRef.current || getCanvasPageFromEvent(e);
     setIsDrawing(false);
     if (activeTool === 'pencil' && currentStroke.length > 0) {
       const stroke = {
@@ -575,25 +593,25 @@ const ReaderPage = () => {
         points: currentStroke
       };
       setAnnotations(prev => {
-        const pageStrokes = prev.pencilStrokes[currentPage] || [];
+        const pageStrokes = prev.pencilStrokes[pageForStroke] || [];
         const next = {
           ...prev,
           pencilStrokes: {
             ...prev.pencilStrokes,
-            [currentPage]: [...pageStrokes, stroke]
+            [pageForStroke]: [...pageStrokes, stroke]
           }
         };
         autoSaveAnnotations(next);
         return next;
       });
-      setRedoStrokes(prev => ({ ...prev, [currentPage]: [] }));
+      setRedoStrokes(prev => ({ ...prev, [pageForStroke]: [] }));
     }
     setCurrentStroke([]);
   };
 
-  const eraseStrokesNear = (xPercent, yPercent) => {
-    const pageStrokes = annotations.pencilStrokes[currentPage] || [];
-    const canvas = canvasRef.current;
+  const eraseStrokesNear = (xPercent, yPercent, page = currentPage, targetCanvas = canvasRef.current) => {
+    const pageStrokes = annotations.pencilStrokes[page] || [];
+    const canvas = targetCanvas;
     if (!canvas) return;
     const width = canvas.width;
     const height = canvas.height;
@@ -620,13 +638,13 @@ const ReaderPage = () => {
         ...prev,
         pencilStrokes: {
           ...prev.pencilStrokes,
-          [currentPage]: updatedStrokes
+          [page]: updatedStrokes
         }
       };
       autoSaveAnnotations(next);
       return next;
     });
-    setRedoStrokes(prev => ({ ...prev, [currentPage]: [] }));
+    setRedoStrokes(prev => ({ ...prev, [page]: [] }));
   };
 
   const handleUndoStroke = () => {
@@ -929,7 +947,7 @@ const ReaderPage = () => {
     });
   };
 
-  const handleWordPointerUp = (absIndex, e) => {
+  const finishVisualSelection = (absIndex, e) => {
     clearLongPressTimer();
 
     const selection = visualSelectionRef.current;
@@ -940,9 +958,11 @@ const ReaderPage = () => {
       return;
     }
 
-    const dx = Math.abs((e.clientX || selection.x) - selection.x);
-    const dy = Math.abs((e.clientY || selection.y) - selection.y);
+    const clientX = e?.clientX ?? selection.x;
+    const clientY = e?.clientY ?? selection.y;
     const end = Number.isFinite(absIndex) ? absIndex : selection.end;
+    const dx = Math.abs(clientX - selection.x);
+    const dy = Math.abs(clientY - selection.y);
     const isRangeSelection = selection.start !== end || selection.moved || dx > 8 || dy > 8;
 
     if (!isRangeSelection) {
@@ -954,8 +974,8 @@ const ReaderPage = () => {
     const finish = Math.max(selection.start, end);
     const selectedText = getTextForRange(start, finish);
     ignoreNextWordClickRef.current = true;
-    e.preventDefault?.();
-    e.stopPropagation?.();
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
 
     if (activeTool === 'highlight') {
       createHighlightRange(start, finish, activeColor, selectedText);
@@ -963,18 +983,32 @@ const ReaderPage = () => {
       return;
     }
 
-    const rect = e.currentTarget?.getBoundingClientRect?.();
+    const targetRect = e?.currentTarget?.getBoundingClientRect?.();
+    const selectedElements = Array.from(readerContainerRef.current?.querySelectorAll('[data-abs-index]') || [])
+      .filter(el => {
+        const idx = Number(el.getAttribute('data-abs-index'));
+        return idx >= start && idx <= finish;
+      });
+    const firstRect = selectedElements[0]?.getBoundingClientRect?.();
+    const lastRect = selectedElements[selectedElements.length - 1]?.getBoundingClientRect?.();
+    const menuX = firstRect && lastRect ? (firstRect.left + lastRect.right) / 2 : targetRect ? targetRect.left + targetRect.width / 2 : clientX;
+    const menuY = Math.max(10, firstRect ? firstRect.top - 50 : targetRect ? targetRect.top - 50 : clientY - 50);
+
     setBubbleMenu({
       visible: true,
       text: selectedText,
       startIndex: start,
       endIndex: finish,
-      x: rect ? rect.left + rect.width / 2 : e.clientX,
-      y: Math.max(10, rect ? rect.top - 50 : e.clientY - 50)
+      x: menuX,
+      y: menuY
     });
     setHighlightMenu(prev => ({ ...prev, visible: false }));
     setVisualSelectionRange(null);
     window.getSelection()?.removeAllRanges();
+  };
+
+  const handleWordPointerUp = (absIndex, e) => {
+    finishVisualSelection(absIndex, e);
   };
 
   const handleSaveAnnotations = async () => {
@@ -997,6 +1031,27 @@ const ReaderPage = () => {
       useToastStore.getState().addToast("Có lỗi xảy ra khi xuất file Word (.docx).", "error");
     }
   };
+
+  useEffect(() => {
+    const handleGlobalPointerUp = (event) => {
+      const selection = visualSelectionRef.current;
+      if (!selection) return;
+
+      const targetToken = window.document
+        .elementsFromPoint(event.clientX, event.clientY)
+        .map(el => el?.closest?.('[data-abs-index]'))
+        .find(Boolean);
+      const endIndex = targetToken ? Number(targetToken.getAttribute('data-abs-index')) : selection.end;
+      finishVisualSelection(endIndex, event);
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, [showVisualReader, activeTool, activeColor, annotations, segments]);
 
   const handleWordClick = async (word, absIndex, e) => {
     if (ignoreNextWordClickRef.current) {
@@ -1085,7 +1140,7 @@ const ReaderPage = () => {
       return;
     }
 
-    if (/^[，。！？；：、（）[\]{}""''\s]+$/.test(selectedText)) return;
+        if (/^[，。！？；：、（）[\]{}""''\s]+$/.test(selectedText)) return;
 
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
@@ -1217,7 +1272,7 @@ const ReaderPage = () => {
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
+                text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
       }]);
     } catch (err) {
       console.error(err);
@@ -1251,11 +1306,8 @@ const ReaderPage = () => {
   };
 
 
-  const validCurrentPage = Math.min(currentPage, totalPages);
+  const validCurrentPage = showVisualReader ? currentPage : Math.min(currentPage, textTotalPages);
   const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
-  const visualDocumentType = getVisualDocumentType(document);
-  const visualOcrJsonUrl = document?.ocrJsonUrl || document?.OcrJsonUrl || null;
-  const showVisualReader = Boolean(visualDocumentType);
 
   // Document selectors filtered list
   const filteredDropdownDocs = documentsList.filter(d =>
@@ -1431,49 +1483,53 @@ const ReaderPage = () => {
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (
         <div
-          className="reader-bubble-menu fixed z-[100] bg-gray-950/95 backdrop-blur-md text-white text-[11px] rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 border border-gray-800"
+          className="reader-bubble-menu fixed z-[100] flex max-w-[calc(100vw-24px)] items-center gap-1 overflow-x-auto rounded-2xl border border-gray-800 bg-gray-950/95 p-1.5 text-[11px] text-white shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
           style={{
             left: `${bubbleMenu.x}px`,
             top: `${bubbleMenu.y}px`,
             transform: 'translate(-50%, -100%)'
           }}
+          onMouseDown={(event) => event.preventDefault()}
         >
           <button
             onClick={handleBubbleSaveToFlashcard}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            + Flashcard
+            <GraduationCap className="h-3.5 w-3.5" />
+            <span>+ Flashcard</span>
           </button>
-          <div className="w-[1px] h-4 bg-white/20" />
+          <div className="h-4 w-px bg-white/20" />
           <button
             onClick={handleBubbleSaveToNotebook}
-            className="px-2.5 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            + Sổ tay
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>{'+ Sổ tay'}</span>
           </button>
-          <div className="w-[1px] h-4 bg-white/20" />
+          <div className="h-4 w-px bg-white/20" />
           <button
             onClick={() => {
-              createHighlightRange(bubbleMenu.startIndex, bubbleMenu.endIndex, activeColor);
+              createHighlightRange(bubbleMenu.startIndex, bubbleMenu.endIndex, activeColor, bubbleMenu.text);
               window.getSelection()?.removeAllRanges();
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            <Highlighter className="w-3.5 h-3.5" />
-            Highlight
+            <Highlighter className="h-3.5 w-3.5" />
+            <span>Highlight</span>
           </button>
-          <div className="w-[1px] h-4 bg-white/20" />
+          <div className="h-4 w-px bg-white/20" />
           <button
             onClick={() => {
               startEditingNote(bubbleMenu.startIndex, 'text', annotations.textNotes[bubbleMenu.startIndex]);
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            📝 Ghi chú
+            <FileText className="h-3.5 w-3.5" />
+            <span>{'Ghi chú'}</span>
           </button>
-          <div className="w-[1px] h-4 bg-white/20" />
+          <div className="h-4 w-px bg-white/20" />
           <button
             onClick={async () => {
               const word = bubbleMenu.text;
@@ -1493,22 +1549,24 @@ const ReaderPage = () => {
                 setIsLoadingVocab(false);
               }
             }}
-            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            🔍 Dịch nhanh
+            <Search className="h-3.5 w-3.5 text-blue-300" />
+            <span>{'Dịch nhanh'}</span>
           </button>
-          <div className="w-[1px] h-4 bg-white/20" />
+          <div className="h-4 w-px bg-white/20" />
           <button
             onClick={() => {
               navigator.clipboard.writeText(bubbleMenu.text);
-              useToastStore.getState().addToast('Đã sao chép nội dung vào bộ nhớ tạm!', 'success');
+              toast.success('Đã sao chép nội dung.');
               setBubbleMenu(prev => ({ ...prev, visible: false }));
             }}
-            className="px-3 py-1.5 hover:bg-white/10 rounded-xl transition-colors font-bold text-center flex items-center gap-1"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
           >
-            📋 Sao chép
+            <Copy className="h-3.5 w-3.5" />
+            <span>{'Sao chép'}</span>
           </button>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-955" />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-950" />
         </div>
       )}
 
@@ -1734,7 +1792,7 @@ const ReaderPage = () => {
                   </div>
 
                   {/* Pagination Controls */}
-                  {totalPages > 1 && (
+                  {!showVisualReader && textTotalPages > 1 && (
                     <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
                       <div className="flex items-center gap-6">
                         <button
@@ -1750,15 +1808,15 @@ const ReaderPage = () => {
                         </button>
 
                         <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
-                          Trang {validCurrentPage} / {totalPages}
+                          Trang {validCurrentPage} / {textTotalPages}
                         </span>
 
                         <button
                           onClick={() => {
-                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                            setCurrentPage(p => Math.min(textTotalPages, p + 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          disabled={validCurrentPage === totalPages}
+                          disabled={validCurrentPage === textTotalPages}
                           className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                           title="Trang tiếp theo"
                         >
@@ -2146,13 +2204,12 @@ const ReaderPage = () => {
                               type="button"
                               onClick={() => setIsUploadModalOpen(true)}
                               className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-                            >
-                              Tải tài liệu khác
-                            </button>
+                            >Tải tài liệu khác</button>
                           </div>
                         ) : showVisualReader ? (
                           <div className="h-full min-h-[64vh]">
                             <VisualDocumentReader
+                              documentId={document.id || document.Id || id}
                               fileUrl={document.fileUrl || document.FileUrl}
                               fileType={visualDocumentType}
                               ocrJsonUrl={visualOcrJsonUrl}
@@ -2339,7 +2396,7 @@ const ReaderPage = () => {
                   </div>
 
                   {/* Pagination bar */}
-                  {totalPages > 1 && (
+                  {!showVisualReader && textTotalPages > 1 && (
                     <div className="mt-2 shrink-0 flex flex-col items-center justify-center border-t border-slate-100/60 pt-3 pb-1">
                       <div className="flex items-center gap-6">
                         <button
@@ -2355,15 +2412,15 @@ const ReaderPage = () => {
                         </button>
 
                         <span className="text-xs font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80 shadow-sm">
-                          Trang {validCurrentPage} / {totalPages}
+                          Trang {validCurrentPage} / {textTotalPages}
                         </span>
 
                         <button
                           onClick={() => {
-                            setCurrentPage(p => Math.min(totalPages, p + 1));
+                            setCurrentPage(p => Math.min(textTotalPages, p + 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          disabled={validCurrentPage === totalPages}
+                          disabled={validCurrentPage === textTotalPages}
                           className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                           title="Trang tiếp theo"
                         >
@@ -2441,7 +2498,7 @@ const ReaderPage = () => {
                       </div>
                       <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Tra cứu thông minh</h3>
                       <p className="text-slate-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                        Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
+                                                Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
                       </p>
                     </div>
                   ) : (
@@ -2627,7 +2684,7 @@ const ReaderPage = () => {
                       </div>
 
                       <div className="text-[10px] text-slate-400 font-semibold italic text-center pt-2 leading-relaxed">
-                        Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
+                                                Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
                       </div>
                     </div>
                   )}
