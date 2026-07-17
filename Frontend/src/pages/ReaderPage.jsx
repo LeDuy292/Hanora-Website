@@ -1234,29 +1234,36 @@ const ReaderPage = () => {
   // Bubble menu methods
   const handleBubbleSaveToNotebook = async () => {
     if (!bubbleMenu.text) return;
+    const showSaveResult = (result, fallbackMessage) => {
+      useToastStore.getState().addToast(
+        result?.message || fallbackMessage,
+        result?.alreadyExists ? 'warning' : 'success'
+      );
+    };
+
     try {
       const vocab = await getVocabulary(bubbleMenu.text);
-      await addWord({
+      const result = await addWord({
         text: vocab.word || bubbleMenu.text,
         pinyin: vocab.pinyin || '',
         translation: typeof vocab.definitions === 'string' ? vocab.definitions : JSON.stringify(vocab.definitions),
         documentId: id,
         documentTitle: document?.title
       });
-      useToastStore.getState().addToast('Đã lưu vào sổ tay từ vựng thành công!', 'success');
+      showSaveResult(result, 'Đã lưu vào sổ tay từ vựng thành công!');
     } catch (error) {
       console.error(error);
       try {
-        await addWord({
+        const result = await addWord({
           text: bubbleMenu.text,
           pinyin: '',
           translation: 'Từ vựng tự học',
           documentId: id,
           documentTitle: document?.title
         });
-        useToastStore.getState().addToast('Đã lưu vào sổ tay thành công!', 'success');
+        showSaveResult(result, 'Đã lưu vào sổ tay thành công!');
       } catch (e2) {
-        useToastStore.getState().addToast('Lỗi khi lưu vào sổ tay.', 'error');
+        useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
       }
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
@@ -1270,7 +1277,7 @@ const ReaderPage = () => {
       useToastStore.getState().addToast('Đã lưu vào danh sách Flashcard thành công!', 'success');
     } catch (error) {
       console.error(error);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu Flashcard.', 'error');
+      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
     }

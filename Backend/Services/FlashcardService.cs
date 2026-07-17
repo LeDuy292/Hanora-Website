@@ -38,7 +38,7 @@ public class FlashcardService : IFlashcardService
                 .ThenInclude(uv => uv.Vocabulary)
                     .ThenInclude(v => v.ExampleSentencesNavigation)
             .Include(f => f.UserVocabulary.SourceDocument)
-            .Where(f => f.UserVocabulary.UserId == userId);
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (deckId.HasValue)
         {
@@ -271,7 +271,7 @@ public class FlashcardService : IFlashcardService
                 await _vocabRepo.CreateAsync(vocab);
             }
 
-            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id);
+            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id && x.IsDeleted != true);
             if (uv == null)
             {
                 uv = new UserVocabulary
@@ -382,7 +382,7 @@ public class FlashcardService : IFlashcardService
     {
         var flashcard = await _db.Flashcards
             .Include(f => f.UserVocabulary)
-            .FirstOrDefaultAsync(f => f.Id == cardId && f.UserVocabulary.UserId == userId);
+            .FirstOrDefaultAsync(f => f.Id == cardId && f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
         if (flashcard == null) return false;
 
         _db.Flashcards.Remove(flashcard);
@@ -446,7 +446,7 @@ public class FlashcardService : IFlashcardService
                 await _vocabRepo.CreateAsync(vocab);
             }
 
-            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id);
+            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id && x.IsDeleted != true);
             if (uv == null)
             {
                 uv = new UserVocabulary
@@ -624,7 +624,7 @@ public class FlashcardService : IFlashcardService
     {
         var flashcard = await _db.Flashcards
             .Include(f => f.UserVocabulary)
-            .FirstOrDefaultAsync(f => f.Id == flashcardId && f.UserVocabulary.UserId == userId);
+            .FirstOrDefaultAsync(f => f.Id == flashcardId && f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (flashcard == null) return false;
 
@@ -642,7 +642,7 @@ public class FlashcardService : IFlashcardService
         var query = _db.Flashcards
             .Include(f => f.UserVocabulary)
                 .ThenInclude(uv => uv.Vocabulary)
-            .Where(f => f.UserVocabulary.UserId == userId);
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (deckId.HasValue)
         {
@@ -675,7 +675,7 @@ public class FlashcardService : IFlashcardService
         var flashcard = await _db.Flashcards
             .Include(f => f.UserVocabulary)
                 .ThenInclude(uv => uv.Vocabulary)
-            .FirstOrDefaultAsync(f => f.Id == flashcardId && f.UserVocabulary.UserId == userId);
+            .FirstOrDefaultAsync(f => f.Id == flashcardId && f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (flashcard == null) return false;
 
@@ -705,7 +705,7 @@ public class FlashcardService : IFlashcardService
         var query = _db.Flashcards
             .Include(f => f.UserVocabulary)
                 .ThenInclude(uv => uv.Vocabulary)
-            .Where(f => f.UserVocabulary.UserId == userId);
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (deckId.HasValue)
         {
@@ -762,11 +762,11 @@ public class FlashcardService : IFlashcardService
     {
         var flashcard1 = await _db.Flashcards
             .Include(f => f.UserVocabulary)
-            .FirstOrDefaultAsync(f => f.Id == flashcardId1 && f.UserVocabulary.UserId == userId);
+            .FirstOrDefaultAsync(f => f.Id == flashcardId1 && f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         var flashcard2 = await _db.Flashcards
             .Include(f => f.UserVocabulary)
-            .FirstOrDefaultAsync(f => f.Id == flashcardId2 && f.UserVocabulary.UserId == userId);
+            .FirstOrDefaultAsync(f => f.Id == flashcardId2 && f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (flashcard1 == null || flashcard2 == null) return false;
 

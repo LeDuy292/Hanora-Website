@@ -1026,6 +1026,12 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.SavedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("saved_at");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+            entity.Property(e => e.DeletedAt)
+                .HasColumnType("timestamp with time zone")
+                .HasColumnName("deleted_at");
             entity.Property(e => e.SourceDocumentId).HasColumnName("source_document_id");
             entity.Property(e => e.SourcePage).HasColumnName("source_page");
             entity.Property(e => e.UserId).HasColumnName("user_id");

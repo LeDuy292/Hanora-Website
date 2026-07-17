@@ -17,13 +17,55 @@ import {
   Mic, 
   X,
   Lightbulb,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
 import { toast } from '../store/notificationStore';
+
+
+const WINDOWS_1252_BYTE_MAP = new Map([
+  [0x20AC, 0x80], [0x201A, 0x82], [0x0192, 0x83], [0x201E, 0x84], [0x2026, 0x85],
+  [0x2020, 0x86], [0x2021, 0x87], [0x02C6, 0x88], [0x2030, 0x89], [0x0160, 0x8A],
+  [0x2039, 0x8B], [0x0152, 0x8C], [0x017D, 0x8E], [0x2018, 0x91], [0x2019, 0x92],
+  [0x201C, 0x93], [0x201D, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
+  [0x02DC, 0x98], [0x2122, 0x99], [0x0161, 0x9A], [0x203A, 0x9B], [0x0153, 0x9C],
+  [0x017E, 0x9E], [0x0178, 0x9F]
+]);
+
+const MOJIBAKE_TOKENS = [
+  '\u00c3', '\u00c4', '\u00c5', '\u00c6', '\u00c2', '\u00ca', '\u00d4',
+  '\u00e1\u00ba', '\u00e1\u00bb', '\u00e2\u20ac', '\u00e5', '\u00e6', '\u00e7', '\u00e8', '\u00e9', '\u00e4', '\u00e3\u20ac',
+  '\u00c7', 'J\u00c5', 'T\u00c4', 'W\u00c7', 'Zh\u00c3', 'Sh\u00c3', 'R\u00c3', 'Ph\u00c3',
+  'Luy\u00e1', 'T\u00e1', 'Ngu\u00e1', 'Ngh\u00c4', 'Ch\u00c6'
+];
+const MOJIBAKE_PATTERN = new RegExp('(' + MOJIBAKE_TOKENS.join('|') + ')');
+const MOJIBAKE_SCORE_PATTERN = new RegExp('(' + MOJIBAKE_TOKENS.concat('\\uFFFD').join('|') + ')', 'g');
+
+const mojibakeScore = (value) => (String(value).match(MOJIBAKE_SCORE_PATTERN) || []).length;
+
+const encodeWindows1252 = (value) => {
+  const bytes = [];
+  for (const char of String(value)) {
+    const code = char.codePointAt(0);
+    if (code <= 0xff) bytes.push(code);
+    else if (WINDOWS_1252_BYTE_MAP.has(code)) bytes.push(WINDOWS_1252_BYTE_MAP.get(code));
+    else return null;
+  }
+  return Uint8Array.from(bytes);
+};
+
+const normalizeVietnameseText = (value) => {
+  if (typeof value !== 'string' || !MOJIBAKE_PATTERN.test(value)) return value;
+  const bytes = encodeWindows1252(value);
+  if (!bytes) return value;
+  const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  if (decoded.includes('\uFFFD')) return value;
+  return mojibakeScore(decoded) <= mojibakeScore(value) ? decoded : value;
+};
 
 // Static database of details for HSK words (consistent with Flashcard.jsx)
 const WORD_DETAILS_DB = {
@@ -124,7 +166,7 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
-  const { vocabList, removeWord, bulkAddCards, createFlashcardSet } = useVocabularyStore();
+  const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies } = useVocabularyStore();
   const { addXp } = useAuthStore();
 
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
@@ -135,7 +177,7 @@ export function VocabularyPage() {
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
   const handleOpenCreateDeckModal = () => {
-    const selectedWordsList = fullVocabularyDataset.filter(w => selectedRows.includes(w.text));
+    const selectedWordsList = fullVocabularyDataset.filter(w => selectedRows.includes(w.selectionKey));
     if (selectedWordsList.length === 0) return;
 
     const firstWord = selectedWordsList[0];
@@ -170,7 +212,7 @@ export function VocabularyPage() {
     setIsSavingDeck(true);
     try {
       const selectedWordsList = fullVocabularyDataset
-        .filter(w => selectedRows.includes(w.text))
+        .filter(w => selectedRows.includes(w.selectionKey))
         .map(w => w.text.split('_')[0]);
 
       await createFlashcardSet(
@@ -219,6 +261,7 @@ export function VocabularyPage() {
 
   // Selected rows (checkboxes)
   const [selectedRows, setSelectedRows] = useState([]);
+  const [openActionMenu, setOpenActionMenu] = useState(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -235,14 +278,19 @@ export function VocabularyPage() {
 
   // Map user vocabulary to consistent structure
   const fullVocabularyDataset = useMemo(() => {
-    return vocabList.map((w) => {
+    return vocabList.map((w, index) => {
       const state = w.srsLevel >= 4 ? 'known' : w.srsLevel > 0 ? 'learning' : 'not_started';
       
       return {
-        text: w.text,
-        pinyin: w.pinyin || "pīnyīn",
-        translation: w.translation || "nghĩa",
-        source: w.documentTitle || "Chưa xác định",
+        id: w.userVocabularyId || w.vocabularyNotebookId || w.userVocabId || w.id,
+        userVocabularyId: w.userVocabularyId || w.vocabularyNotebookId || w.userVocabId || w.id,
+        flashcardId: w.id,
+        flashcardCount: w.flashcardCount ?? (w.id ? 1 : 0),
+        selectionKey: String(w.userVocabularyId || w.vocabularyNotebookId || w.userVocabId || w.id || `${w.text}-${w.documentId || 'none'}-${w.dateAdded || index}-${index}`),
+        text: normalizeVietnameseText(w.text),
+        pinyin: normalizeVietnameseText(w.pinyin) || "pīnyīn",
+        translation: normalizeVietnameseText(w.translation) || "nghĩa",
+        source: normalizeVietnameseText(w.documentTitle) || "Chưa xác định",
         documentId: w.documentId,
         dateAdded: w.dateAdded || new Date().toISOString().split('T')[0],
         difficulty: w.difficulty || "medium",
@@ -302,6 +350,18 @@ export function VocabularyPage() {
 
   const totalPages = Math.ceil(filteredVocabulary.length / pageSize) || 1;
 
+  const selectedVocabularyRows = useMemo(() => {
+    return fullVocabularyDataset.filter(w => selectedRows.includes(w.selectionKey));
+  }, [fullVocabularyDataset, selectedRows]);
+
+  const selectedVocabularyIds = useMemo(() => {
+    return [...new Set(selectedVocabularyRows
+      .map(w => Number(w.userVocabularyId))
+      .filter(Boolean))];
+  }, [selectedVocabularyRows]);
+
+  const selectedVocabularyCount = selectedVocabularyRows.length;
+
   // Generate dynamic page numbers range for pagination controls
   const pageNumbers = useMemo(() => {
     const pages = [];
@@ -350,20 +410,84 @@ export function VocabularyPage() {
   // Checkbox multi-select helpers
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(paginatedData.map(row => row.text));
+      setSelectedRows(paginatedData.map(row => row.selectionKey));
     } else {
       setSelectedRows([]);
     }
   };
 
-  const handleSelectRow = (wordText) => {
+  const handleSelectRow = (rowKey) => {
     setSelectedRows(prev => {
-      if (prev.includes(wordText)) {
-        return prev.filter(t => t !== wordText);
+      if (prev.includes(rowKey)) {
+        return prev.filter(key => key !== rowKey);
       } else {
-        return [...prev, wordText];
+        return [...prev, rowKey];
       }
     });
+  };
+
+  const handleDeleteVocabulary = (row) => {
+    const id = Number(row.userVocabularyId);
+    if (!id) {
+      toast.error('Từ vựng này chưa đồng bộ ID từ máy chủ. Vui lòng tải lại danh sách rồi thử lại.');
+      return;
+    }
+
+    const cleanWord = row.text.split('_')[0];
+    const messageParts = [
+      'Bạn có chắc chắn muốn xóa từ "' + cleanWord + ' (' + (row.pinyin || '') + ')" khỏi Sổ tay từ vựng?',
+      '',
+      'Việc xóa sẽ không ảnh hưởng đến tài liệu gốc.'
+    ];
+
+    if (row.flashcardCount > 0) {
+      messageParts.push('', 'Từ này đang được sử dụng trong Flashcard. Thao tác này chỉ xóa khỏi Sổ tay, Flashcard sẽ được ẩn khỏi luồng học.');
+    }
+
+    toast.confirm(
+      messageParts.join('\n'),
+      async () => {
+        try {
+          const result = await deleteVocabulary(id, { deleteFlashcards: false });
+          setSelectedRows(prev => prev.filter(key => key !== row.selectionKey));
+          setOpenActionMenu(null);
+          toast.success(result?.message || 'Đã xóa từ vựng thành công.');
+        } catch (error) {
+          console.error(error);
+          toast.error(error.message || 'Không thể xóa từ vựng.');
+        }
+      },
+      'Xóa từ vựng'
+    );
+  };
+
+  const handleBulkDeleteVocabulary = () => {
+    if (selectedVocabularyIds.length === 0) {
+      toast.error('Vui lòng chọn ít nhất 1 từ vựng hợp lệ để xóa.');
+      return;
+    }
+
+    const message = [
+      'Bạn có chắc muốn xóa ' + selectedVocabularyCount + ' từ đã chọn khỏi Sổ tay từ vựng?',
+      '',
+      'Các từ này sẽ không bị xóa khỏi tài liệu gốc.'
+    ].join('\n');
+
+    toast.confirm(
+      message,
+      async () => {
+        try {
+          const result = await deleteVocabularies(selectedVocabularyIds, { deleteFlashcards: false });
+          setSelectedRows([]);
+          setOpenActionMenu(null);
+          toast.success(result?.message || ('Đã xóa ' + selectedVocabularyCount + ' từ vựng thành công.'));
+        } catch (error) {
+          console.error(error);
+          toast.error(error.message || 'Không thể xóa các từ vựng đã chọn.');
+        }
+      },
+      'Xóa nhiều từ vựng'
+    );
   };
 
   // Format dynamic HSK details safely for modal popup
@@ -450,7 +574,7 @@ export function VocabularyPage() {
                 >
                   <option value="">Nguồn tài liệu</option>
                   {documentsList.map(doc => (
-                    <option key={doc.id} value={doc.title}>{doc.title}</option>
+                    <option key={doc.id} value={normalizeVietnameseText(doc.title)}>{normalizeVietnameseText(doc.title)}</option>
                   ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -532,7 +656,7 @@ export function VocabularyPage() {
                 <button
                   onClick={() => {
                     const selectedWordObjects = fullVocabularyDataset
-                      .filter(w => selectedRows.includes(w.text))
+                      .filter(w => selectedRows.includes(w.selectionKey))
                       .map(w => ({
                         text: w.text,
                         pinyin: w.pinyin,
@@ -557,6 +681,13 @@ export function VocabularyPage() {
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tạo Flashcard</span>
                 </button>
+                <button
+                  onClick={handleBulkDeleteVocabulary}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xóa</span>
+                </button>
               </div>
             )}
           </div>
@@ -570,7 +701,7 @@ export function VocabularyPage() {
                     <th className="py-4.5 px-4 w-12 text-center select-none">
                       <input 
                         type="checkbox"
-                        checked={paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.text))}
+                        checked={paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.selectionKey))}
                         onChange={handleSelectAll}
                         className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4 shadow-sm"
                       />
@@ -586,7 +717,7 @@ export function VocabularyPage() {
                 <tbody className="divide-y divide-slate-100">
                   {paginatedData.length > 0 ? (
                     paginatedData.map((row, index) => {
-                      const isRowSelected = selectedRows.includes(row.text);
+                      const isRowSelected = selectedRows.includes(row.selectionKey);
                       const isStarred = localStarred[row.text] || (vocabList.find(v => v.text === row.text)?.starred);
                       const cleanWordText = row.text.split('_')[0]; // Extract display word
 
@@ -603,7 +734,7 @@ export function VocabularyPage() {
                             <input 
                               type="checkbox"
                               checked={isRowSelected}
-                              onChange={() => handleSelectRow(row.text)}
+                              onChange={() => handleSelectRow(row.selectionKey)}
                               className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
                             />
                           </td>
@@ -669,12 +800,43 @@ export function VocabularyPage() {
                               </button>
 
                               {/* More action menu */}
-                              <button 
-                                className="p-1.5 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Thao tác khác"
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenActionMenu(openActionMenu === row.userVocabularyId ? null : row.userVocabularyId);
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-100 transition-colors"
+                                  title="Thao tác khác"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                                {openActionMenu === row.userVocabularyId && (
+                                  <div className="absolute right-0 top-8 z-30 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 text-left shadow-xl shadow-slate-900/10">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetailWord(row);
+                                        setOpenActionMenu(null);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                      Chi tiết
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteVocabulary(row);
+                                      }}
+                                      className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      Xóa từ vựng
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>

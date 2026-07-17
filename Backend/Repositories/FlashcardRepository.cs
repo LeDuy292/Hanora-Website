@@ -20,7 +20,7 @@ public class FlashcardRepository : IFlashcardRepository
                 .ThenInclude(v => v.ExampleSentencesNavigation)
             .Include(uv => uv.Flashcards)
             .Include(uv => uv.SourceDocument)
-            .Where(uv => uv.UserId == userId)
+            .Where(uv => uv.UserId == userId && uv.IsDeleted != true)
             .ToListAsync();
     }
 
@@ -28,7 +28,7 @@ public class FlashcardRepository : IFlashcardRepository
     {
         return await _db.UserVocabularies
             .Include(uv => uv.Flashcards)
-            .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId);
+            .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId && uv.IsDeleted != true);
     }
 
     public async Task UpdateFlashcardAsync(Flashcard flashcard)
