@@ -158,14 +158,19 @@
   }
 
   .reader-bubble-menu {
-    left: 0.75rem !important;
-    right: 0.75rem !important;
-    bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: calc(9rem + env(safe-area-inset-bottom)) !important;
     top: auto !important;
     width: auto !important;
-    justify-content: center;
+    justify-content: flex-start;
     transform: none !important;
     overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .reader-bubble-menu::-webkit-scrollbar {
+    display: none;
   }
 }
 
