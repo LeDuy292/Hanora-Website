@@ -1,8 +1,12 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { segmentChineseText } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
 import { generateDocumentOcrPage } from '../../lib/api';
+
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 3;
+const clampScale = (value) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
 const normalizePages = (payload) => {
   if (!payload) return [];
@@ -82,16 +86,59 @@ const PdfVisualReader = ({
   const [pdfDoc, setPdfDoc] = useState(null);
   const [totalPages, setTotalPages] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
-  const [scale, setScale] = useState(1.55);
+  const [scale, setScale] = useState(1.25);
+  const [fitMode, setFitMode] = useState('width');
+  const [pageInput, setPageInput] = useState('1');
+  const [basePageSize, setBasePageSize] = useState({ width: 0, height: 0 });
   const [ocrPages, setOcrPages] = useState([]);
   const [isLoadingOcr, setIsLoadingOcr] = useState(Boolean(ocrJsonUrl));
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const readerRootRef = useRef(null);
+  const scrollAreaRef = useRef(null);
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
   const renderTaskRef = useRef(null);
   const requestedOcrPagesRef = useRef(new Set());
 
   const pageNumber = Math.max(1, Math.min(Number(currentPage) || 1, totalPages || Number(currentPage) || 1));
+  const zoomPercent = Math.round(scale * 100);
+
+  useEffect(() => {
+    setPageInput(String(pageNumber));
+  }, [pageNumber]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === readerRootRef.current);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (fitMode === 'custom' || !basePageSize.width || !basePageSize.height || !scrollAreaRef.current) return undefined;
+
+    const updateFitScale = () => {
+      const viewport = scrollAreaRef.current;
+      if (!viewport) return;
+
+      const availableWidth = Math.max(240, viewport.clientWidth - 24);
+      const availableHeight = Math.max(240, viewport.clientHeight - 24);
+      const widthScale = availableWidth / basePageSize.width;
+      const pageScale = Math.min(widthScale, availableHeight / basePageSize.height);
+      const nextScale = fitMode === 'page' ? pageScale : widthScale;
+      setScale(clampScale(nextScale));
+    };
+
+    updateFitScale();
+    const resizeObserver = new ResizeObserver(updateFitScale);
+    resizeObserver.observe(scrollAreaRef.current);
+    window.addEventListener('resize', updateFitScale);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateFitScale);
+    };
+  }, [fitMode, basePageSize.width, basePageSize.height]);
   const ocrPage = useMemo(() => {
     if (!ocrPages.length) return null;
 
@@ -328,6 +375,12 @@ const PdfVisualReader = ({
 
       try {
         const page = await pdfDoc.getPage(pageNumber);
+        const baseViewport = page.getViewport({ scale: 1 });
+        setBasePageSize((prev) => (
+          Math.abs(prev.width - baseViewport.width) > 0.5 || Math.abs(prev.height - baseViewport.height) > 0.5
+            ? { width: baseViewport.width, height: baseViewport.height }
+            : prev
+        ));
         const viewport = page.getViewport({ scale });
         const canvas = canvasRef.current;
         const textLayerDiv = textLayerRef.current;
@@ -392,35 +445,111 @@ const PdfVisualReader = ({
     onPageChange?.(bounded);
   };
 
+  const commitPageInput = () => {
+    const nextPage = Number(pageInput);
+    if (!Number.isFinite(nextPage)) {
+      setPageInput(String(pageNumber));
+      return;
+    }
+    goToPage(Math.round(nextPage));
+  };
+
+  const zoomBy = (amount) => {
+    setFitMode('custom');
+    setScale((current) => clampScale(current + amount));
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await readerRootRef.current?.requestFullscreen?.();
+      }
+    } catch (error) {
+      console.warn('Cannot toggle PDF fullscreen.', error);
+    }
+  };
+
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
-      <div className="absolute bottom-6 left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center justify-between gap-4 rounded-full border border-slate-200/60 bg-white/90 px-4 py-2.5 shadow-lg shadow-slate-200/40 backdrop-blur-md sm:gap-8 sm:px-5">
-        <div className="flex items-center gap-1">
-          <button onClick={() => setScale(Math.max(0.5, scale - 0.2))} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Thu nhỏ">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" /></svg>
+    <div ref={readerRootRef} className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm sm:rounded-xl">
+      <div className="shrink-0 border-b border-slate-200 bg-white/95 px-1.5 py-1.5 sm:px-3 sm:py-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-thin">
+          <button
+            onClick={() => goToPage(pageNumber - 1)}
+            disabled={pageNumber <= 1}
+            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
+            title="Trang trước"
+          >
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[48px] rounded-full bg-slate-100 px-2 py-1 text-center text-xs font-bold text-slate-700">{Math.round(scale * 100)}%</span>
-          <button onClick={() => setScale(Math.min(3, scale + 0.2))} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Phóng to">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
-          </button>
-        </div>
 
-        <div className="h-6 w-px bg-slate-200" />
+          <div className="flex h-9 min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-700 sm:h-10 sm:rounded-xl sm:gap-2">
+            <span className="hidden text-xs uppercase tracking-wide text-slate-500 sm:inline">Trang</span>
+            <input
+              value={pageInput}
+              onChange={(event) => setPageInput(event.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={commitPageInput}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+              }}
+              className="h-6 w-9 rounded-md border border-slate-200 bg-white text-center text-sm font-black text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:h-7 sm:w-10 sm:rounded-lg"
+              aria-label="Nhập số trang"
+            />
+            <span className="whitespace-nowrap text-xs text-slate-500">/ {totalPages || '?'}</span>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={() => goToPage(pageNumber - 1)} disabled={pageNumber <= 1} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 disabled:opacity-40">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+          <button
+            onClick={() => goToPage(pageNumber + 1)}
+            disabled={pageNumber >= totalPages}
+            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
+            title="Trang sau"
+          >
+            <ChevronRight className="h-4 w-4" />
           </button>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
-            Trang <span className="text-slate-800">{pageNumber}</span> / {totalPages || '?'}
-          </span>
-          <button onClick={() => goToPage(pageNumber + 1)} disabled={pageNumber >= totalPages} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 disabled:opacity-40">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+
+          <div className="mx-1 h-6 w-px shrink-0 bg-slate-200" />
+
+          <button
+            onClick={() => zoomBy(-0.15)}
+            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+            title="Thu nhỏ"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <div className="flex h-9 min-h-9 min-w-[58px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-black text-slate-800 sm:h-10 sm:min-w-[64px] sm:rounded-xl">
+            {zoomPercent}%
+          </div>
+          <button
+            onClick={() => zoomBy(0.15)}
+            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+            title="Phóng to"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setFitMode('width')}
+            className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'width' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
+          >
+            Fit Width
+          </button>
+          <button
+            onClick={() => setFitMode('page')}
+            className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'page' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
+          >
+            Fit Page
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+            title="Toàn màn hình"
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-auto bg-slate-100/50 p-0.5 pb-14 sm:p-1">
+      <div ref={scrollAreaRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-100/60 p-1 sm:p-3">
         {!pdfDoc && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
@@ -428,7 +557,7 @@ const PdfVisualReader = ({
           </div>
         )}
 
-        <div className="relative mx-auto w-fit max-w-full rounded-md bg-white shadow-lg ring-1 ring-slate-900/10 transition-transform duration-200">
+        <div className="relative mx-auto w-fit max-w-full rounded-md bg-white shadow-md ring-1 ring-slate-900/10 transition-transform duration-200 sm:shadow-lg">
           <canvas ref={canvasRef} className="block rounded-md" />
           <div ref={textLayerRef} className="textLayer absolute inset-0 z-10 overflow-hidden rounded-md leading-none opacity-100" style={{ color: 'transparent' }} />
           <canvas
@@ -465,3 +594,5 @@ const PdfVisualReader = ({
 };
 
 export default PdfVisualReader;
+
+
