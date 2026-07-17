@@ -157,6 +157,38 @@ export const getVocabulary = async (word) => {
   return await response.json();
 };
 
+export const deleteVocabularyFromNotebook = async (id, options = {}) => {
+  const token = getToken();
+  const response = await fetch(API_BASE_URL + '/vocabulary/' + id, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+    },
+    body: JSON.stringify({ deleteFlashcards: Boolean(options.deleteFlashcards) })
+  });
+  if (!response.ok) {
+    throw new Error(await readApiError(response, 'Không thể xóa từ vựng.'));
+  }
+  return await response.json();
+};
+
+export const deleteVocabulariesFromNotebook = async (ids, options = {}) => {
+  const token = getToken();
+  const response = await fetch(API_BASE_URL + '/vocabulary', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+    },
+    body: JSON.stringify({ ids, deleteFlashcards: Boolean(options.deleteFlashcards) })
+  });
+  if (!response.ok) {
+    throw new Error(await readApiError(response, 'Không thể xóa từ vựng đã chọn.'));
+  }
+  return await response.json();
+};
+
 export const saveToNotebook = async (word, documentId) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}/save`, {

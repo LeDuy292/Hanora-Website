@@ -110,7 +110,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
     if (!word) return;
     setIsSaving(true);
     try {
-      await addWord({
+      const result = await addWord({
         text: data.word,
         pinyin: data.pinyin,
         translation: typeof data.definitions === 'string' ? data.definitions : JSON.stringify(data.definitions),
@@ -120,7 +120,10 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         wordType: data.wordType,
         pageNumber: pageNumber
       });
-      useToastStore.getState().addToast('Đã lưu vào sổ tay thành công!', 'success');
+      useToastStore.getState().addToast(
+        result?.message || 'Đã lưu vào sổ tay thành công.',
+        result?.alreadyExists ? 'warning' : 'success'
+      );
     } catch (error) {
       console.error(error);
       useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
