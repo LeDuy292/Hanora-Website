@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { segmentChineseText } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
@@ -28,23 +28,92 @@ const getBox = (box) => {
   return { x, y, width, height };
 };
 
+const HANZI_RE = /[\u3400-\u9fff]/;
+
+const hasHanzi = (text = '') => HANZI_RE.test(text);
+
+const measureTextUnits = (text = '') => {
+  const chars = Array.from(text);
+  if (!chars.length) return 1;
+
+  return chars.reduce((total, char) => {
+    if (/\s/.test(char)) return total + 0.95;
+    if (HANZI_RE.test(char)) return total + 1;
+    if (/[A-Za-z0-9]/.test(char)) return total + 0.62;
+    return total + 0.42;
+  }, 0) || 1;
+};
+
+const segmentPdfHitText = (text = '') => {
+  if (!text) return [];
+
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try {
+      const segmenter = new Intl.Segmenter('zh', { granularity: 'word' });
+      const tokens = Array.from(segmenter.segment(text))
+        .map((part) => ({
+          text: part.segment,
+          isWord: hasHanzi(part.segment),
+        }))
+        .filter((token) => token.text);
+
+      if (tokens.length > 1) return tokens;
+    } catch (error) {
+      // Fall through to the project dictionary segmenter.
+    }
+  }
+
+  return segmentChineseText(text).map((token) => ({
+    text: token.text,
+    isWord: Boolean(token.isWord) || hasHanzi(token.text),
+  }));
+};
+
+const splitTextBoxIntoHitWords = (text, box, keyPrefix) => {
+  const tokens = segmentPdfHitText(text);
+  if (!tokens.length || !box) return [];
+
+  const tokenUnits = tokens.map((token) => measureTextUnits(token.text));
+  const totalUnits = tokenUnits.reduce((sum, units) => sum + units, 0) || 1;
+  let cursorUnits = 0;
+
+  return tokens.flatMap((token, tokenIndex) => {
+    const units = tokenUnits[tokenIndex] || 1;
+    const left = box.x + (cursorUnits / totalUnits) * box.width;
+    const width = Math.max(1, (units / totalUnits) * box.width);
+    cursorUnits += units;
+
+    if (!token.isWord || !token.text.trim()) return [];
+
+    return [{
+      key: keyPrefix + '-' + tokenIndex + '-' + token.text,
+      text: token.text,
+      box: {
+        x: left,
+        y: box.y,
+        width,
+        height: box.height,
+      },
+    }];
+  });
+};
+
 const getWords = (page) => {
   const lines = valueOf(page, 'lines', 'Lines', []);
+
   return lines.flatMap((line, lineIndex) => {
     const words = valueOf(line, 'words', 'Words', []);
     if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
-      return words.map((word, wordIndex) => ({
-        key: `${lineIndex}-${wordIndex}-${valueOf(word, 'text', 'Text', '')}`,
-        text: valueOf(word, 'text', 'Text', ''),
-        box: getBox(valueOf(word, 'boundingBox', 'BoundingBox')),
-      }));
+      return words.flatMap((word, wordIndex) => {
+        const text = valueOf(word, 'text', 'Text', '');
+        const box = getBox(valueOf(word, 'boundingBox', 'BoundingBox'));
+        return splitTextBoxIntoHitWords(text, box, lineIndex + '-' + wordIndex);
+      });
     }
 
-    return [{
-      key: `${lineIndex}-line`,
-      text: valueOf(line, 'text', 'Text', ''),
-      box: getBox(valueOf(line, 'boundingBox', 'BoundingBox')),
-    }];
+    const lineText = valueOf(line, 'text', 'Text', '');
+    const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
+    return splitTextBoxIntoHitWords(lineText, lineBox, lineIndex + '-line');
   }).filter((word) => word.text && word.box);
 };
 
@@ -581,8 +650,8 @@ const PdfVisualReader = ({
 
       <style>{`
         .textLayer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }
-        .textLayer > span { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-        .hanora-pdf-ocr-word { position: absolute; color: transparent; white-space: nowrap; cursor: text; line-height: 1; }
+        .textLayer > span { color: transparent; position: absolute; overflow: hidden; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+        .hanora-pdf-ocr-word { position: absolute; display: block; overflow: hidden; color: transparent; white-space: nowrap; cursor: text; line-height: 1; }
         .textLayer .word-highlight:hover, .textLayer .hanora-pdf-ocr-word:hover { background-color: rgba(250, 204, 21, 0.32); border-radius: 4px; }
         .hanora-pdf-token { position: relative; isolation: isolate; }
         .hanora-pdf-token.hanora-token-selecting { background-color: rgba(37, 99, 235, 0.24) !important; outline: 1px solid rgba(37, 99, 235, 0.28); }
