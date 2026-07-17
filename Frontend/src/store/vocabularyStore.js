@@ -36,16 +36,30 @@ export const useVocabularyStore = create(
       quizSession: null,
 
       isWordSaved: (text) => {
-        return get().vocabList.some(item => item.text === text);
+        const normalizedText = (text || '').trim();
+        return get().vocabList.some(item => (item.text || '').trim() === normalizedText);
       },
 
       addWord: async (word) => {
-        if (get().isWordSaved(word.text)) return;
-        
+        const normalizedText = (word?.text || '').trim();
+        const duplicateMessage = 'Từ vựng đã có trong sổ tay của bạn.';
+        if (!normalizedText) {
+          throw new Error('Từ vựng không hợp lệ.');
+        }
+
+        if (get().isWordSaved(normalizedText)) {
+          return {
+            success: true,
+            alreadyExists: true,
+            message: duplicateMessage
+          };
+        }
+
+        let saveResult;
         try {
-          await apiRequest(`/vocabulary/${encodeURIComponent(word.text)}/save`, {
+          saveResult = await apiRequest(`/vocabulary/${encodeURIComponent(normalizedText)}/save`, {
             method: 'POST',
-            body: { 
+            body: {
               documentId: word.documentId,
               customDefinition: word.translation,
               pinyin: word.pinyin,
@@ -58,10 +72,20 @@ export const useVocabularyStore = create(
           });
         } catch (error) {
           console.error("Error saving word to server:", error);
+          throw error;
+        }
+
+        if (saveResult?.alreadyExists) {
+          return {
+            ...saveResult,
+            message: saveResult.message || duplicateMessage
+          };
         }
 
         const newWord = {
-          text: word.text,
+          id: saveResult?.userVocabularyId,
+          userVocabularyId: saveResult?.userVocabularyId,
+          text: normalizedText,
           pinyin: word.pinyin || "",
           translation: cleanTranslation(word.translation || word.meaning || ""),
           hsk: word.hsk || 1,
@@ -72,16 +96,56 @@ export const useVocabularyStore = create(
           srsLevel: 0,
           nextReviewDate: new Date().toISOString().split('T')[0]
         };
-        
+
         set((state) => ({
           vocabList: [newWord, ...state.vocabList]
         }));
+
+        return saveResult || {
+          success: true,
+          created: true,
+          message: 'Đã lưu vào sổ tay thành công.'
+        };
       },
 
       removeWord: (text) => set((state) => ({
         vocabList: state.vocabList.filter(item => item.text !== text)
       })),
 
+      deleteVocabulary: async (id, options = {}) => {
+        const result = await apiRequest('/vocabulary/' + id, {
+          method: 'DELETE',
+          body: { deleteFlashcards: Boolean(options.deleteFlashcards) },
+          auth: true
+        });
+
+        set((state) => ({
+          vocabList: state.vocabList.filter(item => String(item.userVocabularyId ?? item.id) !== String(id))
+        }));
+
+        return result;
+      },
+
+      deleteVocabularies: async (ids, options = {}) => {
+        const normalizedIds = [...new Set(ids.map(Number).filter(Boolean))];
+        if (normalizedIds.length === 0) return null;
+
+        const result = await apiRequest('/vocabulary', {
+          method: 'DELETE',
+          body: {
+            ids: normalizedIds,
+            deleteFlashcards: Boolean(options.deleteFlashcards)
+          },
+          auth: true
+        });
+
+        const idSet = new Set(normalizedIds.map(String));
+        set((state) => ({
+          vocabList: state.vocabList.filter(item => !idSet.has(String(item.userVocabularyId ?? item.id)))
+        }));
+
+        return result;
+      },
       reviewWord: async (text, rating) => {
         const today = new Date();
         const state = get();

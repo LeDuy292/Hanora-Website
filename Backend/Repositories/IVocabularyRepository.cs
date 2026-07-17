@@ -9,8 +9,21 @@ public interface IVocabularyRepository
     Task UpdateAsync(Vocabulary vocabulary);
     Task EnsureWordExistsAsync(string word);
     Task AddRelationAsync(long vocabId, long relatedId, RelationType type);
-    Task<bool> SaveToNotebookAsync(long userId, long vocabId, long? documentId, int? pageNumber = null, string? personalNote = null);
+    Task<NotebookSaveResult> SaveToNotebookAsync(long userId, long vocabId, long? documentId, int? pageNumber = null, string? personalNote = null);
     Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId);
     Task<UserVocabulary?> GetUserVocabularyByIdsAsync(long userId, long vocabularyId);
     Task UpdateUserVocabularyAsync(UserVocabulary userVocabulary);
+}
+
+public enum NotebookSaveStatus
+{
+    Created,
+    Restored,
+    AlreadyExists
+}
+
+public class NotebookSaveResult
+{
+    public NotebookSaveStatus Status { get; set; }
+    public long UserVocabularyId { get; set; }
 }

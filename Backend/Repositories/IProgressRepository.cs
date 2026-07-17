@@ -54,7 +54,7 @@ namespace Repositories
         public async Task<List<SavedWordRow>> GetSavedWordsAsync(long userId)
         {
             return await _db.UserVocabularies
-                .Where(uv => uv.UserId == userId)
+                .Where(uv => uv.UserId == userId && uv.IsDeleted != true)
                 .Select(uv => new SavedWordRow(
                     uv.SourceDocumentId,
                     uv.IsMastered ?? false,
@@ -71,7 +71,7 @@ namespace Repositories
             // EF Core 8 can't translate GroupBy(...).Join(...) with an aggregate in the
             // result selector, so we materialize the grouped counts into a flat shape.
             var counts = await _db.UserVocabularies
-                .Where(uv => uv.UserId == userId && uv.SourceDocumentId != null)
+                .Where(uv => uv.UserId == userId && uv.IsDeleted != true && uv.SourceDocumentId != null)
                 .GroupBy(uv => uv.SourceDocumentId!.Value)
                 .Select(g => new { DocumentId = g.Key, Learned = g.Count() })
                 .ToListAsync();

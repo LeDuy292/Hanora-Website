@@ -242,7 +242,7 @@ public class VocabularyService : IVocabularyService
         }
     }
 
-    public async Task<bool> SaveToNotebookAsync(
+    public async Task<VocabularySaveResult> SaveToNotebookAsync(
         long userId,
         string word,
         long? documentId,
@@ -302,8 +302,9 @@ public class VocabularyService : IVocabularyService
             }
         }
 
-        bool isNew = await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId, pageNumber, personalNote);
-        if (isNew)
+        var saveResult = await _vocabularyRepo.SaveToNotebookAsync(userId, vocab.Id, documentId, pageNumber, personalNote);
+        var shouldCountAsNew = saveResult.Status == NotebookSaveStatus.Created || saveResult.Status == NotebookSaveStatus.Restored;
+        if (shouldCountAsNew)
         {
             var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
             if (stats != null)
@@ -327,12 +328,90 @@ public class VocabularyService : IVocabularyService
             await _statsService.AwardXpAsync(userId, 2, "Lưu từ mới vào Sổ tay");
         }
 
-        return true;
+        var message = saveResult.Status switch
+        {
+            NotebookSaveStatus.AlreadyExists => "Từ vựng đã có trong sổ tay của bạn.",
+            NotebookSaveStatus.Restored => "Đã khôi phục từ vựng vào sổ tay.",
+            _ => "Đã lưu vào sổ tay thành công."
+        };
+
+        return new VocabularySaveResult
+        {
+            Success = true,
+            Created = saveResult.Status == NotebookSaveStatus.Created,
+            Restored = saveResult.Status == NotebookSaveStatus.Restored,
+            AlreadyExists = saveResult.Status == NotebookSaveStatus.AlreadyExists,
+            UserVocabularyId = saveResult.UserVocabularyId,
+            Message = message
+        };
     }
 
     public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
     {
         return await _vocabularyRepo.GetUserVocabularyAsync(userId);
+    }
+
+    public async Task<VocabularyDeleteResult> DeleteFromNotebookAsync(long userId, IReadOnlyCollection<long> userVocabularyIds, bool deleteFlashcards = false)
+    {
+        var ids = userVocabularyIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new VocabularyDeleteResult { Success = false };
+        }
+
+        var entries = await _db.UserVocabularies
+            .Include(uv => uv.Flashcards)
+            .Where(uv => uv.UserId == userId && ids.Contains(uv.Id) && uv.IsDeleted != true)
+            .ToListAsync();
+
+        var foundIds = entries.Select(uv => uv.Id).ToHashSet();
+        var missingIds = ids.Where(id => !foundIds.Contains(id)).ToList();
+        if (entries.Count == 0)
+        {
+            return new VocabularyDeleteResult
+            {
+                Success = false,
+                NotFoundIds = missingIds
+            };
+        }
+
+        var now = DateTime.UtcNow;
+        var flashcardIds = entries
+            .SelectMany(uv => uv.Flashcards)
+            .Select(f => f.Id)
+            .Distinct()
+            .ToList();
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        if (deleteFlashcards && flashcardIds.Count > 0)
+        {
+            await _db.FlipReviews.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+            await _db.LearnRounds.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+            await _db.MatchPairs.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+            await _db.Flashcards.Where(f => flashcardIds.Contains(f.Id)).ExecuteDeleteAsync();
+        }
+
+        foreach (var entry in entries)
+        {
+            entry.IsDeleted = true;
+            entry.DeletedAt = now;
+        }
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return new VocabularyDeleteResult
+        {
+            Success = true,
+            DeletedCount = entries.Count,
+            FlashcardsAffected = flashcardIds.Count,
+            NotFoundIds = missingIds
+        };
     }
 
     public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence)
