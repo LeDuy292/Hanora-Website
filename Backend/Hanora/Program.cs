@@ -129,7 +129,13 @@ namespace Hanora
             {
                 options.AddPolicy("FrontendPolicy", policy =>
                 {
-                    policy.WithOrigins(allowedCorsOrigins)
+                    policy.WithOrigins(
+                            "http://localhost:5173",
+                            "http://localhost:3000",
+                            "https://hanora-website.vercel.app",
+                            "https://hanora.id.vn",
+                            "https://www.hanora.id.vn"
+                        )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials()
@@ -171,6 +177,12 @@ namespace Hanora
             });
 
             var app = builder.Build();
+
+            // Support reverse proxies (like Railway)
+            app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+            {
+                ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+            });
 
             // Run database updates at startup
             using (var scope = app.Services.CreateScope())
@@ -347,12 +359,14 @@ namespace Hanora
                 app.UseSwaggerUI();
             }
 
+            // Ensure CORS is applied before HttpsRedirection short-circuits
+            app.UseCors("FrontendPolicy");
+
             // Avoid HTTP->HTTPS redirects in development so the React dev
             // server (http://localhost:5173) can call the HTTP API directly.
             if (!app.Environment.IsDevelopment())
                 app.UseHttpsRedirection();
 
-            app.UseCors("FrontendPolicy");
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
