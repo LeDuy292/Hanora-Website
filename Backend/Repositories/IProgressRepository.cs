@@ -106,12 +106,12 @@ namespace Repositories
                     d.CreatedAt,
                     _db.DocumentReadingProgresses
                         .Where(p => p.UserId == userId && p.DocumentId == d.Id)
-                        .Select(p => p.ProgressPercent ?? 0m)
-                        .FirstOrDefault(),
+                        .Select(p => p.ProgressPercent)
+                        .FirstOrDefault() ?? 0m,
                     _db.DocumentReadingProgresses
                         .Where(p => p.UserId == userId && p.DocumentId == d.Id)
-                        .Select(p => p.ReadingMinutes ?? 0)
-                        .FirstOrDefault(),
+                        .Select(p => p.ReadingMinutes)
+                        .FirstOrDefault() ?? 0,
                     _db.DocumentReadingProgresses
                         .Where(p => p.UserId == userId && p.DocumentId == d.Id)
                         .Select(p => p.LastReadAt)
