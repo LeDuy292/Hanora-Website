@@ -117,7 +117,9 @@ namespace Hanora
                     policy.WithOrigins(
                             "http://localhost:5173",
                             "http://localhost:3000",
-                            "https://hanora-website.vercel.app"
+                            "https://hanora-website.vercel.app",
+                            "https://hanora.id.vn",
+                            "https://www.hanora.id.vn"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
