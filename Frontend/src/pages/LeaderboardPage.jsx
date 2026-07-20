@@ -90,7 +90,7 @@ export function LeaderboardPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider mb-2">
               <Trophy className="w-4 h-4 text-yellow-300 fill-yellow-300/30" />
-              <span>Leaderboard System</span>
+              <span>Hệ Thống Xếp Hạng</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
               Bảng Xếp Hạng Người Học
@@ -207,7 +207,7 @@ export function LeaderboardPage() {
 
                       {/* Podium Pedestal */}
                       <div className={`w-full mt-4 rounded-t-2xl bg-gradient-to-b border-t shadow-inner flex flex-col justify-center items-center text-center ${user.height} ${user.color}`}>
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider block opacity-75">Score</span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider block opacity-75">Điểm</span>
                         <span className="text-sm md:text-lg font-black mt-0.5 leading-none">{user.score.toLocaleString()}</span>
                       </div>
                     </div>
@@ -282,7 +282,7 @@ export function LeaderboardPage() {
                         {row.score.toLocaleString()}
                       </span>
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 block">
-                        {row.secondaryValue || 'Score'}
+                        {row.secondaryValue || 'Điểm'}
                       </span>
                     </div>
                   </div>
@@ -353,7 +353,7 @@ export function LeaderboardPage() {
             {hallOfFame && (
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-5">
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Đền Danh Vọng (All-time)</h3>
+                  <h3 className="text-base font-bold text-slate-800">Đền Danh Vọng (Toàn thời gian)</h3>
                   <p className="text-[11px] text-slate-400 font-medium">Những người học nổi bật hàng đầu hệ thống</p>
                 </div>
 
@@ -361,11 +361,11 @@ export function LeaderboardPage() {
                   
                   {/* Category Card helper */}
                   {[
-                    { winner: hallOfFame.vocabularyKing, title: 'Vocabulary King', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50', unit: 'từ' },
-                    { winner: hallOfFame.practiceMaster, title: 'Practice Master', icon: Layers, color: 'text-sky-500 bg-sky-50', unit: 'test' },
-                    { winner: hallOfFame.readingChampion, title: 'Reading Champion', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50', unit: 'bài đọc' },
-                    { winner: hallOfFame.pronunciationMaster, title: 'Pronunciation Master', icon: Mic, color: 'text-rose-500 bg-rose-50', unit: 'điểm trung bình' },
-                    { winner: hallOfFame.longestStreak, title: 'Longest Streak', icon: Flame, color: 'text-orange-500 bg-orange-50', unit: 'ngày' }
+                    { winner: hallOfFame.vocabularyKing, title: 'Vua Từ Vựng', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50', unit: 'từ' },
+                    { winner: hallOfFame.practiceMaster, title: 'Trùm Luyện Tập', icon: Layers, color: 'text-sky-500 bg-sky-50', unit: 'bài test' },
+                    { winner: hallOfFame.readingChampion, title: 'Thủ Khoa Đọc Hiểu', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50', unit: 'bài đọc' },
+                    { winner: hallOfFame.pronunciationMaster, title: 'Chuyên Gia Phát Âm', icon: Mic, color: 'text-rose-500 bg-rose-50', unit: 'điểm trung bình' },
+                    { winner: hallOfFame.longestStreak, title: 'Chuỗi Dài Nhất', icon: Flame, color: 'text-orange-500 bg-orange-50', unit: 'ngày' }
                   ].map((category, index) => {
                     const Icon = category.icon;
                     const w = category.winner;
@@ -424,7 +424,7 @@ export function LeaderboardPage() {
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-black text-yellow-400 block">+1,000 XP</span>
-                      <span className="text-[9px] text-yellow-400/70 font-semibold tracking-tight uppercase">Badge Champion</span>
+                      <span className="text-[9px] text-yellow-400/70 font-semibold tracking-tight uppercase">Huy hiệu Quán Quân</span>
                     </div>
                   </div>
 
