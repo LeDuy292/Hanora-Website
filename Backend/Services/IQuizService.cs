@@ -35,6 +35,7 @@ public class StartTestRequest
     public List<string> QuestionTypes { get; set; } = new();
 
     public string Difficulty { get; set; } = "medium"; // easy | medium | hard | adaptive
+    public long? DeckId { get; set; }
 }
 
 public class QuizQuestionAnswerDto

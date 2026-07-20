@@ -58,6 +58,8 @@ export function QuizPage() {
 
   const [session, setSession] = useState(null);
   const [currentStep, setCurrentStep] = useState('intro'); // intro | quiz | result
+  
+  const searchParams = new URLSearchParams(location.search);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // keyed by questionId
   const [selectedOption, setSelectedOption] = useState(null);
@@ -127,8 +129,12 @@ export function QuizPage() {
   };
 
   const handleStart = async () => {
-    if (targetCount > vocabList.length) {
-      setError(`Bạn chỉ có ${vocabList.length} từ vựng. Vui lòng chọn số lượng ít hơn.`);
+    const deckId = searchParams.get('deckId');
+    const maxParam = searchParams.get('max');
+    const maxAvailableWords = maxParam ? Number(maxParam) : vocabList.length;
+
+    if (targetCount > maxAvailableWords) {
+      setError(`Bạn chỉ có ${maxAvailableWords} từ vựng. Vui lòng chọn số lượng ít hơn.`);
       return;
     }
     if (!aiMixed && selectedTypes.length === 0) {
@@ -136,10 +142,12 @@ export function QuizPage() {
       return;
     }
     setError('');
+
     const newSession = await startQuiz({
       questionCount: targetCount,
       questionTypes: aiMixed ? [] : selectedTypes,
-      difficulty
+      difficulty,
+      deckId: deckId ? Number(deckId) : undefined
     });
     if (newSession?.quizQuestions?.length) {
       beginSessionState(newSession);
@@ -310,7 +318,7 @@ export function QuizPage() {
             )}
             <div className="flex items-center gap-2 text-slate-400 font-medium mt-3">
               <BookOpen className="w-4 h-4" />
-              <span>Bạn đang có <strong className="text-slate-800">{vocabList.length}</strong> từ vựng</span>
+              <span>Bạn đang có <strong className="text-slate-800">{searchParams.get('max') ? searchParams.get('max') : vocabList.length}</strong> từ vựng {searchParams.get('deckId') ? 'trong bộ thẻ này' : ''}</span>
             </div>
           </div>
 

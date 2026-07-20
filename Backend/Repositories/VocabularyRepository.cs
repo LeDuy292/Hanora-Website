@@ -101,13 +101,13 @@ public class VocabularyRepository : IVocabularyRepository
             UserVocabularyId = existing.Id
         };
     }
-    public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
+    public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId, long? deckId = null)
     {
         return await _db.UserVocabularies
             .Include(uv => uv.Vocabulary)
             .ThenInclude(v => v.ExampleSentencesNavigation)
             .Include(uv => uv.Flashcards)
-            .Where(uv => uv.UserId == userId && uv.IsDeleted != true)
+            .Where(uv => uv.UserId == userId && uv.IsDeleted != true && (deckId == null || uv.Flashcards.Any(f => f.DeckId == deckId)))
             .ToListAsync();
     }
 
