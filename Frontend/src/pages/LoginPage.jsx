@@ -202,7 +202,6 @@ export function LoginPage() {
       cancelled = true;
     };
     // Re-render the button when toggling sign-up/sign-in (the node remounts).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignUp]);
 
   const handleSubmit = async (e) => {

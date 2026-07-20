@@ -73,24 +73,23 @@ export const DocumentSelectModal = ({ isOpen, onClose, documents, onSelect, curr
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {currentId == doc.id ? (
+                  {currentId == doc.id && (
                     <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-md shrink-0">
-                      Đang đọc
+                      {'\u0110ang \u0111\u1ecdc'}
                     </span>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDelete) {
-                          onDelete(doc.id, doc.title);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
-                      title="Xóa tài liệu"
-                    >
-                      <Trash2 className="w-4.5 h-4.5" />
-                    </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete?.(doc.id, doc.title);
+                    }}
+                    className="p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+                    title={'\u0058\u00f3a t\u00e0i li\u1ec7u'}
+                    aria-label={'\u0058\u00f3a t\u00e0i li\u1ec7u ' + doc.title}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))

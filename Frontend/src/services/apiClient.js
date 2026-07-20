@@ -3,7 +3,12 @@
  * Automatically attaches the JWT bearer token and parses JSON / error envelopes.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5187/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const isLocalApiBaseUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/?$/i.test(configuredApiBaseUrl || '');
+
+export const API_BASE_URL = configuredApiBaseUrl && (import.meta.env.DEV || !isLocalApiBaseUrl)
+  ? configuredApiBaseUrl
+  : (import.meta.env.DEV ? 'http://localhost:5187/api' : '/api');
 
 const TOKEN_KEY = 'hanora-token';
 
