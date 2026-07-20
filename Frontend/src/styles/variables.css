@@ -13,7 +13,8 @@
 
   /* Font Families */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Inter', var(--font-sans);
+  --font-display: 'Be Vietnam Pro', system-ui, sans-serif;
+  --font-logo: 'Sora', system-ui, sans-serif;
   
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);

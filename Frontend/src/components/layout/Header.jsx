@@ -55,7 +55,7 @@ export function Header({ offsetTop }) {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `relative font-bold text-[15px] py-2 transition-all duration-300 group tracking-tight ${isActive
+              `relative font-medium text-[15px] py-2 transition-all duration-300 group tracking-tight ${isActive
                 ? 'text-white'
                 : 'text-white/70 hover:text-white'
               }`
@@ -115,7 +115,7 @@ export function Header({ offsetTop }) {
         ) : (
           <NavLink
             to="/login"
-            className="px-8 py-2.5 text-sm font-black text-[#32A0F4] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
+            className="px-8 py-2.5 text-sm font-display font-semibold text-[#32A0F4] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
           >
             Đăng nhập
           </NavLink>

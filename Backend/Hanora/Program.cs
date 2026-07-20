@@ -161,6 +161,12 @@ namespace Hanora
 
             var app = builder.Build();
 
+            // Support reverse proxies (like Railway)
+            app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+            {
+                ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+            });
+
             // Run database updates at startup
             using (var scope = app.Services.CreateScope())
             {
@@ -287,12 +293,14 @@ namespace Hanora
                 app.UseSwaggerUI();
             }
 
+            // Ensure CORS is applied before HttpsRedirection short-circuits
+            app.UseCors("FrontendPolicy");
+
             // Avoid HTTP->HTTPS redirects in development so the React dev
             // server (http://localhost:5173) can call the HTTP API directly.
             if (!app.Environment.IsDevelopment())
                 app.UseHttpsRedirection();
 
-            app.UseCors("FrontendPolicy");
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

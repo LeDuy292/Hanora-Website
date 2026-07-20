@@ -40,7 +40,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
+        logo: ['Sora', 'system-ui', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out forwards',
