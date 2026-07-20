@@ -29,6 +29,10 @@ public class OcrLineDto
 public class PageLinesDto
 {
     public int PageNumber { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+    public string Unit { get; set; } = "pixel";
+    public double? Angle { get; set; }
     public List<OcrLineDto> Lines { get; set; } = new();
 }
 

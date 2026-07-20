@@ -35,20 +35,20 @@ export function Header({ offsetTop }) {
   };
 
   return (
-    <header className={`fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-6 md:px-12 h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.3)] transition-all duration-300`}>
+    <header className={`fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.22)] transition-all duration-300`}>
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <NavLink to="/" className="hover:opacity-90 transition-opacity group">
           <img
             src={logoImg}
-            className="h-12 md:h-16 w-auto object-contain brightness-0 invert filter transition-transform duration-500 group-hover:scale-105"
+            className="h-10 sm:h-12 md:h-16 w-auto object-contain brightness-0 invert filter transition-transform duration-500 group-hover:scale-105"
             alt="Hanora logo"
           />
         </NavLink>
       </div>
 
       {/* Center: Navigation links list */}
-      <nav className="hidden lg:flex items-center gap-10">
+      <nav className="hidden xl:flex items-center gap-8 2xl:gap-10">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -75,7 +75,7 @@ export function Header({ offsetTop }) {
       <div className="flex items-center gap-4 shrink-0">
         {user ? (
           <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
+            <div className="hidden xl:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
                <div className="flex items-center gap-1.5 text-white">
 
                 <Flame className="w-4 h-4 fill-white/20" />
@@ -90,7 +90,7 @@ export function Header({ offsetTop }) {
             <NavLink
               to="/profile"
               title={displayName}
-              className="w-10 h-10 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-black text-sm hover:bg-white hover:text-[#32A0F4] transition-all shadow-lg overflow-hidden"
+              className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-black text-sm hover:bg-white hover:text-[#32A0F4] transition-all shadow-lg overflow-hidden"
             >
               {user.avatar ? (
                 <img
@@ -105,7 +105,7 @@ export function Header({ offsetTop }) {
             </NavLink>
             <button
               onClick={handleLogout}
-              className="p-1 px-2 text-white/70 hover:text-white transition-colors"
+              className="hidden sm:flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               title="Đăng xuất"
             >
               <LogOut className="w-5 h-5" />
@@ -124,7 +124,7 @@ export function Header({ offsetTop }) {
         {/* Mobile menu toggle */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="lg:hidden p-2 text-white hover:text-white/80 transition-colors"
+          className="lg:hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white hover:bg-white/10 hover:text-white/80 transition-colors"
         >
           {isMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
@@ -132,7 +132,7 @@ export function Header({ offsetTop }) {
 
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
-        <div className="absolute top-full left-0 w-full bg-[#32A0F4] border-t border-white/20 p-8 flex flex-col gap-5 z-50 lg:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#32A0F4] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 lg:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
           {user && (
             <div className="flex items-center gap-6 pb-4 border-b border-white/20 text-xs font-black uppercase tracking-widest text-white/95">
               <div className="flex items-center gap-1.5">
@@ -152,7 +152,7 @@ export function Header({ offsetTop }) {
               end={item.end}
               onClick={() => setIsMenuOpen(false)}
               className={({ isActive }) =>
-                `font-black text-lg py-1 transition-all ${isActive ? 'text-white border-l-4 border-white pl-4' : 'text-white/70 pl-0'
+                `min-h-[44px] flex items-center rounded-xl font-black text-base py-2 transition-all ${isActive ? 'text-white border-l-4 border-white pl-4' : 'text-white/70 pl-0'
                 }`
               }
             >

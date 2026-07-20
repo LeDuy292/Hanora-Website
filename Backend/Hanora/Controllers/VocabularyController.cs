@@ -15,6 +15,12 @@ public class VocabularyController : ControllerBase
         _vocabularyService = vocabularyService;
     }
 
+    private long GetCurrentUserId()
+    {
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return long.TryParse(userIdString, out var userId) ? userId : 1;
+    }
+
     [HttpGet("{word}")]
     public async Task<IActionResult> GetVocabulary(string word)
     {
@@ -62,13 +68,9 @@ public class VocabularyController : ControllerBase
             return BadRequest("Word is required.");
         }
 
-        var userIdString = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-        if (!long.TryParse(userIdString, out long userId))
-        {
-            userId = 1; 
-        }
+        var userId = GetCurrentUserId();
 
-        var success = await _vocabularyService.SaveToNotebookAsync(
+        var result = await _vocabularyService.SaveToNotebookAsync(
             userId,
             word,
             request.DocumentId,
@@ -78,12 +80,73 @@ public class VocabularyController : ControllerBase
             request.WordType,
             request.PageNumber,
             request.PersonalNote);
-        if (!success)
+
+        if (!result.Success)
         {
-            return BadRequest("Could not save to notebook.");
+            return BadRequest(new { success = false, message = "Khong the luu tu vung vao so tay." });
         }
 
-        return Ok(new { Message = "Saved successfully." });
+        return Ok(new
+        {
+            success = true,
+            created = result.Created,
+            restored = result.Restored,
+            alreadyExists = result.AlreadyExists,
+            userVocabularyId = result.UserVocabularyId,
+            message = result.Message
+        });
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> DeleteVocabulary(long id, [FromBody] DeleteVocabularyRequest? request = null)
+    {
+        var userId = GetCurrentUserId();
+        var result = await _vocabularyService.DeleteFromNotebookAsync(
+            userId,
+            new[] { id },
+            request?.DeleteFlashcards ?? false);
+
+        if (result.DeletedCount == 0)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy từ vựng cần xóa." });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            message = "Đã xóa từ vựng thành công.",
+            result.DeletedCount,
+            result.FlashcardsAffected
+        });
+    }
+
+    [HttpDelete]
+    public async Task<IActionResult> DeleteVocabularies([FromBody] BulkDeleteVocabularyRequest request)
+    {
+        if (request.Ids == null || request.Ids.Count == 0)
+        {
+            return BadRequest(new { success = false, message = "Vui lòng chọn ít nhất 1 từ vựng để xóa." });
+        }
+
+        var userId = GetCurrentUserId();
+        var result = await _vocabularyService.DeleteFromNotebookAsync(
+            userId,
+            request.Ids,
+            request.DeleteFlashcards);
+
+        if (result.DeletedCount == 0)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy từ vựng cần xóa." });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            message = $"Đã xóa {result.DeletedCount} từ vựng thành công.",
+            result.DeletedCount,
+            result.FlashcardsAffected,
+            result.NotFoundIds
+        });
     }
 
     [HttpPost("translate-sentence")]
@@ -144,6 +207,17 @@ public class SaveVocabularyRequest
     public string? PersonalNote { get; set; }
 }
 
+public class DeleteVocabularyRequest
+{
+    public bool DeleteFlashcards { get; set; }
+}
+
+public class BulkDeleteVocabularyRequest
+{
+    public List<long> Ids { get; set; } = new();
+    public bool DeleteFlashcards { get; set; }
+}
+
 public class TranslateSentenceRequest
 {
     public string Text { get; set; } = null!;
@@ -161,4 +235,3 @@ public class AiChatRequest
     public string Question { get; set; } = null!;
     public string? ContextSentence { get; set; }
 }
-

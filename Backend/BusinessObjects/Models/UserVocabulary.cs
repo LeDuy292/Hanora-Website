@@ -29,6 +29,10 @@ public partial class UserVocabulary
 
     public DateTime? SavedAt { get; set; }
 
+    public bool? IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual ICollection<Flashcard> Flashcards { get; set; } = new List<Flashcard>();
 
     public virtual Document? SourceDocument { get; set; }

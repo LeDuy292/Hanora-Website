@@ -90,7 +90,7 @@ public class SrsService : ISrsService
         var query = _db.Flashcards
             .Include(f => f.UserVocabulary)
             .Include(f => f.Deck)
-            .Where(f => f.UserVocabulary.UserId == userId);
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
 
         if (deckId.HasValue)
         {
@@ -123,7 +123,7 @@ public class SrsService : ISrsService
             .Include(f => f.UserVocabulary)
             .FirstOrDefaultAsync(f => f.Id == flashcardId);
 
-        if (flashcard == null || flashcard.UserVocabulary == null)
+        if (flashcard == null || flashcard.UserVocabulary == null || flashcard.UserVocabulary.IsDeleted == true)
             return;
 
         // Update mastery level

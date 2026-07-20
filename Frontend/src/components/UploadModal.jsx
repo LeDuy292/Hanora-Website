@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument, getDocument } from '../lib/api';
+import { formatFileSize, UPLOAD_RULE_TEXT, validateUploadFile } from '../utils/uploadRules';
 
 const UploadModal = ({ isOpen, onClose }) => {
   const [file, setFile] = useState(null);
@@ -9,6 +10,7 @@ const UploadModal = ({ isOpen, onClose }) => {
   const [status, setStatus] = useState('');
   const [isFailed, setIsFailed] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,7 +27,7 @@ const UploadModal = ({ isOpen, onClose }) => {
             navigate(`/reader/${processingId}`);
           } else if (doc.status === 'Failed' || doc.status === 'failed' || doc.status === 2) {
             clearInterval(interval);
-            setStatus(doc.extractedText || 'Lỗi xử lý tài liệu.');
+            setStatus(doc.processingError || doc.extractedText || 'Lỗi xử lý tài liệu.');
             setIsFailed(true);
           }
         } catch (error) {
@@ -45,16 +47,32 @@ const UploadModal = ({ isOpen, onClose }) => {
       setStatus('');
       setIsFailed(false);
       setIsDragActive(false);
+      setUploadProgress(0);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const selectFile = (nextFile) => {
+    const validationError = validateUploadFile(nextFile);
+    setProcessingId(null);
+    setUploadProgress(0);
+
+    if (validationError) {
+      setFile(null);
+      setStatus(validationError);
+      setIsFailed(true);
+      return;
+    }
+
+    setFile(nextFile);
+    setIsFailed(false);
+    setStatus('');
+  };
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
-      setIsFailed(false);
-      setStatus('');
+      selectFile(e.target.files[0]);
+      e.target.value = '';
     }
   };
 
@@ -83,10 +101,7 @@ const UploadModal = ({ isOpen, onClose }) => {
     if (isUploading || (processingId && !isFailed)) return;
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
-      setIsFailed(false);
-      setStatus('');
-      setProcessingId(null);
+      selectFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -94,14 +109,15 @@ const UploadModal = ({ isOpen, onClose }) => {
     if (!file) return;
     setIsUploading(true);
     setStatus('Đang tải lên...');
+    setUploadProgress(0);
     setIsFailed(false);
     try {
-      const response = await uploadDocument(file);
+      const response = await uploadDocument(file, { onProgress: setUploadProgress });
       setProcessingId(response.id);
       setStatus('Hệ thống đang xử lý OCR...');
     } catch (error) {
       console.error(error);
-      setStatus('Tải lên thất bại.');
+      setStatus(error.message || 'Tải lên thất bại.');
       setIsFailed(true);
     } finally {
       setIsUploading(false);
@@ -136,7 +152,7 @@ const UploadModal = ({ isOpen, onClose }) => {
         >
           <input
             type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.txt"
+            accept=".pdf,.docx,.jpg,.jpeg,.png"
             onChange={handleFileChange}
             className="hidden"
             id="file-upload"
@@ -148,11 +164,14 @@ const UploadModal = ({ isOpen, onClose }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700 mb-1">
-              {file ? file.name : "Kéo thả hoặc nhấn để chọn file"}
+            <span className="text-sm font-medium text-gray-700 mb-1 break-all">
+              {file ? file.name : "Kéo thả hoặc nhấn để chọn tài liệu"}
             </span>
+            {file && (
+              <span className="text-xs font-semibold text-gray-500 mb-1">{formatFileSize(file.size)}</span>
+            )}
             <span className="text-xs text-gray-500">
-              Hỗ trợ PDF, JPG, PNG, TXT
+              {UPLOAD_RULE_TEXT}
             </span>
           </label>
         </div>
@@ -172,10 +191,16 @@ const UploadModal = ({ isOpen, onClose }) => {
         {status && (
           <div className="mt-8 text-center flex-1 overflow-hidden flex flex-col">
             <p className={`text-sm font-medium mb-4 overflow-y-auto max-h-48 pr-2 custom-scrollbar ${isFailed ? 'text-red-600' : 'text-gray-700'}`}>{status}</p>
-            {processingId && !isFailed && (
+            {(isUploading || uploadProgress > 0 || (processingId && !isFailed)) && (
               <div className="w-full bg-blue-50 rounded-full h-2 overflow-hidden shrink-0">
-                <div className="bg-blue-600 h-2 rounded-full animate-pulse w-full"></div>
+                <div
+                  className={`bg-blue-600 h-2 rounded-full transition-all duration-300 ${processingId && !isFailed ? 'animate-pulse' : ''}`}
+                  style={{ width: processingId && !isFailed ? '100%' : `${uploadProgress}%` }}
+                />
               </div>
+            )}
+            {isUploading && (
+              <span className="mt-2 text-xs font-bold text-blue-600">{uploadProgress}%</span>
             )}
           </div>
         )}

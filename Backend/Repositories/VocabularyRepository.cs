@@ -56,12 +56,12 @@ public class VocabularyRepository : IVocabularyRepository
         }
     }
 
-    public async Task<bool> SaveToNotebookAsync(long userId, long vocabId, long? documentId, int? pageNumber = null, string? personalNote = null)
+    public async Task<NotebookSaveResult> SaveToNotebookAsync(long userId, long vocabId, long? documentId, int? pageNumber = null, string? personalNote = null)
     {
         var existing = await _db.UserVocabularies.FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabId);
         if (existing == null)
         {
-            _db.UserVocabularies.Add(new UserVocabulary
+            var userVocabulary = new UserVocabulary
             {
                 UserId = userId,
                 VocabularyId = vocabId,
@@ -70,28 +70,44 @@ public class VocabularyRepository : IVocabularyRepository
                 PersonalNote = personalNote,
                 SavedAt = DateTime.UtcNow,
                 IsMastered = false
-            });
-            await _db.SaveChangesAsync();
-            return true;
-        }
-        else
-        {
-            if (pageNumber.HasValue) existing.SourcePage = pageNumber;
-            if (!string.IsNullOrEmpty(personalNote)) existing.PersonalNote = personalNote;
-            if (documentId.HasValue) existing.SourceDocumentId = documentId;
-            _db.UserVocabularies.Update(existing);
-            await _db.SaveChangesAsync();
-            return false;
-        }
-    }
+            };
 
+            _db.UserVocabularies.Add(userVocabulary);
+            await _db.SaveChangesAsync();
+            return new NotebookSaveResult
+            {
+                Status = NotebookSaveStatus.Created,
+                UserVocabularyId = userVocabulary.Id
+            };
+        }
+
+        var wasDeleted = existing.IsDeleted == true;
+        existing.IsDeleted = false;
+        existing.DeletedAt = null;
+        if (wasDeleted)
+        {
+            existing.SavedAt = DateTime.UtcNow;
+            existing.IsMastered = false;
+        }
+        if (pageNumber.HasValue) existing.SourcePage = pageNumber;
+        if (!string.IsNullOrEmpty(personalNote)) existing.PersonalNote = personalNote;
+        if (documentId.HasValue) existing.SourceDocumentId = documentId;
+        _db.UserVocabularies.Update(existing);
+        await _db.SaveChangesAsync();
+
+        return new NotebookSaveResult
+        {
+            Status = wasDeleted ? NotebookSaveStatus.Restored : NotebookSaveStatus.AlreadyExists,
+            UserVocabularyId = existing.Id
+        };
+    }
     public async Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId)
     {
         return await _db.UserVocabularies
             .Include(uv => uv.Vocabulary)
             .ThenInclude(v => v.ExampleSentencesNavigation)
             .Include(uv => uv.Flashcards)
-            .Where(uv => uv.UserId == userId)
+            .Where(uv => uv.UserId == userId && uv.IsDeleted != true)
             .ToListAsync();
     }
 
@@ -99,7 +115,7 @@ public class VocabularyRepository : IVocabularyRepository
     {
         return await _db.UserVocabularies
             .Include(uv => uv.Flashcards)
-            .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId);
+            .FirstOrDefaultAsync(uv => uv.UserId == userId && uv.VocabularyId == vocabularyId && uv.IsDeleted != true);
     }
     public async Task UpdateUserVocabularyAsync(UserVocabulary userVocabulary)
     {
