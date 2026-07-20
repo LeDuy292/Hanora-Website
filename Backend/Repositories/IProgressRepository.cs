@@ -95,28 +95,40 @@ namespace Repositories
 
         public async Task<List<RecentDocRow>> GetRecentDocumentsAsync(long userId, int take)
         {
-            return await _db.Documents
+            var docs = await _db.Documents
                 .Where(d => d.UserId == userId)
                 .OrderByDescending(d => d.UpdatedAt ?? d.CreatedAt)
                 .Take(take)
-                .Select(d => new RecentDocRow(
+                .Select(d => new 
+                {
                     d.Id,
                     d.Title,
-                    d.ExtractedText != null ? d.ExtractedText.Length : 0,
-                    d.CreatedAt,
-                    _db.DocumentReadingProgresses
-                        .Where(p => p.UserId == userId && p.DocumentId == d.Id)
-                        .Select(p => p.ProgressPercent)
-                        .FirstOrDefault() ?? 0m,
-                    _db.DocumentReadingProgresses
-                        .Where(p => p.UserId == userId && p.DocumentId == d.Id)
-                        .Select(p => p.ReadingMinutes)
-                        .FirstOrDefault() ?? 0,
-                    _db.DocumentReadingProgresses
-                        .Where(p => p.UserId == userId && p.DocumentId == d.Id)
-                        .Select(p => p.LastReadAt)
-                        .FirstOrDefault()))
+                    CharCount = d.ExtractedText != null ? d.ExtractedText.Length : 0,
+                    d.CreatedAt
+                })
                 .ToListAsync();
+
+            if (docs.Count == 0) return new List<RecentDocRow>();
+
+            var docIds = docs.Select(d => d.Id).ToList();
+
+            var progresses = await _db.DocumentReadingProgresses
+                .Where(p => p.UserId == userId && docIds.Contains(p.DocumentId))
+                .ToListAsync();
+
+            return docs.Select(d => 
+            {
+                var p = progresses.FirstOrDefault(x => x.DocumentId == d.Id);
+                return new RecentDocRow(
+                    d.Id,
+                    d.Title,
+                    d.CharCount,
+                    d.CreatedAt,
+                    p?.ProgressPercent ?? 0m,
+                    p?.ReadingMinutes ?? 0,
+                    p?.LastReadAt
+                );
+            }).ToList();
         }
 
         public async Task<int> GetTotalXpAsync(long userId)
