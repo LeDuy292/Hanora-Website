@@ -25,12 +25,19 @@ public class ProgressController : ControllerBase
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
-            return Unauthorized();
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
 
-        var dashboard = await _progressService.GetDashboardAsync(userId);
-        return Ok(dashboard);
+            var dashboard = await _progressService.GetDashboardAsync(userId);
+            return Ok(dashboard);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = ex.Message, StackTrace = ex.StackTrace, InnerException = ex.InnerException?.Message });
+        }
     }
 
     [HttpPut("goal")]
