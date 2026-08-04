@@ -662,20 +662,13 @@ export function FlashcardPage() {
   // RENDER 1: Deck Manager Dashboard
   if (activeDeck === null) {
     return (
-      <div className="px-3 py-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5 sm:space-y-8 font-sans">
+      <div className="px-3 py-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-5 sm:space-y-8 font-sans">
         {/* Dashboard Header */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">Flashcard của tôi</h1>
             <p className="text-slate-500 text-sm mt-1">Quản lý và ôn tập từ vựng cá nhân hóa theo phương pháp SRS</p>
           </div>
-          <button 
-            onClick={() => navigate('/vocabulary')}
-            className="flex min-h-[44px] items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-5 sm:px-6 rounded-2xl transition shadow-md hover:shadow-lg text-sm select-none"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tạo bộ mới từ Sổ tay</span>
-          </button>
         </div>
 
         {/* Dashboard Stats Panel */}
@@ -1027,8 +1020,7 @@ export function FlashcardPage() {
   // RENDER 2: Play Modes View
   return (
     <div className="flashcard-container page-transition">
-      {/* ===== LEFT COLUMN: MAIN CONTENT ===== */}
-      <div className="flex-1 min-w-0">
+      {/* ===== CENTERED MAIN CONTENT ===== */}
         {/* Back to list and header */}
         <div className="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-3xl shadow-sm">
           <button 
@@ -1457,135 +1449,6 @@ export function FlashcardPage() {
           )}
         </div>
       )}
-      </div>
-
-      {/* ===== RIGHT COLUMN: SIDEBAR ===== */}
-      <aside className="study-sidebar">
-        {/* Card 1: Progress */}
-        <div className="sidebar-card">
-          <div className="sidebar-header-row">
-            <h3 className="sidebar-card-title-main">Tiến độ học tập</h3>
-            <button className="text-link" onClick={() => navigate('/profile')}>Thành tích <ChevronRight className="w-4 h-4 ml-0.5" /></button>
-          </div>
-          
-          <div className="progress-visual-stats">
-            {/* Multi-ring Donut Chart */}
-            <div className="chart-container-wrapper">
-              <div className="chart-container">
-                <svg className="chart-svg" viewBox="0 0 100 100">
-                  {/* Track Backgrounds */}
-                  <circle cx="50" cy="50" r="42" className="chart-track" />
-                  <circle cx="50" cy="50" r="32" className="chart-track" />
-                  <circle cx="50" cy="50" r="22" className="chart-track" />
-                  
-                  {/* Progress Rings (Concentric) */}
-                  <circle 
-                    cx="50" cy="50" r="42" 
-                    className="chart-ring ring-blue"
-                    strokeDasharray="264"
-                    strokeDashoffset={264 * (1 - levelInfo.percent / 100)}
-                  />
-                  <circle 
-                    cx="50" cy="50" r="32" 
-                    className="chart-ring ring-cyan"
-                    strokeDasharray="201"
-                    strokeDashoffset={201 * (1 - Math.min(1, (decks.find(d => d.id === 'known')?.count || 0) / (vocabList.length || 1)))}
-                  />
-                  <circle 
-                    cx="50" cy="50" r="22" 
-                    className="chart-ring ring-orange"
-                    strokeDasharray="138"
-                    strokeDashoffset={138 * (1 - Math.min(1, (user?.todayMinutes || 0) / (user?.targetDailyMinutes || 20)))}
-                  />
-                </svg>
-                <div className="chart-center-text flex flex-col items-center justify-center">
-                  <span className="chart-value text-xl font-black leading-none">{levelInfo.percent}%</span>
-                  <span className="chart-label font-bold text-[9px] text-slate-500 mt-1">Level {levelInfo.level}</span>
-                  <span className="text-[8px] text-slate-400 font-bold mt-0.5 leading-none">{user?.xp || 0}/{levelInfo.nextThreshold} XP</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats dots list */}
-            <div className="stats-dots-list">
-              <div className="stat-dot-item">
-                <span className="dot dot-blue"></span>
-                <div className="stat-text-group">
-                  <span className="stat-name">Cấp độ & XP</span>
-                  <span className="stat-figure">Lvl {levelInfo.level} ({user?.xp || 0}/{levelInfo.nextThreshold} XP)</span>
-                </div>
-              </div>
-              <div className="stat-dot-item">
-                <span className="dot dot-cyan"></span>
-                <div className="stat-text-group">
-                  <span className="stat-name">Từ vựng đã thuộc</span>
-                  <span className="stat-figure">{decks.find(d => d.id === 'known')?.count || 0} / {vocabList.length}</span>
-                </div>
-              </div>
-              <div className="stat-dot-item">
-                <span className="dot dot-orange"></span>
-                <div className="stat-text-group">
-                  <span className="stat-name">Thời gian học today</span>
-                  <span className="stat-figure">{user?.todayMinutes || 0}m / {user?.targetDailyMinutes || 20}m</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Luyện tập */}
-        <div className="sidebar-card">
-          <h3 className="sidebar-card-title">
-            <CheckCircle2 className="w-5 h-5 text-blue-500" />
-            Luyện tập
-          </h3>
-          
-          <div className="practice-header-tabs">
-            <button 
-              className={`practice-tab ${studyMode === 'flashcard' ? 'active' : ''}`}
-              onClick={() => setStudyMode('flashcard')}
-            >
-              <Layers className="w-4 h-4" />
-              Lật thẻ
-            </button>
-            <button 
-              className="practice-tab"
-              onClick={() => navigate('/pronunciation')}
-            >
-              <Mic className="w-4 h-4" />
-              Phát âm
-            </button>
-          </div>
-
-          <div className="practice-list">
-            <div className="practice-item highlight-goal">
-              <div className="practice-icon-box bg-blue-50 text-blue-600">
-                <Target className="w-5 h-5" />
-              </div>
-              <div className="practice-info">
-                <span className="practice-title">Kiểm tra từ vựng</span>
-                <span className="practice-status">Lấy {selectedDeck && typeof selectedDeck.id === 'number' ? selectedDeck.count : vocabList.length} từ trong Flashcard</span>
-              </div>
-              <button className="start-btn primary" onClick={() => {
-                const isCustomDeck = selectedDeck && typeof selectedDeck.id === 'number';
-                const qs = isCustomDeck ? `?deckId=${selectedDeck.id}&max=${selectedDeck.count}` : '';
-                navigate(`/quiz${qs}`);
-              }}>Bắt đầu thi</button>
-            </div>
-
-            <div className="practice-item">
-              <div className="practice-icon-box bg-blue-50 text-blue-500">
-                <Layers className="w-5 h-5" />
-              </div>
-              <div className="practice-info">
-                <span className="practice-title">Học từ mới ({counts.newCount})</span>
-                <span className="practice-status">Tiếp tục lật thẻ...</span>
-              </div>
-              <button className="start-btn" onClick={() => { setSelectedDeck(decks.find(d => d.id === 'new')); setCurrentIndex(0); }}>Bắt đầu</button>
-            </div>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }
