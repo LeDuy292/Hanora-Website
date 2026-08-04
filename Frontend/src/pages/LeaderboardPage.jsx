@@ -82,28 +82,50 @@ export function LeaderboardPage() {
   return (
     <div className="py-6 space-y-8 animate-fadeIn">
       
-      {/* HEADER BANNER */}
-      <div className="relative rounded-[2rem] overflow-hidden bg-gradient-to-r from-blue-600 via-[#32A0F4] to-cyan-500 p-6 md:p-8 text-white shadow-xl shadow-blue-500/10">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none" />
+      {/* HEADER BANNER WITH INTEGRATED PERSONAL RANK CARD */}
+      <div className="relative rounded-[2rem] overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 p-6 md:p-8 text-white shadow-xl shadow-blue-500/10 font-sans">
+        <div className="absolute top-0 right-0 w-56 h-56 bg-white/10 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider mb-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-extrabold uppercase tracking-wider mb-2">
               <Trophy className="w-4 h-4 text-yellow-300 fill-yellow-300/30" />
-              <span>Hệ Thống Xếp Hạng</span>
+              <span>Bảng Xếp Hạng Người Học</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-              Bảng Xếp Hạng Người Học
+              Đua Top & Tích Lũy Điểm Thưởng
             </h1>
-            <p className="text-white/80 font-medium text-xs md:text-sm max-w-xl mt-1.5">
-              Cạnh tranh lành mạnh, tích lũy điểm thưởng và nâng cao trình độ tiếng Trung mỗi ngày.
+            <p className="text-white/80 font-medium text-xs md:text-sm max-w-lg mt-1">
+              Cạnh tranh lành mạnh, nâng cao trình độ tiếng Trung và nhận thưởng XP hàng tuần.
             </p>
           </div>
+
+          {/* Integrated Personal Rank Card */}
+          {currentUserCard ? (
+            <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[240px] flex items-center gap-4 shadow-lg shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-yellow-400/20 border border-yellow-300/40 flex items-center justify-center shrink-0">
+                <Award className="w-6 h-6 text-yellow-300" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-white/80 font-extrabold uppercase tracking-wider block">Thứ hạng của bạn</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-yellow-300">#{currentUserCard.rank}</span>
+                  <span className="text-xs font-bold text-white">({currentUserCard.score.toLocaleString()} XP)</span>
+                </div>
+                <span className="text-[10px] text-yellow-100 font-semibold block">{currentUserCard.secondaryValue}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[220px] text-left shrink-0">
+              <span className="text-[10px] text-white/70 font-extrabold uppercase tracking-wider block">Thứ hạng của bạn</span>
+              <span className="text-xs font-bold text-white mt-1 block">Chưa xếp hạng — Học bài để đua top!</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* FILTERS TOOLBAR */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white border border-slate-100 rounded-3xl p-4 shadow-sm font-sans">
         {/* Period selection */}
         <div className="flex bg-slate-50 border border-slate-100 rounded-2xl p-1 shrink-0 self-start">
           {periods.map((p) => (
@@ -112,7 +134,7 @@ export function LeaderboardPage() {
               onClick={() => setPeriod(p.id)}
               className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all ${
                 period === p.id 
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-100' 
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-100 font-extrabold' 
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -132,7 +154,7 @@ export function LeaderboardPage() {
                 onClick={() => setCriteria(cf.id)}
                 className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-2xl text-xs font-bold tracking-tight shrink-0 transition-all border ${
                   isActive 
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10' 
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10 font-extrabold' 
                     : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200 hover:bg-slate-50/50'
                 }`}
               >
@@ -152,7 +174,7 @@ export function LeaderboardPage() {
           <p className="text-sm font-semibold">{error}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start font-sans">
           
           {/* LEFT: TOP 3 PODIUM & TABLE RANKINGS */}
           <div className="lg:col-span-8 space-y-8">
@@ -161,8 +183,11 @@ export function LeaderboardPage() {
             {top3.length > 0 && (
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-end">
                 <div className="text-center mb-6">
-                  <h3 className="text-base font-bold text-slate-800">Top 3 Dẫn Đầu</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Bảng vàng vinh danh những người học đứng đầu</p>
+                  <h3 className="text-base font-extrabold text-slate-800 flex items-center justify-center gap-2">
+                    <Crown className="w-5 h-5 text-yellow-500 fill-yellow-400" />
+                    <span>Top 3 Vinh Danh</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Bảng vàng khen thưởng những học viên xuất sắc nhất</p>
                 </div>
 
                 <div className="flex justify-center items-end gap-3 md:gap-8 pt-8">
@@ -199,7 +224,7 @@ export function LeaderboardPage() {
                           <span className="text-[10px] bg-slate-50 border border-slate-100 text-slate-400 font-black px-1.5 py-0.5 rounded-md">
                             Lvl {user.level}
                           </span>
-                          <span className="text-[10px] text-blue-500 font-black">
+                          <span className="text-[10px] text-blue-500 font-black flex items-center gap-0.5">
                             {user.streak} <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/20 inline" />
                           </span>
                         </div>

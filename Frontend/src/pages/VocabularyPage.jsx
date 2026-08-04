@@ -4,6 +4,7 @@ import {
   BookMarked, 
   Layers, 
   FileText, 
+  BookOpen,
   Search, 
   Filter, 
   Volume2, 
@@ -25,6 +26,7 @@ import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
 import { toast } from '../store/notificationStore';
+import { extractPlainMeaning } from '../utils/chineseUtils';
 
 
 const WINDOWS_1252_BYTE_MAP = new Map([
@@ -754,23 +756,7 @@ export function VocabularyPage() {
                           </td>
                           <td className="py-4 px-4 font-sans font-semibold text-xs text-slate-600">
                             {(() => {
-                              let rawMeaning = '';
-                              try {
-                                const parsed = JSON.parse(row.translation);
-                                if (Array.isArray(parsed)) {
-                                  const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
-                                  if (vnDef && vnDef.meaning) rawMeaning = vnDef.meaning;
-                                  else if (parsed.length > 0 && parsed[0].meaning) rawMeaning = parsed[0].meaning;
-                                }
-                                else if (parsed && typeof parsed === 'object' && parsed.meaning) {
-                                  rawMeaning = parsed.meaning;
-                                } else {
-                                  rawMeaning = String(row.translation);
-                                }
-                              } catch (e) {
-                                rawMeaning = row.translation || '';
-                              }
-                              // Format to 1-2 primary meanings
+                              const rawMeaning = extractPlainMeaning(row.translation);
                               const parts = String(rawMeaning).split(/;|\n/).map(s => s.trim()).filter(Boolean);
                               return parts.length > 2 ? parts.slice(0, 2).join('; ') : rawMeaning;
                             })()}
@@ -789,15 +775,6 @@ export function VocabularyPage() {
                                 <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
                               </button>
 
-                              {/* Details file icon */}
-                              <button 
-                                onClick={() => setDetailWord(row)}
-                                className="p-1.5 text-slate-400 hover:text-blue-650 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Xem chi tiết"
-                              >
-                                <FileText className="w-4 h-4" />
-                              </button>
-
                               {/* More action menu */}
                               <div className="relative">
                                 <button
@@ -811,26 +788,42 @@ export function VocabularyPage() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
                                 {openActionMenu === row.userVocabularyId && (
-                                  <div className="absolute right-0 top-8 z-30 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 text-left shadow-xl shadow-slate-900/10">
+                                  <div className="absolute right-0 top-8 z-30 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 text-left shadow-xl shadow-slate-900/10 font-sans">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setDetailWord(row);
                                         setOpenActionMenu(null);
                                       }}
-                                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                                     >
-                                      <FileText className="h-4 w-4" />
-                                      Chi tiết
+                                      <FileText className="h-4 w-4 text-blue-500" />
+                                      Chi tiết từ vựng
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenActionMenu(null);
+                                        if (row.documentId) {
+                                          navigate(`/reader/${row.documentId}`);
+                                        } else {
+                                          toast.info(`Từ "${cleanWordText}" được thêm thủ công hoặc không thuộc bài đọc nào.`);
+                                        }
+                                      }}
+                                      className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                                      title="Xem vị trí của từ trong tài liệu gốc"
+                                    >
+                                      <BookOpen className="h-4 w-4 text-emerald-500" />
+                                      Tài liệu gốc
                                     </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteVocabulary(row);
                                       }}
-                                      className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-50"
+                                      className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-50 transition-colors"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-4 w-4 text-rose-500" />
                                       Xóa từ vựng
                                     </button>
                                   </div>
@@ -1208,22 +1201,7 @@ export function VocabularyPage() {
                 <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Nghĩa</span>
                 <div className="bg-blue-50/20 border border-slate-150 rounded-2xl p-4 shadow-inner">
                   <p className="text-blue-650 font-black text-base select-text">
-                    {(() => {
-                      try {
-                        const parsed = JSON.parse(detailWord.translation);
-                        if (Array.isArray(parsed)) {
-                          const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
-                          if (vnDef && vnDef.meaning) return vnDef.meaning;
-                          if (parsed.length > 0 && parsed[0].meaning) return parsed[0].meaning;
-                        }
-                        if (parsed && typeof parsed === 'object' && parsed.meaning) {
-                          return parsed.meaning;
-                        }
-                        return String(detailWord.translation);
-                      } catch (e) {
-                        return detailWord.translation;
-                      }
-                    })()}
+                    {extractPlainMeaning(detailWord.translation)}
                   </p>
                 </div>
               </div>

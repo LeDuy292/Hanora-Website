@@ -1,31 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { apiRequest } from '../services/apiClient';
+import { extractPlainMeaning } from '../utils/chineseUtils';
 
 const INITIAL_VOCABULARY = [];
 
-const cleanTranslation = (val) => {
-  if (!val) return "";
-  let current = val.trim();
-  for (let i = 0; i < 5; i++) {
-    if (!(current.startsWith("[") && current.endsWith("]")) && !(current.startsWith("{") && current.endsWith("}"))) {
-      break;
-    }
-    try {
-      const parsed = JSON.parse(current);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        current = parsed[0].meaning || parsed[0].translation || current;
-      } else if (parsed && typeof parsed === 'object') {
-        current = parsed.meaning || parsed.translation || current;
-      } else {
-        break;
-      }
-    } catch (e) {
-      break;
-    }
-  }
-  return current;
-};
+const cleanTranslation = (val) => extractPlainMeaning(val);
 
 export const useVocabularyStore = create(
   persist(
@@ -42,7 +22,7 @@ export const useVocabularyStore = create(
 
       addWord: async (word) => {
         const normalizedText = (word?.text || '').trim();
-        const duplicateMessage = 'Từ vựng đã có trong sổ tay của bạn.';
+        const duplicateMessage = 'Từ vựng này đã được lưu trong sổ tay từ vựng trước đây!';
         if (!normalizedText) {
           throw new Error('Từ vựng không hợp lệ.');
         }

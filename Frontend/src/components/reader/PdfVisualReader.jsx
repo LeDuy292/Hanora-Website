@@ -542,7 +542,38 @@ const PdfVisualReader = ({
 
   return (
     <div ref={readerRootRef} className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm sm:rounded-xl">
-      <div className="shrink-0 border-b border-slate-200 bg-white/95 px-1.5 py-1.5 sm:px-3 sm:py-2">
+      <div ref={scrollAreaRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-100/60 p-1 sm:p-3">
+        {!pdfDoc && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+            <p className="mt-4 text-sm font-bold uppercase tracking-widest text-slate-500">Đang tải tài liệu...</p>
+          </div>
+        )}
+
+        <div className="relative mx-auto w-fit max-w-full rounded-md bg-white shadow-md ring-1 ring-slate-900/10 transition-transform duration-200 sm:shadow-lg">
+          <canvas ref={canvasRef} className="block rounded-md" />
+          <div ref={textLayerRef} className="textLayer absolute inset-0 z-10 overflow-hidden rounded-md leading-none opacity-100" style={{ color: 'transparent' }} />
+          <canvas
+            ref={drawingCanvasRef}
+            data-page-number={pageNumber}
+            className={`absolute inset-0 z-30 h-full w-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+            style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
+            onPointerDown={onDrawingPointerDown}
+            onPointerMove={onDrawingPointerMove}
+            onPointerUp={onDrawingPointerUp}
+            onPointerLeave={onDrawingPointerUp}
+          />
+        </div>
+
+        {isLoadingOcr && (
+          <div className="pointer-events-none absolute right-4 top-4 z-40 flex items-center gap-2 rounded-full border border-blue-100 bg-white/90 px-3 py-2 text-xs font-bold text-blue-700 shadow-sm">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR
+          </div>
+        )}
+      </div>
+
+      {/* BOTTOM PAGINATION & CONTROL TOOLBAR */}
+      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-1.5 py-1.5 sm:px-3 sm:py-2">
         <div className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-thin">
           <button
             onClick={() => goToPage(pageNumber - 1)}
@@ -616,36 +647,6 @@ const PdfVisualReader = ({
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
-      </div>
-
-      <div ref={scrollAreaRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-100/60 p-1 sm:p-3">
-        {!pdfDoc && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
-            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-            <p className="mt-4 text-sm font-bold uppercase tracking-widest text-slate-500">Đang tải tài liệu...</p>
-          </div>
-        )}
-
-        <div className="relative mx-auto w-fit max-w-full rounded-md bg-white shadow-md ring-1 ring-slate-900/10 transition-transform duration-200 sm:shadow-lg">
-          <canvas ref={canvasRef} className="block rounded-md" />
-          <div ref={textLayerRef} className="textLayer absolute inset-0 z-10 overflow-hidden rounded-md leading-none opacity-100" style={{ color: 'transparent' }} />
-          <canvas
-            ref={drawingCanvasRef}
-            data-page-number={pageNumber}
-            className={`absolute inset-0 z-30 h-full w-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
-            style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
-            onPointerDown={onDrawingPointerDown}
-            onPointerMove={onDrawingPointerMove}
-            onPointerUp={onDrawingPointerUp}
-            onPointerLeave={onDrawingPointerUp}
-          />
-        </div>
-
-        {isLoadingOcr && (
-          <div className="pointer-events-none absolute right-4 top-4 z-40 flex items-center gap-2 rounded-full border border-blue-100 bg-white/90 px-3 py-2 text-xs font-bold text-blue-700 shadow-sm">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR
-          </div>
-        )}
       </div>
 
       <style>{`

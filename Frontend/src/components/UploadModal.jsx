@@ -180,7 +180,7 @@ const UploadModal = ({ isOpen, onClose }) => {
           <button
             onClick={handleUpload}
             disabled={isUploading}
-            className={`w-full mt-8 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:bg-gray-400 shadow-md ${
+            className={`w-full mt-6 text-white font-bold py-3.5 rounded-2xl transition-colors disabled:bg-gray-400 shadow-md ${
               isFailed ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
             }`}
           >
@@ -188,20 +188,76 @@ const UploadModal = ({ isOpen, onClose }) => {
           </button>
         )}
 
-        {status && (
-          <div className="mt-8 text-center flex-1 overflow-hidden flex flex-col">
-            <p className={`text-sm font-medium mb-4 overflow-y-auto max-h-48 pr-2 custom-scrollbar ${isFailed ? 'text-red-600' : 'text-gray-700'}`}>{status}</p>
-            {(isUploading || uploadProgress > 0 || (processingId && !isFailed)) && (
-              <div className="w-full bg-blue-50 rounded-full h-2 overflow-hidden shrink-0">
-                <div
-                  className={`bg-blue-600 h-2 rounded-full transition-all duration-300 ${processingId && !isFailed ? 'animate-pulse' : ''}`}
-                  style={{ width: processingId && !isFailed ? '100%' : `${uploadProgress}%` }}
-                />
+        {(isUploading || (processingId && !isFailed)) && (
+          <div className="mt-6 flex-1 flex flex-col space-y-4 font-sans text-left">
+            {/* 4-Step Progress Stepper */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+              <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider block mb-1">Tiến trình xử lý tài liệu</span>
+              
+              <div className="space-y-2">
+                {[
+                  { step: 0, title: 'Đang tải tài liệu', desc: 'Chuyển tệp và khởi tạo dữ liệu' },
+                  { step: 1, title: 'Đang nhận diện chữ Hán', desc: 'OCR bóc tách ký tự tiếng Trung' },
+                  { step: 2, title: 'Đang phân tích nội dung', desc: 'Phân tách từ vựng & bố cục' },
+                  { step: 3, title: 'Hoàn tất', desc: 'Sẵn sàng trong giao diện Reader' }
+                ].map((item) => {
+                  const getStepIndex = (st) => {
+                    const s = String(st || '').toLowerCase();
+                    if (s === 'ready' || s === '4') return 3;
+                    if (s === 'analyzingcontent' || s === '3') return 2;
+                    if (s === 'recognizingocr' || s === 'ocr' || s === '2') return 1;
+                    if (s === 'processing' || s === '1') return 1;
+                    return 0; // Uploading
+                  };
+                  const currentStepIdx = isUploading ? 0 : getStepIndex(status);
+                  const isDone = item.step < currentStepIdx;
+                  const isCurrent = item.step === currentStepIdx;
+
+                  return (
+                    <div key={item.step} className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
+                        isDone 
+                          ? 'bg-emerald-500 text-white' 
+                          : isCurrent 
+                          ? 'bg-blue-600 text-white animate-pulse' 
+                          : 'bg-slate-200 text-slate-400'
+                      }`}>
+                        {isDone ? '✓' : item.step + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-extrabold line-clamp-1 ${isCurrent ? 'text-blue-600' : isDone ? 'text-slate-700' : 'text-slate-400'}`}>
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-medium line-clamp-1">{item.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-            {isUploading && (
-              <span className="mt-2 text-xs font-bold text-blue-600">{uploadProgress}%</span>
-            )}
+
+              {isUploading && (
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden mt-2">
+                  <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              )}
+            </div>
+
+            {/* Leave page & receive notification button */}
+            <button
+              onClick={() => {
+                toast.info('Tài liệu đang được xử lý ở nền. Bạn sẽ nhận được thông báo ngay khi hoàn tất!');
+                onClose();
+              }}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200/70 text-slate-700 font-bold rounded-xl text-xs transition border border-slate-200 flex items-center justify-center gap-2"
+            >
+              <span>🔔 Rời trang & nhận thông báo khi hoàn tất</span>
+            </button>
+          </div>
+        )}
+
+        {isFailed && (
+          <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-center">
+            <p className="text-xs font-bold text-rose-700">{status}</p>
           </div>
         )}
       </div>

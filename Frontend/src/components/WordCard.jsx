@@ -3,7 +3,7 @@ import { translateSentence, compareSentences } from '../lib/api';
 import { useToastStore } from '../store/toastStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { toast } from '../store/notificationStore';
-import { CHINESE_DICTIONARY } from '../utils/chineseUtils';
+import { CHINESE_DICTIONARY, extractPlainMeaning } from '../utils/chineseUtils';
 import { 
   Volume2, Bookmark, Award, HelpCircle,
   ArrowRight, BookOpen, Plus, Activity, RefreshCw, 
@@ -327,36 +327,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
     );
   }
 
-  const cleanDefinition = () => {
-    let currentDef = data.definitions;
-    if (!currentDef) return "";
-
-    try {
-      if (typeof currentDef === 'string') {
-        currentDef = JSON.parse(currentDef);
-      }
-      if (typeof currentDef === 'string') {
-        // Try parsing again in case of double stringification
-        currentDef = JSON.parse(currentDef);
-      }
-    } catch (e) {
-      // Ignore and fallback
-    }
-
-    if (Array.isArray(currentDef)) {
-      const vnDef = currentDef.find(d => d.lang === 'vn' || d.lang === 'vi');
-      if (vnDef && vnDef.meaning) return vnDef.meaning;
-      if (currentDef.length > 0 && currentDef[0].meaning) return currentDef[0].meaning;
-      return JSON.stringify(currentDef);
-    }
-    
-    if (currentDef && typeof currentDef === 'object') {
-      if (currentDef.meaning) return currentDef.meaning;
-      return JSON.stringify(currentDef);
-    }
-    
-    return String(currentDef);
-  };
+  const cleanDefinition = () => extractPlainMeaning(data.definitions || data.translation || data.meaning);
 
   // Parse wordType — may contain multiple types separated by '/' or ','
   const parseWordTypes = () => {
