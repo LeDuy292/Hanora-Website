@@ -40,6 +40,7 @@ namespace Repositories
 
         Task<int> GetDocumentCountAsync(long userId);
         Task<List<Achievement>> GetAchievementsAsync();
+        Task<List<DateOnly>> GetActiveDatesInRangeAsync(long userId, DateOnly from, DateOnly to);
     }
 
     public class ProgressRepository : IProgressRepository
@@ -49,6 +50,15 @@ namespace Repositories
         public ProgressRepository(AppDbContext db)
         {
             _db = db;
+        }
+
+        public async Task<List<DateOnly>> GetActiveDatesInRangeAsync(long userId, DateOnly from, DateOnly to)
+        {
+            return await _db.LearningProgresses
+                .Where(p => p.UserId == userId && p.ActivityDate >= from && p.ActivityDate <= to
+                    && ((p.XpEarned ?? 0) > 0 || (p.StudyMinutes ?? 0) > 0 || (p.NewWordsSaved ?? 0) > 0 || (p.FlashcardsReviewed ?? 0) > 0 || (p.QuizzesCompleted ?? 0) > 0))
+                .Select(p => p.ActivityDate)
+                .ToListAsync();
         }
 
         public async Task<List<SavedWordRow>> GetSavedWordsAsync(long userId)

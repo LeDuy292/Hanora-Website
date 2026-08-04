@@ -1,26 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Flame,
   Clock,
   Bookmark,
   Layers,
-  Plus,
-  FileText,
-  ArrowRight,
-  Trophy,
   TrendingUp,
   Check,
   X,
   Lock,
   Award,
+  Trophy,
+  Crown,
   BookOpen,
-  Mic
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useTimerStore } from '../store/timerStore';
 import { progressApi } from '../services/progressService';
+import { leaderboardApi } from '../services/leaderboardService';
 import { toast } from '../store/notificationStore';
-import { Button } from '../components/common/Button';
 import streakBadgeImg from '../assets/StreakImage.png';
 
 // Maps the short weekday label used by the growth chart from an ISO date.
@@ -45,24 +46,63 @@ const ACHIEVEMENT_ICONS = {
   top10_weekly: Trophy,
 };
 
-function formatVnDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user, updateProfileOnServer } = useAuthStore();
+  const { user } = useAuthStore();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [tempGoal, setTempGoal] = useState(90);
+  const [isCustomGoal, setIsCustomGoal] = useState(false);
   const [activePoint, setActivePoint] = useState(null);
 
+  // Global Study Timer state
+  const timerState = useTimerStore((s) => s.timerState);
+  const elapsedSeconds = useTimerStore((s) => s.elapsedSeconds);
+  const startTimer = useTimerStore((s) => s.startTimer);
+  const pauseTimer = useTimerStore((s) => s.pauseTimer);
+  const resumeTimer = useTimerStore((s) => s.resumeTimer);
+  const finishTimer = useTimerStore((s) => s.finishTimer);
+
+  const formatTime = (totalSeconds) => {
+    const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const secs = String(totalSeconds % 60).padStart(2, '0');
+    return `${hrs} : ${mins} : ${secs}`;
+  };
+
+  const handleFinishTimer = async () => {
+    try {
+      const saved = await finishTimer(async (minutesTracked) => {
+        toast.success(`🎉 Tuyệt vời! Bạn đã ghi nhận thêm ${minutesTracked} phút học tập.`);
+      });
+      if (saved) {
+        // Reload dashboard progress data
+        const dashboard = await progressApi.getDashboard();
+        setData(dashboard);
+      } else {
+        toast.warning("Phiên học kết thúc nhưng chưa đủ 1 phút để tích lũy.");
+      }
+    } catch (err) {
+      toast.error(`Lỗi ghi nhận thời gian: ${err.message}`);
+    }
+  };
+
+  // Auto-start study countdown timer as soon as dashboard data resolves
+  useEffect(() => {
+    if (data && timerState === 'inactive') {
+      startTimer();
+    }
+  }, [data, timerState, startTimer]);
+
+  // Leaderboard state
+  const [leaderboardData, setLeaderboardData] = useState(null);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState('weekly');
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+
+  // Fetch progress dashboard data
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -82,7 +122,27 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Safe accessors with graceful fallbacks while loading / on error.
+  // Fetch leaderboard data when period changes
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchLeaderboard() {
+      setLeaderboardLoading(true);
+      try {
+        const result = await leaderboardApi.getLeaderboard(leaderboardPeriod, 'default');
+        if (!cancelled) {
+          setLeaderboardData(result);
+        }
+      } catch (err) {
+        console.error('Failed to load leaderboard in dashboard', err);
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
+      }
+    }
+    fetchLeaderboard();
+    return () => { cancelled = true; };
+  }, [leaderboardPeriod]);
+
+  // Safe accessors with graceful fallbacks
   const streak = data?.streak ?? 0;
   const xp = data?.xp ?? 0;
   const level = data?.level ?? 1;
@@ -91,13 +151,13 @@ export function DashboardPage() {
 
   const targetMinutes = data?.dailyGoal?.target ?? 90;
   const todayMins = data?.dailyGoal?.current ?? 0;
+  const currentSessionMinutes = timerState !== 'inactive' ? elapsedSeconds / 60 : 0;
+  const totalMinsTodayCalculated = todayMins + currentSessionMinutes;
   const progressPercent = targetMinutes > 0
-    ? Math.min(Math.round((todayMins / targetMinutes) * 100), 100)
+    ? Math.min(Math.round((totalMinsTodayCalculated / targetMinutes) * 100), 100)
     : 0;
 
-  const notebookProgress = data?.notebookProgress ?? [];
   const growthChart = data?.growthChart ?? [];
-  const recentDocuments = data?.recentDocuments ?? [];
   const achievements = data?.achievements ?? [];
 
   // SVG circle specifications
@@ -108,8 +168,8 @@ export function DashboardPage() {
 
   // Consistency Calendar days matching current week
   const today = new Date();
-  const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
-  const todayIdx = currentDay === 0 ? 6 : currentDay - 1; // Map Monday to 0, Sunday to 6
+  const currentDay = today.getDay(); 
+  const todayIdx = currentDay === 0 ? 6 : currentDay - 1; 
 
   const weekDays = [
     { name: 'T2', label: 'Thứ 2' },
@@ -121,22 +181,28 @@ export function DashboardPage() {
     { name: 'CN', label: 'Chủ nhật' }
   ];
 
-  const isDayCompleted = (idx) => {
-    if (idx < todayIdx) {
-      return streak >= (todayIdx - idx);
-    }
-    if (idx === todayIdx) {
-      return todayMins > 0 || streak > 0;
-    }
-    return false;
-  };
+  // Monday of the current week in local time
+  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - daysToMonday);
 
-  const streakDisplayDays = weekDays.map((day, idx) => ({
-    ...day,
-    completed: isDayCompleted(idx),
-    today: idx === todayIdx,
-    isPast: idx < todayIdx,
-  }));
+  const streakDisplayDays = weekDays.map((day, idx) => {
+    const dayDate = new Date(monday);
+    dayDate.setDate(monday.getDate() + idx);
+    const y = dayDate.getFullYear();
+    const m = String(dayDate.getMonth() + 1).padStart(2, '0');
+    const d = String(dayDate.getDate()).padStart(2, '0');
+    const dayIso = `${y}-${m}-${d}`;
+
+    const completed = data?.activeDaysThisWeek?.includes(dayIso) ?? false;
+
+    return {
+      ...day,
+      completed,
+      today: idx === todayIdx,
+      isPast: idx < todayIdx,
+    };
+  });
 
   // Growth chart points derived from the backend's 7-day series.
   const graphPoints = growthChart.map((p) => {
@@ -149,7 +215,7 @@ export function DashboardPage() {
   const maxVal = Math.max(...graphPoints.map(p => p.count), 10);
   const chartPoints = graphPoints.map((p, idx) => ({
     x: 40 + idx * 70,
-    y: 100 - (p.count / maxVal) * 85, // Scale graph heights slightly better
+    y: 100 - (p.count / maxVal) * 85,
     ...p,
     idx
   }));
@@ -171,773 +237,716 @@ export function DashboardPage() {
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
-  const currentLevelXp = data?.currentLevelXp ?? 0;
   const nextLevelXp = data?.nextLevelXp ?? 300;
   const levelProgressPercent = data?.levelProgressPercent ?? 0;
 
-  const handleOpenDoc = (id) => {
-    navigate(`/reader/${id}`);
-  };
-
   if (loading && !data) {
     return (
-      <div className="space-y-5 sm:space-y-8 page-transition">
+      <div className="space-y-6 sm:space-y-8 page-transition">
         <div className="h-32 bg-white border border-slate-100 rounded-3xl animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-white border border-slate-100 rounded-2xl animate-pulse" />
           ))}
         </div>
-        <div className="h-80 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-8 h-96 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+          <div className="lg:col-span-4 h-96 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 sm:space-y-8 page-transition">
+    <div className="max-w-[1600px] mx-auto space-y-6 page-transition">
       {error && (
         <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-xs font-semibold rounded-2xl">
           {error}
         </div>
       )}
 
-      {/* Top Welcome / XP Progress Milestone Header Card */}
-      {user && (
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-4 sm:p-6 lg:p-8 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl gap-5 sm:gap-6 relative overflow-hidden shadow-sm">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      {/* ===== Outer 2-Column Dashboard Grid ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* ===== LEFT COLUMN: USER PROGRESS (8/12) ===== */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Greeting & Level XP Progress Header (No Import Button) */}
+          {user && (
+            <div className="p-6 sm:p-8 bg-white border border-slate-100 rounded-3xl relative overflow-hidden shadow-sm">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div className="space-y-3 flex-grow max-w-2xl">
-            <span className="text-blue-600 text-xs font-extrabold uppercase tracking-widest block">
-              Bảng điều khiển học tập
-            </span>
-            <h2 className="text-xl sm:text-2xl font-extrabold font-display text-slate-800">
-              Chào mừng trở lại, {user.name}!
-            </h2>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Cấp độ của bạn: <span className="text-blue-600 font-bold">Level {level}</span> ({xp} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
-            </p>
+              <div className="space-y-4">
+                <span className="text-blue-600 text-xs font-extrabold uppercase tracking-widest block">
+                  Bảng điều khiển học tập
+                </span>
+                <h2 className="text-2xl font-extrabold font-display text-slate-800">
+                  Chào mừng trở lại, {user.name}!
+                </h2>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Cấp độ của bạn: <span className="text-blue-600 font-bold">Level {level}</span> ({xp} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
+                </p>
 
-            {/* XP progress bar */}
-            <div className="space-y-2 pt-1 max-w-md">
-              <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                <span>Tiến trình lên Level {level + 1}</span>
-                <span>{xp} / {nextLevelXp} XP</span>
+                {/* Level progress bar */}
+                <div className="space-y-2 pt-1 max-w-xl">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                    <span>Tiến trình lên Level {level + 1}</span>
+                    <span>{xp} / {nextLevelXp} XP</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 border border-slate-200/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
+                      style={{ width: `${levelProgressPercent}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
-              <div className="h-2 bg-slate-100 border border-slate-200/50 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
-                  style={{ width: `${levelProgressPercent}%` }}
-                ></div>
+            </div>
+          )}
+
+          {/* Grid: Stat Summary Blocks (4 cards) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            
+            {/* Streak */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-orange-500 flex items-center justify-center shrink-0">
+                <Flame className="w-5 h-5 fill-orange-500/10" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Chuỗi học tập</span>
+                <h4 className="text-base font-extrabold text-slate-800 mt-0.5 truncate">{streak} Ngày</h4>
               </div>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 w-full lg:w-auto">
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => navigate('/reader', { state: { openUpload: true } })}
-            >
-              Nhập tài liệu mới
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Actionable Today's Recommendations (Step 9 optimization) */}
-      {(reviewToday > 0 || recentDocuments.length > 0) && (
-        <div className="p-4 sm:p-5 bg-rose-50/90 dark:bg-slate-900 border border-red-200/80 dark:border-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-red-500/20 shrink-0">
-              ⚡
+            {/* Time Today */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Học hôm nay</span>
+                <h4 className="text-base font-extrabold text-slate-800 mt-0.5 truncate">{todayMins} / {targetMinutes} phút</h4>
+              </div>
             </div>
-            <div>
-              <h4 className="font-black text-slate-900 dark:text-white text-sm tracking-tight">Gợi ý hành động hôm nay</h4>
-              <p className="text-xs text-slate-700 dark:text-slate-200 font-semibold mt-0.5">
-                {reviewToday > 0 ? (
-                  <>Bạn có <strong className="text-red-600 dark:text-red-400 font-extrabold">{reviewToday} từ</strong> đến lịch ôn tập Spaced Repetition.</>
-                ) : recentDocuments.length > 0 ? (
-                  <>Tài liệu <strong className="text-slate-900 dark:text-white font-extrabold">"{recentDocuments[0].title}"</strong> còn {100 - (recentDocuments[0].progressPercent || 0)}% chưa hoàn thành.</>
-                ) : (
-                  <>Duy trì <strong className="text-red-600 dark:text-red-400 font-extrabold">{streak} ngày</strong> học liên tục để đạt mục tiêu daily!</>
-                )}
-              </p>
+
+            {/* Saved Vocab */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                <Bookmark className="w-5 h-5 fill-sky-500/10" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Sổ tay từ vựng</span>
+                <h4 className="text-base font-extrabold text-slate-800 mt-0.5 truncate">{wordsSaved} Từ đã lưu</h4>
+              </div>
             </div>
+
+            {/* SRS count */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-3.5 shadow-sm cursor-pointer hover:border-slate-200 transition" onClick={() => navigate('/flashcards')}>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Cần ôn tập SRS</span>
+                <h4 className="text-base font-extrabold text-slate-800 mt-0.5 truncate">{reviewToday} Từ đến hạn</h4>
+              </div>
+            </div>
+
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {reviewToday > 0 && (
-              <button
-                onClick={() => navigate('/practice')}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition-all"
-              >
-                Ôn ngay (3 phút)
-              </button>
-            )}
-            {recentDocuments.length > 0 && (
-              <button
-                onClick={() => handleOpenDoc(recentDocuments[0].id)}
-                className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs transition-all"
-              >
-                Đọc tiếp
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Grid: Stat Summary Blocks */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-
-        {/* Streak card */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-orange-500 flex items-center justify-center">
-            <Flame className="w-6 h-6 fill-orange-500/10" />
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Chuỗi học tập</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{streak} Ngày</h4>
-          </div>
-        </div>
-
-        {/* Study Time Card */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Học hôm nay</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{todayMins} / {targetMinutes} phút</h4>
-          </div>
-        </div>
-
-        {/* Notebook count */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center">
-            <Bookmark className="w-6 h-6 fill-sky-500/10" />
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Sổ tay từ vựng</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{wordsSaved} Từ đã lưu</h4>
-          </div>
-        </div>
-
-        {/* Reviews due */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center">
-            <Layers className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Cần ôn tập SRS</span>
-            <h4 className="text-lg font-bold text-slate-800 mt-0.5">{reviewToday} Từ đến hạn</h4>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Grid: SVG Goal Ring (left) vs Streak Calendar (right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-
-        {/* SVG Goal Ring */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col justify-between items-center text-center gap-6 shadow-sm">
-          <div className="w-full flex justify-between items-start border-b border-slate-50 pb-3 text-left">
-            <div className="flex-grow">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span>Mục Tiêu Mỗi Ngày</span>
-                {!isEditingGoal && (
-                  <button 
-                    onClick={() => {
-                      setTempGoal(targetMinutes);
-                      setIsEditingGoal(true);
-                    }}
-                    className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
-                  >
-                    (Sửa)
-                  </button>
-                )}
-              </h3>
-
-              {isEditingGoal && (
-                <div className="flex flex-col gap-2.5 p-3.5 bg-slate-50/80 border border-slate-150 rounded-2xl w-full max-w-[285px] mt-2.5 shadow-sm" onClick={(e) => e.stopPropagation()}>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide select-none">Chọn nhanh (phút):</div>
-                  <div className="flex flex-wrap gap-1">
-                    {[15, 30, 45, 60, 90, 120, 180].map((mins) => (
-                      <button
-                        key={mins}
-                        type="button"
-                        onClick={() => setTempGoal(mins)}
-                        className={`px-2.5 py-1 text-[10px] rounded-lg font-bold border transition ${
-                          tempGoal === mins
-                            ? 'bg-blue-600 border-transparent text-white shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
-                        }`}
+          {/* Grid: Circular Goal vs 7-day Streak Calendar */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+            
+            {/* Goal Ring & Study Timer Card (col-span-5) */}
+            <div className="md:col-span-5 bg-white border border-slate-100 rounded-3xl p-5 flex flex-col justify-between items-center text-center gap-4 shadow-sm relative min-h-[350px]">
+              
+              {/* Header */}
+              <div className="w-full flex justify-between items-start border-b border-slate-50 pb-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <span>Mục Tiêu Mỗi Ngày</span>
+                    {!isEditingGoal && (
+                      <button 
+                        onClick={() => {
+                          setTempGoal(targetMinutes);
+                          setIsCustomGoal(![30, 60, 90, 120].includes(targetMinutes));
+                          setIsEditingGoal(true);
+                        }}
+                        className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
                       >
-                        {mins}m
+                        (Sửa mục tiêu)
                       </button>
+                    )}
+                  </h3>
+                </div>
+                <span className="text-[9px] font-black text-slate-400 tracking-wider bg-slate-50 px-2 py-0.5 rounded-md">Hôm nay</span>
+              </div>
+
+              {isEditingGoal ? (
+                // Edit daily goal section
+                <div className="flex flex-col gap-4 py-4 w-full max-w-md mx-auto text-left" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Chọn mục tiêu học mỗi ngày</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {[30, 60, 90, 120].map((mins) => (
+                      <label key={mins} className="flex items-center gap-2.5 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2.5 rounded-xl transition text-xs font-bold text-slate-700">
+                        <input
+                          type="radio"
+                          name="dailyGoalPreset"
+                          checked={!isCustomGoal && tempGoal === mins}
+                          onChange={() => {
+                            setTempGoal(mins);
+                            setIsCustomGoal(false);
+                          }}
+                          className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                        />
+                        <span>{mins} phút {mins === 90 ? '(Mặc định)' : ''}</span>
+                      </label>
                     ))}
+                    <label className="flex items-center gap-2.5 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2.5 rounded-xl transition text-xs font-bold text-slate-700">
+                      <input
+                        type="radio"
+                        name="dailyGoalPreset"
+                        checked={isCustomGoal}
+                        onChange={() => setIsCustomGoal(true)}
+                        className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                      />
+                      <span>Khác (tùy chỉnh)</span>
+                    </label>
                   </div>
-                  <div className="flex items-center gap-2.5 mt-1 pt-2 border-t border-slate-200/50">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Tự nhập:</span>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      max="1440" 
-                      value={tempGoal} 
-                      onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
-                      className="w-16 px-2 py-1 text-xs border border-slate-250 rounded-lg text-center focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800"
-                    />
-                    <span className="text-[11px] text-slate-400 font-bold">phút</span>
-                  </div>
-                  <div className="flex justify-end gap-1.5 mt-2">
-                    <button 
-                      onClick={() => setIsEditingGoal(false)}
-                      className="px-2.5 py-1 text-[10px] bg-white border border-slate-250 text-slate-500 rounded-lg font-bold hover:bg-slate-100 transition active:scale-97"
-                    >
-                      Hủy
-                    </button>
+
+                  {isCustomGoal && (
+                    <div className="flex items-center gap-2 mt-2 px-1">
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="1440" 
+                        value={tempGoal} 
+                        onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
+                        className="w-20 px-3 py-1.5 text-xs border border-slate-250 rounded-lg text-center font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                      <span className="text-xs text-slate-400 font-bold">phút học mỗi ngày</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 mt-2">
+                    <button onClick={() => setIsEditingGoal(false)} className="px-3.5 py-1.5 text-xs bg-white border border-slate-200 text-slate-500 rounded-xl font-bold">Hủy</button>
                     <button 
                       onClick={async () => {
-                        if (tempGoal <= 0) {
-                          toast.warning("Mục tiêu học phải lớn hơn 0.");
-                          return;
-                        }
+                        if (tempGoal <= 0) return;
                         try {
                           const updatedDashboard = await progressApi.setGoal(tempGoal);
                           setData(updatedDashboard);
                           setIsEditingGoal(false);
-                          // Sync global stats instantly
                           await useAuthStore.getState().refreshStats();
-                          toast.success("Đã cập nhật mục tiêu học tập thành công!");
+                          toast.success("Cập nhật mục tiêu thành công!");
                         } catch (err) {
-                          toast.error(err.message || "Lỗi khi cập nhật mục tiêu.");
+                          toast.error(err.message);
                         }
                       }}
-                      className="px-2.5 py-1 text-[10px] bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition active:scale-97 shadow-md"
+                      className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded-xl font-bold"
                     >
-                      Lưu
+                      Lưu mục tiêu
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-            <span className="text-[10px] font-bold text-slate-400 tracking-widest bg-slate-50 px-2 py-1 rounded-md shrink-0">
-              HÔM NAY
-            </span>
-          </div>
-
-          <div className="relative w-40 h-40 flex items-center justify-center my-4">
-            <svg className="w-full h-full transform -rotate-90 z-10 relative" viewBox="0 0 130 130">
-              <circle
-                cx="65"
-                cy="65"
-                r={radius}
-                className="stroke-slate-100 fill-transparent"
-                strokeWidth={strokeWidth}
-              />
-              <circle
-                cx="65"
-                cy="65"
-                r={radius}
-                className="stroke-blue-600 fill-transparent transition-all duration-1000 ease-out"
-                strokeWidth={strokeWidth}
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute flex flex-col items-center justify-center z-20 w-full h-full">
-              <span className="text-3xl font-black text-slate-800 font-display leading-tight">
-                {progressPercent}%
-              </span>
-              <span className="text-xs text-slate-500 font-bold mt-1">
-                {todayMins} / {targetMinutes} phút
-              </span>
-            </div>
-          </div>
-
-          <div className="text-xs text-slate-500 font-medium">
-            {progressPercent >= 100
-              ? '🎉 Tuyệt vời! Bạn đã hoàn thành mục tiêu học tập hôm nay!'
-              : `Còn ${Math.max(targetMinutes - todayMins, 0)} phút nữa để đạt chỉ tiêu ngày.`}
-          </div>
-        </div>
-
-        {/* Streak card with daily sequence */}
-        <div className="lg:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
-          <img 
-            src={streakBadgeImg} 
-            alt="Streak Badge" 
-            className="pointer-events-none absolute right-6 top-8 h-24 w-24 object-cover rounded-full" 
-          />
-
-          <div className="flex flex-col xl:flex-row justify-between items-start gap-6">
-            <div className="max-w-xl">
-              <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-semibold">
-                Chuỗi ngày học
-
-              </span>
-              <div className="flex items-center gap-6">
-                <div className="flex flex-col">
-                  <h3 className="text-[5rem] font-extrabold tracking-tighter text-white leading-[1]">
-                    {streak}
-                  </h3>
-                  <p className="text-sm font-bold uppercase tracking-wider text-blue-100/90 mt-1">
-                    NGÀY LIÊN TIẾP
-                  </p>
-                </div>
-                <div className="rounded-[2rem] bg-white/10 p-4 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FFB03A] to-[#FF8116] shadow-[0_4px_12px_rgba(255,129,22,0.5)]">
-                    <Flame className="h-6 w-6 text-white drop-shadow-sm" fill="currentColor" />
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Panda Image / Mascot */}
-            <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
-              <img src={streakBadgeImg} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-[1.5rem] bg-white/10 border border-white/15 p-5 backdrop-blur-md relative z-10">
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-white">
-                  TUẦN NÀY
-                </p>
-                <p className="text-[11px] text-blue-100 mt-1 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
-              </div>
-              <div className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
-                {streak} NGÀY
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center px-1">
-              {streakDisplayDays.map((day, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-2">
-                  <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
-                    day.completed 
-                      ? 'bg-white text-[#1E5BDB]' 
-                      : day.isPast
-                        ? 'bg-red-500/20 border border-red-500/50 text-red-200'
-                        : 'border border-white/20 bg-white/5 text-blue-100'
-                  }`}>
-                    {day.completed ? (
-                      <Check className="h-5 w-5" strokeWidth={3} />
-                    ) : day.isPast ? (
-                      <X className="h-5 w-5" strokeWidth={3} />
-                    ) : (
-                      <span className="font-bold">{day.name}</span>
-                    )}
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-100">
-                    {day.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 text-xs sm:text-[13px] leading-relaxed text-blue-100/90 font-medium relative z-10">
-            Tiếp tục học mỗi ngày và giữ chuỗi ổn định. Bạn đang trên đường xây dựng thói quen học tiếng Trung bền vững.
-          </div>
-        </div>
-
-      </div>
-
-      {/* Grid: SRS Study Card + Notebook Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-        {/* SRS quick study widget */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4.5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-            <Layers className="w-4 h-4 text-amber-500" /> Ôn tập thông minh SRS
-          </h3>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-4">
-            <div>
-              <span className="text-2xl font-black text-slate-800 font-display block">
-                {reviewToday}
-              </span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">
-                từ vựng cần ôn tập hôm nay
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              Ôn tập theo thuật toán Spaced Repetition nâng cao hiệu quả nhớ từ lâu hơn.
-            </p>
-
-            <Button
-              variant={reviewToday > 0 ? 'primary' : 'secondary'}
-              className="w-full shadow-sm"
-              icon={Layers}
-              onClick={() => navigate('/flashcards')}
-              disabled={wordsSaved === 0}
-            >
-              Bắt đầu ôn tập ngay
-            </Button>
-          </div>
-        </div>
-
-        {/* Vocabulary notebook distribution (per document) */}
-        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-5 shadow-sm">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Bookmark className="w-4 h-4" style={{ color: '#2563eb' }} />
-              Sổ Tay Từ Vựng
-            </h3>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
-              Tiến độ học từ vựng theo từng tài liệu
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {notebookProgress.length > 0 ? (
-              notebookProgress.map((doc) => {
-                const percent = doc.total > 0
-                  ? Math.min(Math.round((doc.learned / doc.total) * 100), 100)
-                  : 0;
-                return (
-                  <div key={doc.documentId} className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-800 truncate max-w-[60%]">{doc.title}</span>
-                      <span className="text-slate-500 font-semibold">{doc.learned} / {doc.total || '?'} từ ({percent}%)</span>
+              ) : (
+                // Double layout: Left side (Progress Ring) & Right side (Countdown Timer)
+                <div className="flex flex-col sm:flex-row items-center justify-around gap-4 py-4 w-full flex-grow">
+                  
+                  {/* Left Side: Biểu đồ thời gian đã học */}
+                  <div className="flex flex-col items-center text-center gap-2 shrink-0">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Đã học hôm nay</span>
+                    <div className="relative w-28 h-28 flex items-center justify-center select-none">
+                      <svg className="w-full h-full transform -rotate-90 z-10 relative" viewBox="0 0 130 130">
+                        <circle cx="65" cy="65" r={radius} className="stroke-slate-100 fill-transparent" strokeWidth={strokeWidth} />
+                        <circle cx="65" cy="65" r={radius} className="stroke-blue-600 fill-transparent transition-all duration-1000 ease-out" strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" />
+                      </svg>
+                      <div className="absolute flex flex-col items-center justify-center z-20 w-full h-full">
+                        <span className="text-xl font-black text-slate-800 font-display leading-tight">{progressPercent}%</span>
+                      </div>
                     </div>
-                    <div className="h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden relative">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
-                        style={{ width: `${percent || 2}%` }}
-                      ></div>
+                    <div className="text-[11px] font-bold text-slate-700 mt-0.5">
+                      {Math.round(totalMinsTodayCalculated)} / {targetMinutes} phút
                     </div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="py-6 text-center text-slate-400 text-xs font-semibold">
-                Chưa có từ vựng nào được lưu theo tài liệu.
-              </div>
-            )}
-          </div>
-        </div>
 
-      </div>
+                  {/* Divider line */}
+                  <div className="hidden sm:block h-28 w-px bg-slate-100"></div>
 
-      {/* Grid: Vocabulary Growth SVG Line Chart vs Recent Documents */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+                  {/* Right Side: Đồng hồ đếm ngược thời gian mục tiêu */}
+                  <div className="flex flex-col items-center text-center gap-2 flex-grow max-w-[190px]">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                      {totalMinsTodayCalculated >= targetMinutes ? "Học vượt mục tiêu" : "Đếm ngược"}
+                    </span>
+                    
+                    <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-3 w-full flex flex-col items-center shadow-inner">
+                      {totalMinsTodayCalculated >= targetMinutes ? (
+                        <>
+                          <span className="text-base font-black text-emerald-600 font-mono tracking-tight leading-tight">
+                            +{formatTime(Math.max(0, Math.round((totalMinsTodayCalculated - targetMinutes) * 60)))}
+                          </span>
+                          <span className="text-[7.5px] font-bold mt-0.5 px-1 py-0.5 rounded-full bg-emerald-50 text-emerald-600 uppercase tracking-wider animate-pulse">
+                            Học vượt
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-base font-black text-blue-600 font-mono tracking-tight leading-tight">
+                            {formatTime(Math.max(0, Math.round((targetMinutes - totalMinsTodayCalculated) * 60)))}
+                          </span>
+                          <span className={`text-[7.5px] font-bold mt-0.5 px-1 py-0.5 rounded-full uppercase tracking-wider ${timerState === 'running' ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-amber-50 text-amber-600'}`}>
+                            {timerState === 'running' ? 'Đếm ngược' : 'Tạm dừng'}
+                          </span>
+                        </>
+                      )}
+                    </div>
 
-        {/* Vocabulary Growth SVG Line Chart */}
-        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              Biểu Đồ Tăng Trưởng Từ Vựng
-            </h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">
-              7 Ngày Qua
-            </span>
-          </div>
-
-          <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-6 border border-slate-100/80 shadow-sm overflow-hidden select-none flex-grow flex items-center">
-            {/* Absolute HTML Floating Tooltip */}
-            {activePoint && (
-              <div 
-                className="absolute bg-slate-900 border border-slate-800/80 text-white px-3 py-2 rounded-2xl shadow-xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 text-center leading-none"
-                style={{ 
-                  left: `${(activePoint.x / 500) * 100}%`, 
-                  top: `${(activePoint.y / 130) * 100 - 15}%`,
-                  transform: 'translate(-50%, -100%)'
-                }}
-              >
-                <span className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest block">
-                  {activePoint.day} ({activePoint.date})
-                </span>
-                <span className="text-xs text-yellow-300 font-black mt-1 block">
-                  +{activePoint.count} từ mới
-                </span>
-              </div>
-            )}
-
-            <svg
-              viewBox="0 0 500 130"
-              className="w-full overflow-visible"
-            >
-              {/* Horizontal Grid lines */}
-              <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-
-              <defs>
-                <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#3B82F6" />
-                  <stop offset="100%" stopColor="#8B5CF6" />
-                </linearGradient>
-                <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-
-              {/* Hover Crosshair Vertical line */}
-              {activePoint && (
-                <line 
-                  x1={activePoint.x} 
-                  y1="10" 
-                  x2={activePoint.x} 
-                  y2="100" 
-                  stroke="#3B82F6" 
-                  strokeWidth="1.5" 
-                  strokeDasharray="4,4" 
-                  className="transition-all"
-                  opacity="0.35"
-                />
-              )}
-
-              {/* Glow Area under smoothed Bézier path */}
-              {chartPoints.length > 0 && (
-                <path
-                  d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`}
-                  fill="url(#chartProgressGlow)"
-                />
-              )}
-
-              {/* Smooth Bézier curve line */}
-              {chartPoints.length > 0 && (
-                <path
-                  d={bezierPath}
-                  fill="none"
-                  stroke="url(#chartStrokeGradient)"
-                  strokeWidth="3.2"
-                  strokeLinecap="round"
-                  className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]"
-                />
-              )}
-
-              {/* Pulsing glow ring on active dot */}
-              {activePoint && (
-                <circle
-                  cx={activePoint.x}
-                  cy={activePoint.y}
-                  r="8"
-                  fill="#3B82F6"
-                  opacity="0.25"
-                  className="animate-ping pointer-events-none"
-                />
-              )}
-
-              {/* Active and regular dots */}
-              {chartPoints.map((p, idx) => {
-                const isActive = activePoint?.idx === idx;
-                return (
-                  <g key={idx} className="pointer-events-none">
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={isActive ? "5.5" : "4"}
-                      className={`fill-white stroke-[2.5] transition-all duration-200 ${
-                        isActive ? 'stroke-blue-600 shadow-lg scale-110' : 'stroke-blue-500/80'
-                      }`}
-                    />
-                  </g>
-                );
-              })}
-
-              {/* X-axis Weekday labels */}
-              {chartPoints.map((p, idx) => {
-                const isActive = activePoint?.idx === idx;
-                return (
-                  <text
-                    key={idx}
-                    x={p.x}
-                    y="118"
-                    className={`text-[9px] font-bold font-sans transition-all duration-200 ${
-                      isActive ? 'fill-slate-800 scale-105' : 'fill-slate-400'
-                    }`}
-                    textAnchor="middle"
-                  >
-                    {p.day}
-                  </text>
-                );
-              })}
-
-              {/* Invisible vertical hover zones for easy hover interaction */}
-              {chartPoints.map((p, idx) => (
-                <rect
-                  key={`hover-${idx}`}
-                  x={p.x - 30}
-                  y="0"
-                  width="60"
-                  height="125"
-                  fill="transparent"
-                  className="cursor-pointer"
-                  onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })}
-                  onMouseLeave={() => setActivePoint(null)}
-                />
-              ))}
-            </svg>
-          </div>
-        </div>
-
-        {/* Recent Documents Grid List */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-5 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-blue-500" />
-              Tài liệu đọc gần đây
-            </h3>
-            <span className="text-xs text-slate-400 font-semibold">{recentDocuments.length} Tài liệu</span>
-          </div>
-
-          <div className="flex-grow flex flex-col justify-center">
-            {recentDocuments.length > 0 ? (
-              <div className="space-y-4">
-                {recentDocuments.slice(0, 2).map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="group flex flex-col justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm transition-all duration-200 gap-3"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-inner group-hover:text-blue-500 group-hover:border-blue-100 transition-colors">
-                          <FileText className="w-4.5 h-4.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4
-                            onClick={() => handleOpenDoc(doc.id)}
-                            className="text-xs font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition-colors truncate max-w-[200px]"
+                    {/* Controls Row */}
+                    <div className="w-full flex gap-1.5 mt-0.5">
+                      {timerState === 'running' ? (
+                        <>
+                          <button
+                            onClick={pauseTimer}
+                            className="flex-1 flex items-center justify-center gap-0.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
                           >
-                            {doc.title}
-                          </h4>
-                          <p className="text-[9px] text-slate-400 font-bold mt-0.5">
-                            Đọc gần nhất: {formatVnDate(doc.lastReadAt)}
-                          </p>
-                        </div>
-                      </div>
+                            <Pause className="w-2.5 h-2.5 fill-current" />
+                            <span>Tạm dừng</span>
+                          </button>
+                          <button
+                            onClick={handleFinishTimer}
+                            className="flex-1 flex items-center justify-center gap-0.5 bg-red-600 hover:bg-red-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
+                          >
+                            <Square className="w-2.5 h-2.5 fill-current" />
+                            <span>Kết thúc</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={timerState === 'paused' ? resumeTimer : startTimer}
+                            className="flex-1 flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
+                          >
+                            <Play className="w-2.5 h-2.5 fill-current" />
+                            <span>{timerState === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}</span>
+                          </button>
+                          {timerState === 'paused' && (
+                            <button
+                              onClick={handleFinishTimer}
+                              className="flex-1 flex items-center justify-center gap-0.5 bg-red-600 hover:bg-red-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
+                            >
+                              <Square className="w-2.5 h-2.5 fill-current" />
+                              <span>Kết thúc</span>
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
-                        <span>Tiến trình</span>
-                        <span>{Math.round(doc.progressPercent || 0)}%</span>
-                      </div>
-                      <div className="h-1 bg-slate-100 border border-slate-200/55 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"
-                          style={{ width: `${doc.progressPercent || 0}%` }}
-                        ></div>
-                      </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* Bottom Status text */}
+              {!isEditingGoal && (
+                <div className="text-[10px] text-slate-550 font-semibold leading-relaxed px-1 border-t border-slate-50 pt-2 text-center w-full">
+                  {totalMinsTodayCalculated >= targetMinutes ? (
+                    <span className="text-blue-600 font-bold">
+                      🎉 Đã đạt mục tiêu ngày! +1 XP/10 phút học thêm.
+                    </span>
+                  ) : (
+                    <span>
+                      Còn {Math.max(0, Math.ceil(targetMinutes - totalMinsTodayCalculated))} phút nữa để đạt mục tiêu.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Streak Calendar Card (col-span-7) */}
+            <div className="md:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
+
+              <div className="flex flex-col xl:flex-row justify-between items-start gap-6 relative z-10">
+                <div className="max-w-xl">
+                  <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-bold">
+                    Chuỗi ngày học
+                  </span>
+                  <div className="flex items-center gap-6 mt-2">
+                    <div className="flex flex-col">
+                      <h3 className="text-[5rem] font-extrabold tracking-tighter text-white leading-[1]">
+                        {streak}
+                      </h3>
+                      <p className="text-sm font-bold uppercase tracking-wider text-blue-100/90 mt-1">
+                        NGÀY LIÊN TIẾP
+                      </p>
                     </div>
-
-                    <div className="flex items-center justify-between text-[9px] text-slate-400 border-t border-slate-100 pt-2">
-                      <div className="flex items-center gap-2 font-semibold">
-                        <span>{doc.charCount} ký tự</span>
-                        <span>&bull;</span>
-                        <span>{doc.readingMinutes} phút</span>
-                      </div>
-
-                      <button
-                        onClick={() => handleOpenDoc(doc.id)}
-                        className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-500"
-                      >
-                        Đọc tiếp <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                      </button>
+                    <div className="rounded-[2rem] bg-white/10 p-4 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FFB03A] to-[#FF8116] shadow-[0_4px_12px_rgba(255,129,22,0.5)]">
+                        <Flame className="h-6 w-6 text-white drop-shadow-sm" fill="currentColor" />
+                      </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Panda Image / Mascot */}
+                <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
+                  <img src={streakBadgeImg} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-[1.5rem] bg-white/10 border border-white/15 p-5 backdrop-blur-md relative z-10">
+                <div className="flex justify-between items-center mb-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-white">
+                      TUẦN NÀY
+                    </p>
+                    <p className="text-[11px] text-blue-100 mt-1 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
+                  </div>
+                  <div className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
+                    {streak} NGÀY
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center px-1">
+                  {streakDisplayDays.map((day, idx) => (
+                    <div key={idx} className="flex flex-col items-center gap-2">
+                      <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
+                        day.completed 
+                          ? 'bg-white text-[#1E5BDB]' 
+                          : day.isPast
+                            ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                            : 'border border-white/20 bg-white/5 text-blue-100'
+                      }`}>
+                        {day.completed ? (
+                          <Check className="h-5 w-5" strokeWidth={3} />
+                        ) : day.isPast ? (
+                          <X className="h-5 w-5" strokeWidth={3} />
+                        ) : (
+                          <span className="font-bold">{day.name}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-blue-100">
+                        {day.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 text-xs sm:text-[13px] leading-relaxed text-blue-100/90 font-medium relative z-10">
+                Tiếp tục học mỗi ngày và giữ chuỗi ổn định. Bạn đang trên đường xây dựng thói quen học tiếng Trung bền vững.
+              </div>
+            </div>
+
+          </div>
+
+          {/* Vocabulary Growth SVG Line Chart */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                Biểu Đồ Tăng Trưởng Từ Vựng
+              </h3>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">7 ngày qua</span>
+            </div>
+
+            <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-4 border border-slate-100/80 shadow-sm overflow-hidden select-none min-h-[140px] flex items-center">
+              {activePoint && (
+                <div className="absolute bg-slate-900 border border-slate-800/80 text-white px-2.5 py-1.5 rounded-xl shadow-xl pointer-events-none z-20 flex flex-col items-center text-center leading-none" style={{ left: `${(activePoint.x / 500) * 100}%`, top: `${(activePoint.y / 130) * 100 - 15}%`, transform: 'translate(-50%, -100%)' }}>
+                  <span className="text-[7px] text-slate-400 font-extrabold tracking-widest">{activePoint.day} ({activePoint.date})</span>
+                  <span className="text-[10px] text-yellow-300 font-black mt-1">+{activePoint.count} từ mới</span>
+                </div>
+              )}
+              <svg viewBox="0 0 500 130" className="w-full overflow-visible">
+                <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
+                <defs>
+                  <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#3B82F6" /><stop offset="100%" stopColor="#8B5CF6" /></linearGradient>
+                  <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" /><stop offset="100%" stopColor="#3B82F6" stopOpacity="0" /></linearGradient>
+                </defs>
+                {activePoint && <line x1={activePoint.x} y1="10" x2={activePoint.x} y2="100" stroke="#3B82F6" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.35" />}
+                {chartPoints.length > 0 && <path d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`} fill="url(#chartProgressGlow)" />}
+                {chartPoints.length > 0 && <path d={bezierPath} fill="none" stroke="url(#chartStrokeGradient)" strokeWidth="3.2" strokeLinecap="round" className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]" />}
+                {chartPoints.map((p, idx) => (
+                  <circle key={idx} cx={p.x} cy={p.y} r={activePoint?.idx === idx ? "5.5" : "4"} className={`fill-white stroke-[2.5] transition-all duration-200 ${activePoint?.idx === idx ? 'stroke-blue-600 scale-110' : 'stroke-blue-500/80'}`} />
+                ))}
+                {chartPoints.map((p, idx) => (
+                  <text key={idx} x={p.x} y="118" className={`text-[8px] font-bold transition-all duration-200 ${activePoint?.idx === idx ? 'fill-slate-800 font-black' : 'fill-slate-400 font-semibold'}`} textAnchor="middle">{p.day}</text>
+                ))}
+                {chartPoints.map((p, idx) => (
+                  <rect key={`hover-${idx}`} x={p.x - 30} y="0" width="60" height="125" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })} onMouseLeave={() => setActivePoint(null)} />
+                ))}
+              </svg>
+            </div>
+          </div>
+
+          {/* Trophy Room / Achievements block */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-5 shadow-sm">
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-500 fill-amber-500/10" />
+                  Phòng Danh Hiệu (Achievements)
+                </h3>
+                <p className="text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Huy hiệu vinh danh cá nhân và cột mốc học tập</p>
+              </div>
+              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100/50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Award className="w-3.5 h-3.5" />
+                {unlockedCount} / {achievements.length} Đạt được
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {achievements.map((achievement) => {
+                const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
+                const progressText = achievement.target > 0 ? `${achievement.progress}/${achievement.target}` : '—';
+
+                return (
+                  <div key={achievement.code} className={`p-4 rounded-xl border flex flex-col justify-between h-[150px] relative overflow-hidden group ${achievement.unlocked ? 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md' : 'bg-slate-50/50 border-slate-100/60 opacity-65'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className={`p-2 rounded-xl border ${achievement.unlocked ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-slate-100 border-slate-150 text-slate-400'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[8px] font-bold">{achievement.unlocked ? 'Đạt' : 'Khóa'}</span>
+                    </div>
+                    <div className="space-y-0.5 mt-2">
+                      <h4 className="text-[11px] font-extrabold text-slate-800">{achievement.name}</h4>
+                      <p className="text-[9px] text-slate-500 leading-tight line-clamp-2">{achievement.description}</p>
+                    </div>
+                    <div className="border-t border-slate-100 pt-1.5 mt-2 flex justify-between text-[8px] text-slate-400 font-bold">
+                      <span>+{achievement.xpReward} XP</span>
+                      <span className={achievement.unlocked ? 'text-blue-600 font-extrabold' : 'text-slate-550'}>{progressText}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ===== RIGHT COLUMN: LEADERBOARD & COMPETITION (4/12) ===== */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* 1. MY RANK CARD (Top Preference) */}
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 shadow-lg text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <span className="text-[9px] text-blue-100 font-bold uppercase tracking-widest block">Hạng của bạn</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-4xl font-black">
+                    {leaderboardData?.currentUser ? `#${leaderboardData.currentUser.rank}` : '—'}
+                  </span>
+                  <span className="text-[10px] text-blue-100/90 font-bold">
+                    / {leaderboardData?.rankings ? leaderboardData.rankings.length + (leaderboardData.top3?.length || 0) : '0'} người
+                  </span>
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/20">
+                <Award className="w-5 h-5 text-yellow-300" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-3 text-xs font-bold">
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Cấp độ</span>
+                <span className="text-sm">{level}</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Tổng XP</span>
+                <span className="text-sm">{xp} XP</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Từ đã lưu</span>
+                <span className="text-sm">{wordsSaved} từ</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Ngày Streak</span>
+                <span className="text-sm">{streak} ngày</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 mt-4 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 w-fit">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>↑ Giữ vững phong độ tuần này</span>
+            </div>
+          </div>
+
+          {/* 2. LEADERBOARD TOP 10 CARD */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+              <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
+                <Trophy className="w-4 h-4 text-yellow-500 fill-yellow-500/10" />
+                Bảng Xếp Hạng
+              </h3>
+              
+              {/* Short Period Selector Tabs */}
+              <div className="flex bg-slate-50 border border-slate-100 rounded-xl p-0.5">
+                {[
+                  { id: 'today', label: 'Hôm nay' },
+                  { id: 'weekly', label: 'Tuần' },
+                  { id: 'monthly', label: 'Tháng' },
+                  { id: 'global', label: 'Tất cả' }
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setLeaderboardPeriod(p.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[9px] font-black transition-all ${
+                      leaderboardPeriod === p.id 
+                        ? 'bg-white text-blue-605 shadow-xs border border-slate-200/30' 
+                        : 'text-slate-400 hover:text-slate-700'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
                 ))}
               </div>
-            ) : (
-              <div className="py-8 text-center text-slate-400 text-xs font-semibold">
-                Không có tài liệu nào gần đây. Hãy nhập một file văn bản hoặc thêm mẫu có sẵn.
-              </div>
-            )}
+            </div>
+
+            {/* Top 10 list */}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-0.5">
+              {leaderboardLoading ? (
+                <div className="text-center py-8 text-slate-400 text-xs font-bold animate-pulse">
+                  Đang tải xếp hạng...
+                </div>
+              ) : (
+                <>
+                  {[
+                    ...(leaderboardData?.top3 || []),
+                    ...(leaderboardData?.rankings || [])
+                  ].slice(0, 10).map((row, index) => {
+                    const isCurrentUser = row.userId === user?.id;
+                    const displayRank = index + 1;
+                    return (
+                      <div 
+                        key={row.userId} 
+                        className={`flex items-center justify-between p-2 rounded-xl transition border ${
+                          isCurrentUser 
+                            ? 'bg-blue-50/40 border-blue-200 shadow-xs' 
+                            : 'bg-slate-50/30 border-transparent hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`w-5 text-center text-[10px] font-black ${
+                            displayRank === 1 ? 'text-yellow-500 text-xs' : displayRank === 2 ? 'text-slate-400' : displayRank === 3 ? 'text-amber-600' : 'text-slate-405'
+                          }`}>
+                            #{displayRank}
+                          </span>
+                          
+                          {/* Avatar */}
+                          <div className="w-7.5 h-7.5 rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                            {row.avatarUrl ? (
+                              <img src={row.avatarUrl} alt={row.displayName} className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                              <div className="w-full h-full rounded-full bg-slate-250 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase">
+                                {row.displayName.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <span className={`text-[11px] font-bold block truncate max-w-[110px] ${isCurrentUser ? 'text-blue-600' : 'text-slate-800'}`}>
+                              {row.displayName}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[8px] font-black text-slate-400">Lvl {row.level}</span>
+                              <span className="text-[8px] text-slate-400 font-bold flex items-center gap-0.5">
+                                &bull; {row.streak} ngày
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* XP score */}
+                        <div className="text-right">
+                          <span className="text-[11px] font-black text-slate-805 block">
+                            {row.score.toLocaleString()} XP
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Highlight current user if not in top 10 */}
+                  {leaderboardData?.currentUser && leaderboardData.currentUser.rank > 10 && (
+                    <>
+                      <div className="text-center text-slate-300 font-bold py-1 select-none tracking-widest">...</div>
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/40 border border-blue-200 shadow-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 text-center text-[10px] font-black text-blue-600">
+                            #{leaderboardData.currentUser.rank}
+                          </span>
+                          <div className="w-7.5 h-7.5 rounded-full border border-blue-100 overflow-hidden flex items-center justify-center shrink-0 bg-blue-100 text-blue-600 text-[10px] font-black">
+                            B
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-black text-blue-600 block">Bạn</span>
+                            <span className="text-[8px] font-bold text-slate-400">Lvl {level} &bull; {streak} ngày</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] font-black text-blue-600 block">
+                            {leaderboardData.currentUser.score.toLocaleString()} XP
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-      </div>
-
-      {/* Expanded Trophy Room / Achievements block */}
-      <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-6 shadow-sm">
-        <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Trophy className="w-4.5 h-4.5 text-amber-500 fill-amber-500/10" />
-              Phòng Danh Hiệu (Achievements)
-            </h3>
-            <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-              Huy hiệu vinh danh cá nhân và cột mốc học tập
-            </p>
-          </div>
-
-          <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-100/50 px-3 py-1 rounded-full flex items-center gap-1.5">
-            <Award className="w-4 h-4 fill-amber-500/10" />
-            {unlockedCount} / {achievements.length} Đạt được
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {achievements.map((achievement) => {
-            const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
-            const progressText = achievement.target > 0
-              ? `${achievement.progress}/${achievement.target}`
-              : '—';
-
-            return (
-              <div
-                key={achievement.code}
-                className={`p-5 rounded-2xl border flex flex-col justify-between h-[180px] transition-all duration-300 relative overflow-hidden group ${
-                  achievement.unlocked
-                    ? 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md'
-                    : 'bg-slate-50/50 border-slate-100/60 opacity-60'
-                }`}
-              >
-                {achievement.unlocked && (
-                  <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-blue-500/5 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform duration-500"></div>
-                )}
-
-                <div className="flex justify-between items-start">
-                  <div className={`p-3 rounded-2xl border transition-colors ${
-                    achievement.unlocked
-                      ? 'bg-blue-50 border-blue-100 text-blue-600'
-                      : 'bg-slate-100 border-slate-150 text-slate-400'
-                  }`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-
-                  <div className="flex items-center">
-                    {achievement.unlocked ? (
-                      <span className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
-                        Đã đạt
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-150 px-2 py-0.5 rounded-md flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5" /> Khóa
-                      </span>
-                    )}
-                  </div>
+          {/* 3. WEEKLY REWARDS CARD */}
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-5 text-white shadow-xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-yellow-450/20 border border-yellow-450/30 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-yellow-400 fill-yellow-400/20" />
                 </div>
-
-                <div className="space-y-1 mt-3">
-                  <h4 className={`text-xs font-bold ${achievement.unlocked ? 'text-slate-800' : 'text-slate-400'}`}>
-                    {achievement.name}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 leading-normal line-clamp-2">
-                    {achievement.description}
-                  </p>
-                </div>
-
-                <div className="mt-2.5 pt-2 border-t border-slate-100 flex justify-between items-center text-[9px] text-slate-400 font-bold">
-                  <span>+{achievement.xpReward} XP</span>
-                  <span className={achievement.unlocked ? 'text-blue-600 font-extrabold' : 'text-slate-500'}>
-                    {progressText}
-                  </span>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wide">Giải Thưởng Tuần</h3>
+                  <p className="text-[9px] text-white/40 font-medium">Nhận giải 00:00 Thứ Hai hàng tuần</p>
                 </div>
               </div>
-            );
-          })}
+
+              {/* Reward list */}
+              <div className="space-y-2.5 pt-1.5 text-[11px] font-semibold text-slate-350">
+                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2">
+                  <span className="flex items-center gap-1.5">🥇 <span>Top 1</span></span>
+                  <span className="text-yellow-400 font-black">+1,000 XP</span>
+                </div>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
+                  <span className="flex items-center gap-1.5">🥈 <span>Top 2</span></span>
+                  <span className="font-bold">+700 XP</span>
+                </div>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
+                  <span className="flex items-center gap-1.5">🥉 <span>Top 3</span></span>
+                  <span className="font-bold">+500 XP</span>
+                </div>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
+                  <span className="flex items-center gap-1.5">🎖️ <span>Top 4-5</span></span>
+                  <span className="font-bold">+300 XP</span>
+                </div>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
+                  <span className="flex items-center gap-1.5">🎖️ <span>Top 6-10</span></span>
+                  <span className="font-bold">+200 XP</span>
+                </div>
+              </div>
+              
+              <div className="text-[9.5px] text-white/45 font-medium leading-relaxed mt-1 text-center border-t border-white/5 pt-2">
+                Phần thưởng sẽ được trao lúc 00:00 thứ Hai hàng tuần.
+              </div>
+            </div>
+          </div>
+
         </div>
+
       </div>
     </div>
   );

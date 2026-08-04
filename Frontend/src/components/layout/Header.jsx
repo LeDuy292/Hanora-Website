@@ -25,7 +25,6 @@ export function Header({ offsetTop }) {
     { to: '/vocabulary', label: 'Từ vựng' },
     { to: '/flashcards', label: 'Flashcard' },
     { to: '/reader', label: 'Dịch thuật' },
-    { to: '/leaderboard', label: 'Bảng xếp hạng' },
     { to: '/pronunciation', label: 'Luyện phát âm' },
     ...(user?.role === 'Admin' ? [{ to: '/admin', label: 'Admin' }] : []),
   ];
@@ -35,7 +34,7 @@ export function Header({ offsetTop }) {
   };
 
   return (
-    <header className={`fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.22)] transition-all duration-300`}>
+    <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.22)] transition-all duration-300`}>
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <NavLink to="/" className="hover:opacity-90 transition-opacity group">

@@ -87,12 +87,12 @@ namespace Services
                 int periodReadingMins = allTimeReadingMins;
                 double periodReadingChars = allTimeReadingChars;
 
-                if (period == "weekly" || period == "monthly")
+                if (period == "today" || period == "weekly" || period == "monthly")
                 {
-                    DateOnly dateBoundary = period == "weekly" ? startOfWeek : startOfMonth;
-                    DateTime timeBoundaryUtc = period == "weekly" ? startOfWeekUtc : startOfMonthUtc;
+                    DateOnly dateBoundary = period == "today" ? today : (period == "weekly" ? startOfWeek : startOfMonth);
+                    DateTime timeBoundaryUtc = period == "today" ? DateTime.SpecifyKind(today.ToDateTime(TimeOnly.MinValue) - VietnamOffset, DateTimeKind.Utc) : (period == "weekly" ? startOfWeekUtc : startOfMonthUtc);
 
-                    periodXp = period == "weekly" ? (stats.XpThisWeek ?? 0) : (stats.XpThisMonth ?? 0);
+                    periodXp = period == "today" ? (stats.XpToday ?? 0) : (period == "weekly" ? (stats.XpThisWeek ?? 0) : (stats.XpThisMonth ?? 0));
                     
                     var userProgress = progressLogs.Where(p => p.UserId == u.Id && p.ActivityDate >= dateBoundary).ToList();
                     periodVocab = userProgress.Sum(p => p.NewWordsSaved ?? 0);

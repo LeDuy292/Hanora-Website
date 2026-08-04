@@ -17,7 +17,6 @@ import { PronunciationPracticePage } from '../pages/PronunciationPracticePage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { QuizPage } from '../pages/QuizPage';
 import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
-import { LeaderboardPage } from '../pages/LeaderboardPage';
 import { AdminPage } from '../pages/AdminPage';
 
 
@@ -152,16 +151,7 @@ export function AppRoutes() {
         }
       />
 
-      <Route 
-        path="/leaderboard" 
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <LeaderboardPage />
-            </MainLayout>
-          </ProtectedRoute>
-        } 
-      />
+
 
       <Route
         path="/admin"
