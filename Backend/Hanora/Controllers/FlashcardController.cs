@@ -68,12 +68,23 @@ public class FlashcardController : ControllerBase
     [HttpPost("decks/bulk-add")]
     public async Task<IActionResult> BulkAddCards([FromBody] BulkAddCardsRequest request)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) return Unauthorized();
-        
-        long userId = long.Parse(userIdClaim.Value);
-        var result = await _flashcardService.BulkAddCardsAsync(userId, request);
-        return Ok(new { success = result });
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized();
+            
+            long userId = long.Parse(userIdClaim.Value);
+            var result = await _flashcardService.BulkAddCardsAsync(userId, request);
+            return Ok(new { success = result });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message, stackTrace = ex.StackTrace });
+        }
     }
 
     [HttpPost("session/complete")]

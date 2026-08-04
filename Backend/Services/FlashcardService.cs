@@ -253,6 +253,11 @@ public class FlashcardService : IFlashcardService
             throw new ArgumentException("Either DeckId or NewDeckName must be provided.");
         }
 
+        if (request.Words == null || !request.Words.Any())
+        {
+            return false;
+        }
+
         foreach (var word in request.Words)
         {
             if (string.IsNullOrWhiteSpace(word)) continue;

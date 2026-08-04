@@ -46,6 +46,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   const updateServerStatus = useVocabularyStore(state => state.updateServerStatus);
   const fetchDecks = useVocabularyStore(state => state.fetchDecks);
   const bulkAddCards = useVocabularyStore(state => state.bulkAddCards);
+  const isWordSaved = useVocabularyStore(state => state.isWordSaved);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showDeckModal, setShowDeckModal] = useState(false);
@@ -53,6 +54,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   const [selectedDeckId, setSelectedDeckId] = useState('');
   const [newDeckName, setNewDeckName] = useState('');
   const [isAddingFlashcard, setIsAddingFlashcard] = useState(false);
+  const [showCardMenu, setShowCardMenu] = useState(false);
 
   const handleOpenDeckModal = async () => {
     setShowDeckModal(true);
@@ -370,8 +372,18 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   const hskLevel = getHskLevel(data.word);
   const badgeConfig = HSK_BADGES[hskLevel] || { label: 'HSK Level', style: 'bg-gray-50 text-gray-600 border-gray-200' };
 
+  const isAlreadySavedInStore = isWordSaved(data.word || word);
+
   return (
     <div className="mt-4 space-y-6">
+      {/* Saved Notification Banner */}
+      {isAlreadySavedInStore && (
+        <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-amber-800 flex items-center gap-2 shadow-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>Từ vựng này đã được bạn lưu trước đây trong Sổ tay!</span>
+        </div>
+      )}
+
       {/* Header: Word & Audio */}
       <div className="border-b border-gray-100 pb-4">
         <div className="flex items-center justify-between gap-4">
@@ -381,13 +393,39 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
               {badgeConfig.label}
             </span>
           </div>
-          <button 
-            onClick={() => playAudio(data.word)}
-            className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors shrink-0"
-            title="Nghe phát âm"
-          >
-            <Volume2 className="w-5.5 h-5.5" />
-          </button>
+          <div className="flex items-center gap-2 relative">
+            <button 
+              onClick={() => playAudio(data.word)}
+              className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors shrink-0"
+              title="Nghe phát âm"
+            >
+              <Volume2 className="w-5.5 h-5.5" />
+            </button>
+
+            {/* 3-dots Menu Button */}
+            <button
+              onClick={() => setShowCardMenu(!showCardMenu)}
+              className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
+              title="Tùy chọn khác"
+            >
+              <ChevronRight className="w-5 h-5 rotate-90" />
+            </button>
+
+            {showCardMenu && (
+              <div className="absolute right-0 top-10 z-50 w-48 bg-white rounded-2xl border border-slate-200 shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  onClick={() => {
+                    setShowCardMenu(false);
+                    useToastStore.getState().addToast(`Đang hiển thị vị trí từ "${data.word}" trong bài gốc`, 'info');
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                >
+                  <BookOpen className="w-4 h-4 text-blue-500" />
+                  <span>Tài liệu gốc</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Pinyin, Part of Speech, Hán Việt */}

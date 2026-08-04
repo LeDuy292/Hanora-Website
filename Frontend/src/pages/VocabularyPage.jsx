@@ -706,11 +706,10 @@ export function VocabularyPage() {
                         className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4 shadow-sm"
                       />
                     </th>
-                    <th className="py-4.5 px-4 font-black w-[20%]">Từ vựng</th>
-                    <th className="py-4.5 px-4 font-black w-[18%]">Pinyin</th>
-                    <th className="py-4.5 px-4 font-black w-[25%]">Nghĩa</th>
-                    <th className="py-4.5 px-4 font-black w-[18%]">Nguồn tài liệu</th>
-                    <th className="py-4.5 px-4 font-black w-[13%]">Ngày học</th>
+                    <th className="py-4.5 px-4 font-black w-[22%]">Từ vựng</th>
+                    <th className="py-4.5 px-4 font-black w-[20%]">Pinyin</th>
+                    <th className="py-4.5 px-4 font-black w-[42%]">Nghĩa</th>
+                    <th className="py-4.5 px-4 font-black w-[14%]">Ngày học</th>
                     <th className="py-4.5 px-4 font-black text-center w-[12%]">Thao tác</th>
                   </tr>
                 </thead>
@@ -755,26 +754,26 @@ export function VocabularyPage() {
                           </td>
                           <td className="py-4 px-4 font-sans font-semibold text-xs text-slate-600">
                             {(() => {
+                              let rawMeaning = '';
                               try {
                                 const parsed = JSON.parse(row.translation);
                                 if (Array.isArray(parsed)) {
                                   const vnDef = parsed.find(d => d.lang === 'vn' || d.lang === 'vi');
-                                  if (vnDef && vnDef.meaning) return vnDef.meaning;
-                                  if (parsed.length > 0 && parsed[0].meaning) return parsed[0].meaning;
+                                  if (vnDef && vnDef.meaning) rawMeaning = vnDef.meaning;
+                                  else if (parsed.length > 0 && parsed[0].meaning) rawMeaning = parsed[0].meaning;
                                 }
-                                if (parsed && typeof parsed === 'object' && parsed.meaning) {
-                                  return parsed.meaning;
+                                else if (parsed && typeof parsed === 'object' && parsed.meaning) {
+                                  rawMeaning = parsed.meaning;
+                                } else {
+                                  rawMeaning = String(row.translation);
                                 }
-                                return String(row.translation);
                               } catch (e) {
-                                return row.translation;
+                                rawMeaning = row.translation || '';
                               }
+                              // Format to 1-2 primary meanings
+                              const parts = String(rawMeaning).split(/;|\n/).map(s => s.trim()).filter(Boolean);
+                              return parts.length > 2 ? parts.slice(0, 2).join('; ') : rawMeaning;
                             })()}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`inline-flex px-2.5 py-1 text-[10px] font-black rounded-lg border uppercase tracking-wider ${getSourceBadgeStyle(row.source)}`}>
-                              {row.source}
-                            </span>
                           </td>
                           <td className="py-4 px-4 font-sans font-bold text-[11px] text-slate-450">
                             {row.dateAdded}

@@ -25,7 +25,7 @@ namespace Hanora.Controllers
             if (!result.Success)
                 return Unauthorized(new { error = result.Error });
 
-            return Ok(new { token = result.Token, user = result.User });
+            return Ok(new { token = result.Token, user = result.User, isNewUser = result.IsNewUser });
         }
 
         [HttpPost("login")]
@@ -38,7 +38,7 @@ namespace Hanora.Controllers
             if (!result.Success)
                 return Unauthorized(new { error = result.Error });
 
-            return Ok(new { token = result.Token, user = result.User });
+            return Ok(new { token = result.Token, user = result.User, isNewUser = false });
         }
 
         [HttpPost("register")]
@@ -49,9 +49,9 @@ namespace Hanora.Controllers
 
             var result = await _authService.RegisterAsync(req.Username, req.Email, req.Password);
             if (!result.Success)
-                return Conflict(new { error = result.Error });
+                return BadRequest(new { error = result.Error });
 
-            return Ok(new { token = result.Token, user = result.User });
+            return Ok(new { token = result.Token, user = result.User, isNewUser = true });
         }
 
         [Authorize]

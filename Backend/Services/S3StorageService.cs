@@ -13,11 +13,15 @@ public class S3StorageService : IS3StorageService
 
     public S3StorageService(IConfiguration config)
     {
-        _bucketName = config["AWS:BucketName"] ?? "projectswp1";
+        _bucketName = config["AWS:BucketName"] ?? "hanora";
         var accessKey = config["AWS:AccessKey"];
         var secretKey = config["AWS:SecretKey"];
-        var region = Amazon.RegionEndpoint.GetBySystemName(config["AWS:Region"] ?? "ap-southeast-2");
-        
+
+        var rawRegion = config["AWS:Region"] ?? "ap-southeast-2";
+        var match = System.Text.RegularExpressions.Regex.Match(rawRegion, @"[a-z]{2,4}-[a-z]+-\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var regionName = match.Success ? match.Value.ToLowerInvariant() : rawRegion.Trim();
+
+        var region = Amazon.RegionEndpoint.GetBySystemName(regionName);
         _s3Client = new AmazonS3Client(accessKey, secretKey, region);
     }
 

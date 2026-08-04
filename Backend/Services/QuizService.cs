@@ -40,9 +40,9 @@ public class QuizService : IQuizService
     // ============================================================
     public async Task<QuizSession> CreateQuizAsync(long userId, StartTestRequest request)
     {
-        var userVocabs = await _vocabRepo.GetUserVocabularyAsync(userId);
+        var userVocabs = await _vocabRepo.GetUserVocabularyAsync(userId, request.DeckId);
         if (!userVocabs.Any())
-            throw new Exception("User has no vocabulary to quiz on.");
+            throw new Exception(request.DeckId.HasValue ? "Bộ thẻ này hiện chưa có từ vựng nào để kiểm tra." : "Bạn chưa có từ vựng nào trong sổ tay để kiểm tra.");
 
         // Close out any lingering open sessions so the user only ever has one active test.
         await _quizRepo.AbandonInProgressSessionsAsync(userId);

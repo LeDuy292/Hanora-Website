@@ -650,10 +650,10 @@ const PdfVisualReader = ({
 
       <style>{`
         .textLayer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }
-        .textLayer > span { color: transparent; position: absolute; overflow: hidden; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-        .hanora-pdf-ocr-word { position: absolute; display: block; overflow: hidden; color: transparent; white-space: nowrap; cursor: text; line-height: 1; }
+        .textLayer > span { color: transparent; position: absolute; overflow: visible !important; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+        .hanora-pdf-ocr-word { position: absolute; display: block; overflow: visible !important; color: transparent; white-space: nowrap; cursor: text; line-height: 1; }
         .textLayer .word-highlight:hover, .textLayer .hanora-pdf-ocr-word:hover { background-color: rgba(250, 204, 21, 0.32); border-radius: 4px; }
-        .hanora-pdf-token { position: relative; isolation: isolate; }
+        .hanora-pdf-token { position: relative; isolation: isolate; overflow: visible !important; }
         .hanora-pdf-token.hanora-token-selecting { background-color: rgba(37, 99, 235, 0.24) !important; outline: 1px solid rgba(37, 99, 235, 0.28); }
         .hanora-note-badge { position: absolute; right: -0.72em; top: -0.82em; z-index: 2; color: #e11d48; font-size: 0.72em; line-height: 1; pointer-events: auto; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; }
         .hanora-pinyin-label { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); color: #2563eb; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; white-space: nowrap; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; }

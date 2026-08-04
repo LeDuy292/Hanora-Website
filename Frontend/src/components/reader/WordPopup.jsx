@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Bookmark, BookmarkCheck, Volume2, Sparkles, X, Loader2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Volume2, Sparkles, X, Loader2, MoreVertical, FileText, AlertCircle } from 'lucide-react';
 import { aiService } from '../../services/aiService';
+import { useVocabularyStore } from '../../store/vocabularyStore';
+import { useToastStore } from '../../store/toastStore';
 
-export function WordPopup({ word, onSave, isSaved, onClose }) {
+export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewOriginalDoc }) {
   const [examples, setExamples] = useState([]);
   const [isLoadingExamples, setIsLoadingExamples] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const isWordSaved = useVocabularyStore(state => state.isWordSaved);
+  const isAlreadySavedInStore = isWordSaved(word?.text || word?.word);
+  const isSaved = propIsSaved || isAlreadySavedInStore;
 
   // Setup HSK styles in light theme
   const getHskColor = (hsk) => {
@@ -14,7 +21,7 @@ export function WordPopup({ word, onSave, isSaved, onClose }) {
     return "bg-purple-50 text-purple-600 border-purple-100";
   };
 
-  const hskLabel = `HSK ${word.hsk}`;
+  const hskLabel = `HSK ${word.hsk || 1}`;
 
   // Fetch AI examples when toggled
   useEffect(() => {
@@ -22,7 +29,7 @@ export function WordPopup({ word, onSave, isSaved, onClose }) {
       Promise.resolve().then(() => {
         setIsLoadingExamples(true);
       });
-      aiService.generateExamples(word.text)
+      aiService.generateExamples(word.text || word.word)
         .then(res => {
           setExamples(res);
           setIsLoadingExamples(false);
@@ -32,20 +39,36 @@ export function WordPopup({ word, onSave, isSaved, onClose }) {
           setIsLoadingExamples(false);
         });
     }
-  }, [showExamples, word.text, examples.length]);
+  }, [showExamples, word, examples.length]);
 
   // TTS audio trigger using browser API
   const speakWord = (e) => {
     e.stopPropagation();
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word.text);
+      const utterance = new SpeechSynthesisUtterance(word.text || word.word);
       utterance.lang = 'zh-CN';
       window.speechSynthesis.speak(utterance);
     }
   };
 
+  const handleSaveWord = () => {
+    if (isSaved) {
+      useToastStore.getState().addToast('Từ vựng này đã được lưu trước đây trong sổ tay của bạn!', 'info');
+      return;
+    }
+    onSave(word);
+  };
+
   return (
-    <div className="w-full bg-white border border-slate-100 rounded-2xl p-5 shadow-md flex flex-col gap-4 animate-scale-in">
+    <div className="w-full bg-white border border-slate-100 rounded-2xl p-5 shadow-md flex flex-col gap-4 animate-scale-in relative">
+      {/* Saved Notification Banner */}
+      {isSaved && (
+        <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-amber-800 flex items-center gap-2 shadow-xs">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>Từ vựng này đã được bạn lưu trước đây trong Sổ tay!</span>
+        </div>
+      )}
+
       {/* Header row */}
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
@@ -60,18 +83,46 @@ export function WordPopup({ word, onSave, isSaved, onClose }) {
             <Volume2 className="w-4 h-4" />
           </button>
         </div>
-        <button 
-          onClick={onClose}
-          className="text-slate-400 hover:text-slate-650 p-0.5"
-        >
-          <X className="w-4 h-4" />
-        </button>
+
+        <div className="flex items-center gap-1 relative">
+          {/* 3-dots Menu Button */}
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            title="Tùy chọn khác"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+
+          {showMenu && (
+            <div className="absolute right-0 top-7 z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  if (onViewOriginalDoc) onViewOriginalDoc(word);
+                  else useToastStore.getState().addToast(`Đang xem vị trí từ "${word.text || word.word}" trong bài gốc`, 'info');
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-500" />
+                <span>Tài liệu gốc</span>
+              </button>
+            </div>
+          )}
+
+          <button 
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-650 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Main characters lookup */}
       <div className="flex items-baseline gap-3">
         <h3 className="text-4xl font-extrabold text-slate-800 font-display select-text">
-          {word.text}
+          {word.text || word.word}
         </h3>
         <p className="text-base font-bold text-blue-650 select-text">
           [{word.pinyin}]
@@ -80,20 +131,19 @@ export function WordPopup({ word, onSave, isSaved, onClose }) {
 
       {/* Translation */}
       <p className="text-sm text-slate-650 font-medium select-text italic">
-        "{word.translation}"
+        "{word.translation || word.definitions}"
       </p>
 
       {/* Action triggers */}
       <div className="flex gap-2 border-t border-slate-100 pt-4">
         {/* Save to vocabulary */}
         <button
-          onClick={() => onSave(word)}
+          onClick={handleSaveWord}
           className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
             isSaved
-              ? 'bg-slate-50 text-slate-400 border border-slate-150 cursor-default'
+              ? 'bg-slate-50 text-slate-500 border border-slate-200 cursor-default'
               : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white shadow-sm shadow-blue-500/10 border border-blue-500/20'
           }`}
-          disabled={isSaved}
         >
           {isSaved ? (
             <>

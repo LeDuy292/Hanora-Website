@@ -602,9 +602,10 @@ export function LandingPage() {
                 <div className="w-full h-[1px] bg-slate-200"></div>
                 <ul className="space-y-4">
                   {[
-                    "Tra cứu từ điển HSK cơ bản",
-                    "Tải lên tối đa 3 tài liệu/tháng",
-                    "Ôn tập flashcard SRS"
+                    "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
+                    "Đọc và phân tích tối đa 3 tài liệu/tháng",
+                    "Lưu từ mới vào bộ thẻ cá nhân",
+                    "Ôn từ vựng bằng flashcard SRS"
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm text-slate-600 font-medium">
                       <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
@@ -633,20 +634,21 @@ export function LandingPage() {
               </div>
               <div className="space-y-8">
                 <div>
-                  <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest">Gói Chuyên Nghiệp</h4>
+                  <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest">Gói Tháng</h4>
                   <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black text-slate-900">99k</span>
+                    <span className="text-5xl font-black text-slate-900">59k</span>
                     <span className="text-sm font-bold text-slate-400">/tháng</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">Khuyên dùng dành cho học viên ôn thi HSK và luyện đọc hàng ngày.</p>
+                <p className="text-sm text-slate-500 leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 tháng.</p>
                 <div className="w-full h-[1px] bg-slate-100"></div>
                 <ul className="space-y-4">
                   {[
-                    "Không giới hạn lượt tải tài liệu",
-                    "AI giải thích chi tiết ngữ pháp",
-                    "Tra cứu ngữ cảnh vô hạn",
-                    "Lưu trữ đám mây từ vựng"
+                    "Đọc và phân tích tài liệu không giới hạn",
+                    "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
+                    "AI dịch câu và giải thích ngữ pháp theo ngữ cảnh",
+                    "Lưu từ mới và ôn tập flashcard SRS không giới hạn",
+                    "Luyện phát âm với chấm điểm và phản hồi từ AI"
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm text-slate-700 font-bold">
                       <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
@@ -662,7 +664,7 @@ export function LandingPage() {
               </button>
             </motion.div>
 
-            {/* Package 3: Academic */}
+            {/* Package 3: Yearly */}
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -672,20 +674,21 @@ export function LandingPage() {
             >
               <div className="space-y-8">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Gói Cao Cấp</h4>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Gói Năm</h4>
                   <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black text-slate-900">199k</span>
-                    <span className="text-sm font-bold text-slate-400">/tháng</span>
+                    <span className="text-5xl font-black text-slate-900">599k</span>
+                    <span className="text-sm font-bold text-slate-400">/năm</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">Được thiết kế chuyên biệt cho nghiên cứu dịch thuật nâng cao.</p>
+                <p className="text-sm text-slate-500 leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 năm.</p>
                 <div className="w-full h-[1px] bg-slate-200"></div>
                 <ul className="space-y-4">
                   {[
-                    "Tất cả tính năng Pro+",
-                    "Giọng đọc TTS AI cao cấp",
-                    "Xuất dữ liệu PDF/Anki",
-                    "Hỗ trợ ưu tiên 24/7"
+                    "Đọc và phân tích tài liệu không giới hạn",
+                    "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
+                    "AI dịch câu và giải thích ngữ pháp theo ngữ cảnh",
+                    "Lưu từ mới và ôn tập flashcard SRS không giới hạn",
+                    "Luyện phát âm với chấm điểm và phản hồi từ AI"
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm text-slate-600 font-medium">
                       <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
@@ -697,7 +700,7 @@ export function LandingPage() {
                 onClick={handleStart}
                 className="w-full mt-10 py-5 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-sm"
               >
-                Liên hệ tư vấn
+                Đăng ký ngay
               </button>
             </motion.div>
 

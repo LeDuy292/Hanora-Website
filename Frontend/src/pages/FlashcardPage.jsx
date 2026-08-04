@@ -1564,9 +1564,13 @@ export function FlashcardPage() {
               </div>
               <div className="practice-info">
                 <span className="practice-title">Kiểm tra từ vựng</span>
-                <span className="practice-status">Lấy {vocabList.length} từ trong Flashcard</span>
+                <span className="practice-status">Lấy {selectedDeck && typeof selectedDeck.id === 'number' ? selectedDeck.count : vocabList.length} từ trong Flashcard</span>
               </div>
-              <button className="start-btn primary" onClick={() => navigate('/quiz')}>Bắt đầu thi</button>
+              <button className="start-btn primary" onClick={() => {
+                const isCustomDeck = selectedDeck && typeof selectedDeck.id === 'number';
+                const qs = isCustomDeck ? `?deckId=${selectedDeck.id}&max=${selectedDeck.count}` : '';
+                navigate(`/quiz${qs}`);
+              }}>Bắt đầu thi</button>
             </div>
 
             <div className="practice-item">

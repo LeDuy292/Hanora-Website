@@ -226,7 +226,8 @@ export const useVocabularyStore = create(
         const body = {
           questionCount: config.questionCount ?? 10,
           questionTypes: config.questionTypes ?? [],
-          difficulty: config.difficulty ?? 'medium'
+          difficulty: config.difficulty ?? 'medium',
+          deckId: config.deckId
         };
         try {
           const session = await apiRequest(`/practice/start`, {

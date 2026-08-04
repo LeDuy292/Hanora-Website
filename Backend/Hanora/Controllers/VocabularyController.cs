@@ -68,33 +68,40 @@ public class VocabularyController : ControllerBase
             return BadRequest("Word is required.");
         }
 
-        var userId = GetCurrentUserId();
-
-        var result = await _vocabularyService.SaveToNotebookAsync(
-            userId,
-            word,
-            request.DocumentId,
-            request.CustomDefinition,
-            request.Pinyin,
-            request.HanViet,
-            request.WordType,
-            request.PageNumber,
-            request.PersonalNote);
-
-        if (!result.Success)
+        try
         {
-            return BadRequest(new { success = false, message = "Khong the luu tu vung vao so tay." });
+            var userId = GetCurrentUserId();
+
+            var result = await _vocabularyService.SaveToNotebookAsync(
+                userId,
+                word,
+                request.DocumentId,
+                request.CustomDefinition,
+                request.Pinyin,
+                request.HanViet,
+                request.WordType,
+                request.PageNumber,
+                request.PersonalNote);
+
+            if (!result.Success)
+            {
+                return BadRequest(new { success = false, message = "Khong the luu tu vung vao so tay." });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                created = result.Created,
+                restored = result.Restored,
+                alreadyExists = result.AlreadyExists,
+                userVocabularyId = result.UserVocabularyId,
+                message = result.Message
+            });
         }
-
-        return Ok(new
+        catch (Exception ex)
         {
-            success = true,
-            created = result.Created,
-            restored = result.Restored,
-            alreadyExists = result.AlreadyExists,
-            userVocabularyId = result.UserVocabularyId,
-            message = result.Message
-        });
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:long}")]
