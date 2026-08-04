@@ -27,29 +27,71 @@ public class S3StorageService : IS3StorageService
 
     public async Task<string> UploadFileAsync(IFormFile file, string folderPath = "Hanora")
     {
+        // Try S3 first
+        try
+        {
+            var fileExtension = Path.GetExtension(file.FileName);
+            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+            var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
+
+            using var newMemoryStream = new MemoryStream();
+            await file.CopyToAsync(newMemoryStream);
+
+            var uploadRequest = new TransferUtilityUploadRequest
+            {
+                InputStream = newMemoryStream,
+                Key = key,
+                BucketName = _bucketName,
+                ContentType = file.ContentType
+            };
+
+            var fileTransferUtility = new TransferUtility(_s3Client);
+            await fileTransferUtility.UploadAsync(uploadRequest);
+
+            return $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+        }
+        catch (Exception ex) when (ex is AmazonS3Exception || ex is Exception)
+        {
+            // Fallback: save file locally (dev environment)
+            return await SaveLocallyAsync(file, folderPath);
+        }
+    }
+
+    private async Task<string> SaveLocallyAsync(IFormFile file, string folderPath = "Hanora")
+    {
+        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", folderPath);
+        Directory.CreateDirectory(uploadsDir);
+
         var fileExtension = Path.GetExtension(file.FileName);
         var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
-        var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
+        var filePath = Path.Combine(uploadsDir, uniqueFileName);
 
-        using var newMemoryStream = new MemoryStream();
-        await file.CopyToAsync(newMemoryStream);
+        await using var stream = new FileStream(filePath, FileMode.Create);
+        await file.CopyToAsync(stream);
 
-        var uploadRequest = new TransferUtilityUploadRequest
-        {
-            InputStream = newMemoryStream,
-            Key = key,
-            BucketName = _bucketName,
-            ContentType = file.ContentType
-        };
-
-        var fileTransferUtility = new TransferUtility(_s3Client);
-        await fileTransferUtility.UploadAsync(uploadRequest);
-
-        return $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+        // Return a local URL that can be served by ASP.NET static files
+        return $"/uploads/{folderPath}/{uniqueFileName}";
     }
+
 
     public async Task<Stream> DownloadFileAsync(string fileUrl)
     {
+        if (IsLocalUploadUrl(fileUrl))
+        {
+            var relativePath = Uri.UnescapeDataString(fileUrl.TrimStart('/'))
+                .Replace('/', Path.DirectorySeparatorChar);
+            var uploadsRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
+            var localPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath));
+
+            if (!localPath.StartsWith(uploadsRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                || !File.Exists(localPath))
+            {
+                throw new FileNotFoundException("The locally uploaded document could not be found.", localPath);
+            }
+
+            return new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+
         var uri = new Uri(fileUrl);
         var key = uri.AbsolutePath.TrimStart('/');
 
@@ -86,25 +128,46 @@ public class S3StorageService : IS3StorageService
 
     public async Task<string> UploadBytesAsync(byte[] bytes, string fileName, string contentType, string folderPath = "Hanora")
     {
-        var fileExtension = Path.GetExtension(fileName);
-        if (string.IsNullOrEmpty(fileExtension) && contentType.Contains("pdf")) fileExtension = ".pdf";
-        
-        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
-        var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
-
-        using var newMemoryStream = new MemoryStream(bytes);
-
-        var uploadRequest = new TransferUtilityUploadRequest
+        try
         {
-            InputStream = newMemoryStream,
-            Key = key,
-            BucketName = _bucketName,
-            ContentType = contentType
-        };
+            var fileExtension = Path.GetExtension(fileName);
+            if (string.IsNullOrEmpty(fileExtension) && contentType.Contains("pdf")) fileExtension = ".pdf";
+            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+            var key = string.IsNullOrEmpty(folderPath) ? uniqueFileName : $"{folderPath.TrimEnd('/')}/{uniqueFileName}";
 
-        var fileTransferUtility = new TransferUtility(_s3Client);
-        await fileTransferUtility.UploadAsync(uploadRequest);
+            using var newMemoryStream = new MemoryStream(bytes);
+            var uploadRequest = new TransferUtilityUploadRequest
+            {
+                InputStream = newMemoryStream,
+                Key = key,
+                BucketName = _bucketName,
+                ContentType = contentType
+            };
 
-        return $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+            var fileTransferUtility = new TransferUtility(_s3Client);
+            await fileTransferUtility.UploadAsync(uploadRequest);
+            return $"https://{_bucketName}.s3.{_s3Client.Config.RegionEndpoint.SystemName}.amazonaws.com/{key}";
+        }
+        catch (Exception)
+        {
+            return await SaveBytesLocallyAsync(bytes, fileName, folderPath);
+        }
+    }
+
+    private static bool IsLocalUploadUrl(string fileUrl) =>
+        fileUrl.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<string> SaveBytesLocallyAsync(byte[] bytes, string fileName, string folderPath)
+    {
+        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", folderPath);
+        Directory.CreateDirectory(uploadsDir);
+
+        var extension = Path.GetExtension(fileName);
+        var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsDir, uniqueFileName);
+
+        await File.WriteAllBytesAsync(filePath, bytes);
+
+        return $"/uploads/{folderPath}/{uniqueFileName}";
     }
 }

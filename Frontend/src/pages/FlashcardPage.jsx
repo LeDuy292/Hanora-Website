@@ -291,8 +291,20 @@ export function FlashcardPage() {
   // Review Mode actions
   const startReviewMode = async () => {
     try {
-      const data = await store.fetchReviewCards(activeDeck?.id === 'all' ? null : activeDeck?.id);
-      setReviewCards(data || []);
+      const isNumericDeck = activeDeck?.id && !isNaN(Number(activeDeck.id));
+      if (isNumericDeck) {
+        const data = await store.fetchReviewCards(activeDeck.id);
+        setReviewCards(data || []);
+      } else {
+        const source = activeList && activeList.length > 0 ? activeList : (selectedDeck ? selectedDeck.getWords() : vocabList);
+        setReviewCards(source.map((w, idx) => ({
+          id: w.userVocabularyId || w.id || idx,
+          frontText: w.text,
+          pinyin: w.pinyin,
+          backText: w.translation,
+          srsLevel: w.srsLevel || 0
+        })));
+      }
       setReviewIndex(0);
       setReviewFlipped(false);
     } catch (err) {
@@ -410,6 +422,26 @@ export function FlashcardPage() {
     }
   };
 
+  // URL query parameter listener for quick review decks
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const deckIdParam = params.get('deckId');
+    const modeParam = params.get('mode');
+
+    if (deckIdParam) {
+      setActiveDeck({ id: deckIdParam, title: '⚡ Bộ từ vựng vừa lưu' });
+      setStudyMode('review');
+      store.fetchUserFlashcards(deckIdParam);
+    } else if (modeParam === 'quick' && !activeDeck) {
+      const count = store.sessionSavedCount || 10;
+      const recentWords = vocabList.slice(0, count);
+      if (recentWords.length > 0) {
+        setActiveDeck({ id: 'recent', title: `⚡ Ôn tập ${recentWords.length} từ vừa lưu` });
+        setStudyMode('review');
+      }
+    }
+  }, [location.search, vocabList]);
+
   // Switch tabs
   useEffect(() => {
     if (!activeDeck) return;
@@ -435,21 +467,31 @@ export function FlashcardPage() {
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [sessionStats, setSessionStats] = useState({ cardsSeen: 0, easyCount: 0, hardCount: 0 });
 
-  // Decks generation and counts
+  // Decks generation and counts according to Smart Review Categories
   const { decks, counts } = useMemo(() => {
     const list = [];
     const todayStr = new Date().toISOString().split('T')[0];
-    const dueWords = vocabList.filter(v => v.srsLevel > 0 && v.nextReviewDate <= todayStr);
-    const newCount = vocabList.filter(v => v.srsLevel === 0).length;
-    const learningCount = vocabList.filter(v => v.srsLevel > 0 && v.srsLevel < 4).length;
-    const knownCount = vocabList.filter(v => v.srsLevel >= 4).length;
 
-    list.push({ id: 'all', title: 'Tất cả', count: vocabList.length, getWords: () => vocabList });
-    list.push({ id: 'new', title: 'Học mới', count: newCount, getWords: () => vocabList.filter(v => v.srsLevel === 0) });
-    list.push({ id: 'learning', title: 'Đang học', count: learningCount, getWords: () => vocabList.filter(v => v.srsLevel > 0 && v.srsLevel < 4) });
-    list.push({ id: 'known', title: 'Đã thuộc', count: knownCount, getWords: () => vocabList.filter(v => v.srsLevel >= 4) });
+    const newWords = vocabList.filter(v => v.srsLevel === 0 || !v.srsLevel);
+    const dueWords = vocabList.filter(v => (v.nextReviewDate && v.nextReviewDate <= todayStr) || (v.srsLevel > 0 && v.srsLevel < 4));
+    const hardWords = vocabList.filter(v => (v.hardCount && v.hardCount > 0) || v.srsLevel === 1 || v.status === 'hard');
+    const knownWords = vocabList.filter(v => v.srsLevel >= 4 || v.status === 'mastered');
 
-    return { decks: list, counts: { dueCount: dueWords.length, newCount, learningCount, knownCount } };
+    list.push({ id: 'all', title: 'Tất cả từ vựng', icon: '📖', count: vocabList.length, getWords: () => vocabList });
+    list.push({ id: 'new', title: 'Từ mới', icon: '🆕', count: newWords.length, getWords: () => newWords });
+    list.push({ id: 'due', title: 'Từ cần ôn (SRS)', icon: '⏰', count: dueWords.length, getWords: () => dueWords });
+    list.push({ id: 'hard', title: 'Từ thường trả lời sai', icon: '⚠️', count: hardWords.length, getWords: () => hardWords });
+    list.push({ id: 'known', title: 'Từ đã ghi nhớ', icon: '✅', count: knownWords.length, getWords: () => knownWords });
+
+    return { 
+      decks: list, 
+      counts: { 
+        dueCount: dueWords.length, 
+        newCount: newWords.length, 
+        hardCount: hardWords.length, 
+        knownCount: knownWords.length 
+      } 
+    };
   }, [vocabList]);
 
   // Initial Selection inside player
@@ -1039,6 +1081,30 @@ export function FlashcardPage() {
         <div className="text-right">
           <h2 className="text-base font-extrabold text-slate-800 line-clamp-1">{activeDeck?.title}</h2>
           <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Chế độ: {studyMode.toUpperCase()}</span>
+        </div>
+      </div>
+
+      {/* Smart Review Pre-Session Banner */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1 relative z-10">
+          <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Phiên ôn tập thông minh (Smart SRS)</span>
+          </div>
+          <h3 className="text-base sm:text-lg font-black">{activeDeck?.title || selectedDeck?.title || 'Bộ từ vựng'}</h3>
+          <p className="text-xs text-white/80 font-medium">Tự động sắp xếp khoảng cách lặp lại ngắt quãng (Spaced Repetition) để tối ưu khả năng ghi nhớ dài hạn.</p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 shrink-0 relative z-10">
+          <div className="text-center px-2">
+            <span className="text-[10px] font-bold text-white/70 uppercase block">Số lượng thẻ</span>
+            <span className="text-lg font-black text-white">{activeList.length} Thẻ</span>
+          </div>
+          <div className="h-8 w-px bg-white/20"></div>
+          <div className="text-center px-2">
+            <span className="text-[10px] font-bold text-white/70 uppercase block">Dự kiến phiên</span>
+            <span className="text-lg font-black text-white">~{Math.max(3, Math.ceil((activeList.length * 25) / 60))} phút</span>
+          </div>
         </div>
       </div>
 
