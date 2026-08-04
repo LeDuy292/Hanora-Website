@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadDocument, getDocument } from '../lib/api';
+import { toast } from '../store/notificationStore';
 import { formatFileSize, UPLOAD_RULE_TEXT, validateUploadFile } from '../utils/uploadRules';
 
 const UploadModal = ({ isOpen, onClose }) => {
@@ -21,11 +22,12 @@ const UploadModal = ({ isOpen, onClose }) => {
           const doc = await getDocument(processingId);
           setStatus(doc.status);
           
-          if (doc.status === 'Ready' || doc.status === 'Ready' || doc.status === 'ready' || doc.status === 1) { // checking various casing/enums
+          // Backend enums: Ready=4, Failed=5
+          if (doc.status === 'Ready' || doc.status === 'ready' || doc.status === 4) {
             clearInterval(interval);
-            onClose(); // close modal
+            onClose();
             navigate(`/reader/${processingId}`);
-          } else if (doc.status === 'Failed' || doc.status === 'failed' || doc.status === 2) {
+          } else if (doc.status === 'Failed' || doc.status === 'failed' || doc.status === 5) {
             clearInterval(interval);
             setStatus(doc.processingError || doc.extractedText || 'Lỗi xử lý tài liệu.');
             setIsFailed(true);
@@ -116,8 +118,9 @@ const UploadModal = ({ isOpen, onClose }) => {
       setProcessingId(response.id);
       setStatus('Hệ thống đang xử lý OCR...');
     } catch (error) {
-      console.error(error);
-      setStatus(error.message || 'Tải lên thất bại.');
+      console.error('[UploadModal] Upload error:', error);
+      const msg = error?.message || String(error) || 'Tải lên thất bại.';
+      setStatus(msg);
       setIsFailed(true);
     } finally {
       setIsUploading(false);

@@ -14,6 +14,11 @@ export const useVocabularyStore = create(
       isLoading: false,
       quizLoading: false,
       quizSession: null,
+      sessionSavedCount: 0,
+      pendingMilestonePrompt: null,
+
+      clearMilestonePrompt: () => set({ pendingMilestonePrompt: null }),
+      triggerManualMilestonePrompt: (count = 10, docTitle = '') => set({ pendingMilestonePrompt: { count, docTitle } }),
 
       isWordSaved: (text) => {
         const normalizedText = (text || '').trim();
@@ -77,15 +82,58 @@ export const useVocabularyStore = create(
           nextReviewDate: new Date().toISOString().split('T')[0]
         };
 
-        set((state) => ({
-          vocabList: [newWord, ...state.vocabList]
-        }));
+        set((state) => {
+          const newSessionCount = (state.sessionSavedCount || 0) + 1;
+          // Trigger milestone prompt at 5, 10, 15, 20... words saved
+          const isMilestone = newSessionCount === 5 || newSessionCount === 10 || newSessionCount === 15 || (newSessionCount > 0 && newSessionCount % 10 === 0);
+          return {
+            vocabList: [newWord, ...state.vocabList],
+            sessionSavedCount: newSessionCount,
+            pendingMilestonePrompt: isMilestone ? { count: newSessionCount, docTitle: word.documentTitle } : state.pendingMilestonePrompt
+          };
+        });
 
         return saveResult || {
           success: true,
           created: true,
           message: 'Đã lưu vào sổ tay thành công.'
         };
+      },
+
+      createQuickDeckFromRecent: async (count = 10) => {
+        const recentWords = get().vocabList.slice(0, count);
+        if (!recentWords || recentWords.length === 0) return null;
+
+        const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const name = `⚡ Ôn tập ${recentWords.length} từ vừa lưu (${timeStr})`;
+        const description = `Bộ thẻ tự động lưu ${recentWords.length} từ vựng bạn vừa thêm trong bài đọc.`;
+
+        try {
+          const deck = await apiRequest('/flashcard/deck', {
+            method: 'POST',
+            body: { name, description },
+            auth: true
+          });
+
+          if (deck && deck.id) {
+            for (const w of recentWords) {
+              const vocabId = w.userVocabularyId || w.id;
+              if (vocabId) {
+                try {
+                  await apiRequest(`/flashcard/deck/${deck.id}/add-word`, {
+                    method: 'POST',
+                    body: { userVocabularyId: vocabId },
+                    auth: true
+                  });
+                } catch (e) {}
+              }
+            }
+          }
+          return deck;
+        } catch (err) {
+          console.error("Error creating quick deck from recent words:", err);
+          return null;
+        }
       },
 
       removeWord: (text) => set((state) => ({

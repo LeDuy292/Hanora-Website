@@ -8,6 +8,16 @@ const API_BASE_URL = configuredApiBaseUrl && (import.meta.env.DEV || !isLocalApi
   ? configuredApiBaseUrl
   : (import.meta.env.DEV ? 'http://localhost:5187/api' : '/api');
 
+// Documents stored by the local-development fallback use paths such as
+// "/uploads/Hanora/...". Resolve those against the API server rather than the
+// Vite server, which otherwise responds with index.html instead of the asset.
+export const resolveDocumentAssetUrl = (url) => {
+  if (!url || /^(?:https?:|blob:|data:)/i.test(url)) return url;
+
+  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/i, '');
+  return `${apiOrigin}${url.startsWith('/') ? url : `/${url}`}`;
+};
+
 async function readApiError(response, fallback) {
   const errorData = await response.json().catch(() => ({}));
   return errorData.error || errorData.message || fallback;
@@ -19,21 +29,6 @@ function uploadToPresignedUrl(presignedUrl, file, onProgress) {
     request.open('PUT', presignedUrl);
     request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable && typeof onProgress === 'function') {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) {
-        onProgress?.(100);
-        resolve();
-      } else {
-        reject(new Error('Không thể tải tệp lên hệ thống lưu trữ.'));
-      }
-    };
-    request.onerror = () => reject(new Error('Kết nối tải tệp bị gián đoạn.'));
     request.send(file);
   });
 }
@@ -46,47 +41,40 @@ export const uploadDocument = async (file, options = {}) => {
 
   const token = getToken();
 
-  const presignedResponse = await fetch(`${API_BASE_URL}/documents/presigned-url`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify({
-      fileName: file.name,
-      contentType: file.type || 'application/octet-stream',
-      fileSizeBytes: file.size
-    })
-  });
+  console.log('[api] uploadDocument: starting direct upload to', `${API_BASE_URL}/documents/upload`);
 
-  if (!presignedResponse.ok) {
-    throw new Error(await readApiError(presignedResponse, 'Không thể chuẩn bị tải tài liệu.'));
+  const formData = new FormData();
+  formData.append('file', file);
+
+  options.onProgress?.(30);
+
+  let directResponse;
+  try {
+    directResponse = await fetch(`${API_BASE_URL}/documents/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+  } catch (networkErr) {
+    console.error('[api] uploadDocument: network error (fetch failed):', networkErr);
+    throw new Error(`Không thể kết nối tới máy chủ: ${networkErr.message}`);
   }
 
-  const { presignedUrl, fileUrl } = await presignedResponse.json();
+  console.log('[api] uploadDocument: response status', directResponse.status);
 
-  await uploadToPresignedUrl(presignedUrl, file, options.onProgress);
-
-  const registerResponse = await fetch(`${API_BASE_URL}/documents/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify({
-      fileUrl,
-      originalFilename: file.name,
-      contentType: file.type || 'application/octet-stream',
-      fileSizeBytes: file.size
-    })
-  });
-
-  if (!registerResponse.ok) {
-    throw new Error(await readApiError(registerResponse, 'Không thể đăng ký tài liệu.'));
+  if (directResponse.ok) {
+    options.onProgress?.(100);
+    return await directResponse.json();
   }
 
-  return await registerResponse.json();
+  // Direct upload failed — read error and throw
+  const errMsg = await readApiError(directResponse, 'Đã xảy ra lỗi không xác định khi xử lý tài liệu.');
+  throw new Error(errMsg);
 };
+
+
 export const getDocument = async (id) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {

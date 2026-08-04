@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
   saveDocumentAnnotations, exportDocx, askAiAssistant, deleteDocument
@@ -10,6 +9,7 @@ import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
 import CreateDocModal from '../components/CreateDocModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
+import { SmartReviewPromptModal } from '../components/vocabulary/SmartReviewPromptModal';
 import VisualDocumentReader from '../components/reader/VisualDocumentReader';
 import FloatingVerticalToolbar from '../components/reader/FloatingVerticalToolbar';
 import { pinyin } from 'pinyin-pro';
@@ -121,6 +121,73 @@ const parseNoteContent = (noteStr) => {
   return { text: noteStr, category: 'text', icon: '📝', label: 'Ghi chú văn bản' };
 };
 
+const FormattedMarkdownText = ({ content, isUser = false }) => {
+  if (!content) return null;
+
+  const renderInline = (str) => {
+    const parts = [];
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+    let keyIdx = 0;
+
+    while ((match = boldRegex.exec(str)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(str.substring(lastIndex, match.index));
+      }
+      parts.push(
+        <strong key={`bold-${keyIdx++}`} className={isUser ? "font-black" : "font-extrabold text-slate-900"}>
+          {match[1]}
+        </strong>
+      );
+      lastIndex = boldRegex.lastIndex;
+    }
+    if (lastIndex < str.length) {
+      parts.push(str.substring(lastIndex));
+    }
+    return parts.length > 0 ? parts : str;
+  };
+
+  const lines = content.split('\n');
+
+  return (
+    <div className="space-y-1.5 leading-relaxed">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+
+        if (trimmed === '---' || trimmed === '***') {
+          return <hr key={idx} className="my-2.5 border-slate-200/80" />;
+        }
+
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const bulletText = trimmed.replace(/^[-*]\s+/, '');
+          return (
+            <div key={idx} className="flex items-start gap-1.5 pl-1 my-0.5">
+              <span className={isUser ? "text-white opacity-80" : "text-blue-500 font-bold"}>•</span>
+              <span className="flex-1">{renderInline(bulletText)}</span>
+            </div>
+          );
+        }
+
+        if (trimmed.startsWith('#')) {
+          const headingText = trimmed.replace(/^#+\s+/, '');
+          return (
+            <h4 key={idx} className={`font-extrabold text-xs mt-2 mb-1 ${isUser ? 'text-white' : 'text-slate-800'}`}>
+              {renderInline(headingText)}
+            </h4>
+          );
+        }
+
+        if (trimmed === '') {
+          return <div key={idx} className="h-1" />;
+        }
+
+        return <p key={idx}>{renderInline(line)}</p>;
+      })}
+    </div>
+  );
+};
+
 
 const ReaderPage = () => {
   const { id } = useParams();
@@ -175,6 +242,10 @@ const ReaderPage = () => {
   // Document-specific progress statistics
   const [readingSeconds, setReadingSeconds] = useState(0);
   const [lookupCount, setLookupCount] = useState(0);
+
+  // Smart Review milestone states
+  const [savedSessionCount, setSavedSessionCount] = useState(0);
+  const [showSmartReviewModal, setShowSmartReviewModal] = useState(false);
 
   // Chatbot state for overall document chat
   const [docChatMessages, setDocChatMessages] = useState([]);
@@ -360,6 +431,42 @@ const ReaderPage = () => {
     };
     fetchDocsList();
   }, []);
+
+  const [searchParams] = useSearchParams();
+  const targetWordParam = searchParams.get('word');
+
+  // Auto-position & open dictionary sidebar when target word is passed via URL query
+  useEffect(() => {
+    if (!targetWordParam) return;
+    const cleanWord = targetWordParam.trim();
+    if (!cleanWord) return;
+
+    // 1. Auto-open dictionary sidebar with word details
+    setSelectedWord(cleanWord);
+    setVocabData(null);
+    setIsLoadingVocab(true);
+    setSidebarTab('dict');
+    setIsSidebarOpen(true);
+    getVocabulary(cleanWord)
+      .then(data => setVocabData(data))
+      .catch(err => console.error("Failed to load vocab for target word:", err))
+      .finally(() => setIsLoadingVocab(false));
+
+    // 2. Locate target word inside document segments & switch to target page
+    if (segments && segments.length > 0) {
+      const matchIndex = segments.findIndex(seg => 
+        typeof seg === 'string' && seg.includes(cleanWord)
+      );
+
+      if (matchIndex !== -1) {
+        const targetPage = Math.floor(matchIndex / WORDS_PER_PAGE) + 1;
+        setCurrentPage(targetPage);
+        toast.success(`Đã tự động định vị từ "${cleanWord}" tại Trang ${targetPage} trong tài liệu.`);
+      } else {
+        toast.info(`Đang mở chi tiết vị trí từ "${cleanWord}" trong bài đọc.`);
+      }
+    }
+  }, [id, targetWordParam, segments.length]);
 
   const handleDeleteDocument = async (docId, title) => {
     const safeTitle = title || 'tài liệu';
@@ -1264,6 +1371,13 @@ const ReaderPage = () => {
         documentTitle: document?.title
       });
       showSaveResult(result, 'Đã lưu vào sổ tay từ vựng thành công!');
+      setSavedSessionCount(prev => {
+        const next = prev + 1;
+        if (next === 5 || next === 10 || next === 15) {
+          setShowSmartReviewModal(true);
+        }
+        return next;
+      });
     } catch (error) {
       console.error(error);
       try {
@@ -2706,7 +2820,7 @@ const ReaderPage = () => {
                             : 'bg-slate-50 text-slate-800 border border-slate-100 mr-auto rounded-tl-none font-medium'
                           }`}
                       >
-                        <div className="whitespace-pre-line">{msg.text}</div>
+                        <FormattedMarkdownText content={msg.text} isUser={msg.sender === 'user'} />
                       </div>
                     ))}
                     {isSendingDocChat && (
@@ -2859,6 +2973,12 @@ const ReaderPage = () => {
           </div>
         )}
 
+        <SmartReviewPromptModal
+          isOpen={showSmartReviewModal}
+          onClose={() => setShowSmartReviewModal(false)}
+          wordCount={savedSessionCount || 10}
+          docTitle={document?.title}
+        />
       </div>
     </div>
   );

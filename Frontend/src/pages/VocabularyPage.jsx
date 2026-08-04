@@ -575,8 +575,8 @@ export function VocabularyPage() {
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[160px]"
                 >
                   <option value="">Nguồn tài liệu</option>
-                  {documentsList.map(doc => (
-                    <option key={doc.id} value={normalizeVietnameseText(doc.title)}>{normalizeVietnameseText(doc.title)}</option>
+                  {documentsList.map((doc, idx) => (
+                    <option key={`${doc.id}-${idx}`} value={normalizeVietnameseText(doc.title)}>{normalizeVietnameseText(doc.title)}</option>
                   ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -804,8 +804,13 @@ export function VocabularyPage() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setOpenActionMenu(null);
-                                        if (row.documentId) {
-                                          navigate(`/reader/${row.documentId}`);
+                                        let targetDocId = row.documentId;
+                                        if (!targetDocId && row.source && documentsList?.length > 0) {
+                                          const matchedDoc = documentsList.find(d => d.title === row.source || d.originalFilename === row.source);
+                                          if (matchedDoc) targetDocId = matchedDoc.id;
+                                        }
+                                        if (targetDocId) {
+                                          navigate(`/reader/${targetDocId}?word=${encodeURIComponent(cleanWordText)}`);
                                         } else {
                                           toast.info(`Từ "${cleanWordText}" được thêm thủ công hoặc không thuộc bài đọc nào.`);
                                         }
