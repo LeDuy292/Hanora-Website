@@ -49,6 +49,7 @@ export const useNotificationStore = create((set) => ({
 // Export helper shortcuts
 export const toast = {
   success: (msg, duration) => useNotificationStore.getState().addToast(msg, 'success', duration),
+  info: (msg, duration) => useNotificationStore.getState().addToast(msg, 'info', duration),
   warning: (msg, duration) => useNotificationStore.getState().addToast(msg, 'warning', duration),
   error: (msg, duration) => useNotificationStore.getState().addToast(msg, 'error', duration),
   confirm: (msg, onConfirm, title) => useNotificationStore.getState().showConfirm(msg, onConfirm, title)

@@ -277,39 +277,32 @@ const ReaderPage = () => {
       setLookupCount(0);
       return;
     }
+    let intervalId = null;
     const fetchDoc = async () => {
       try {
         const doc = await getDocument(id);
         setDocument(doc);
         setCurrentPage(1);
-        setReadingSeconds(0);
-        setLookupCount(0);
         setDocumentError('');
 
         const status = String(doc.status || '').toLowerCase();
-        if (status === 'failed' || doc.status === 2) {
+        if (status === 'failed' || doc.status === 5 || doc.status === 2) {
           setSegments([]);
-                    setDocumentError(doc.processingError || doc.extractedText || 'Không thể xử lý tài liệu này. Vui lòng thử tài liệu rõ hơn hoặc định dạng khác.');
+          setDocumentError(doc.processingError || doc.extractedText || 'Không thể xử lý tài liệu này. Vui lòng thử tài liệu rõ hơn hoặc định dạng khác.');
+          if (intervalId) clearInterval(intervalId);
           return;
         }
 
-        if ((status === 'processing' || doc.status === 0) && !doc.extractedText) {
-          setSegments([]);
-                    setDocumentError('Tài liệu đang được xử lý OCR. Vui lòng chờ trong giây lát rồi tải lại trang.');
-          return;
-        }
-
-        if (doc.extractedText) {
+        if (doc.extractedText && (status === 'ready' || doc.status === 4 || doc.status === 'ready')) {
+          if (intervalId) clearInterval(intervalId);
           try {
             const parsed = JSON.parse(doc.extractedText);
-            // Normalize \r\n to \n so LINE_BREAK/PARAGRAPH_BREAK comparisons work
             const normalized = parsed.map(s =>
               typeof s === 'string' ? s.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : s
             );
             setSegments(normalized);
           } catch (e) {
             console.warn("Extracted text is not valid JSON, preserving line breaks.", e);
-            // Fallback: split by newline and words but preserve structure markers
             const raw = doc.extractedText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             const fallbackSegs = [];
             raw.split('\n\n').forEach((para, pi) => {
@@ -326,7 +319,13 @@ const ReaderPage = () => {
         console.error(error);
       }
     };
+
     fetchDoc();
+    intervalId = setInterval(fetchDoc, 2000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [id]);
 
   useEffect(() => {
@@ -2309,6 +2308,66 @@ const ReaderPage = () => {
                               onClick={() => setIsUploadModalOpen(true)}
                               className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                             >Tải tài liệu khác</button>
+                          </div>
+                        ) : String(document?.status || '').toLowerCase() !== 'ready' && document?.status !== 4 && segments.length === 0 ? (
+                          <div className="mx-auto mt-10 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg font-sans">
+                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm animate-pulse">
+                              <Activity className="h-7 w-7" />
+                            </div>
+                            <h2 className="text-xl font-extrabold text-slate-800">Đang xử lý tài liệu "{document?.title}"</h2>
+                            <p className="mt-1 text-xs font-medium text-slate-400">Hệ thống đang tự động bóc tách chữ Hán và phân tích bố cục</p>
+
+                            <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 mt-6 text-left space-y-3">
+                              {[
+                                { step: 0, title: 'Đang tải tài liệu', desc: 'Khởi tạo tệp và tải lên máy chủ' },
+                                { step: 1, title: 'Đang nhận diện chữ Hán', desc: 'OCR bóc tách chữ Hán trong tài liệu' },
+                                { step: 2, title: 'Đang phân tích nội dung', desc: 'Phân tách từ vựng (Segmentation) & bố cục' },
+                                { step: 3, title: 'Hoàn tất', desc: 'Mở giao diện đọc ngay lập tức' }
+                              ].map((item) => {
+                                const getStepIndex = (st) => {
+                                  const s = String(st || '').toLowerCase();
+                                  if (s === 'ready' || s === '4') return 3;
+                                  if (s === 'analyzingcontent' || s === '3') return 2;
+                                  if (s === 'recognizingocr' || s === 'ocr' || s === '2') return 1;
+                                  if (s === 'processing' || s === '1') return 1;
+                                  return 0;
+                                };
+                                const currentStepIdx = getStepIndex(document?.status);
+                                const isDone = item.step < currentStepIdx;
+                                const isCurrent = item.step === currentStepIdx;
+
+                                return (
+                                  <div key={item.step} className="flex items-center gap-3">
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
+                                      isDone 
+                                        ? 'bg-emerald-500 text-white' 
+                                        : isCurrent 
+                                        ? 'bg-blue-600 text-white animate-pulse' 
+                                        : 'bg-slate-200 text-slate-400'
+                                    }`}>
+                                      {isDone ? '✓' : item.step + 1}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs font-extrabold ${isCurrent ? 'text-blue-600' : isDone ? 'text-slate-800' : 'text-slate-400'}`}>
+                                        {item.title}
+                                      </p>
+                                      <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toast.info('Tài liệu đang được xử lý ở nền. Bạn sẽ nhận được thông báo ngay khi hoàn tất!');
+                                navigate('/reader');
+                              }}
+                              className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 text-xs transition border border-slate-200 gap-2"
+                            >
+                              <span>🔔 Rời trang & nhận thông báo khi hoàn tất</span>
+                            </button>
                           </div>
                         ) : showVisualReader ? (
                           <div className="h-full min-h-[calc(100svh-255px)] lg:min-h-0">

@@ -3,6 +3,9 @@ import { Bookmark, BookmarkCheck, Volume2, Sparkles, X, Loader2, MoreVertical, F
 import { aiService } from '../../services/aiService';
 import { useVocabularyStore } from '../../store/vocabularyStore';
 import { useToastStore } from '../../store/toastStore';
+import { extractPlainMeaning } from '../../utils/chineseUtils';
+
+const getCleanTranslation = (item) => extractPlainMeaning(item?.translation || item?.definitions || item?.meaning);
 
 export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewOriginalDoc }) {
   const [examples, setExamples] = useState([]);
@@ -28,22 +31,22 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
     if (showExamples && examples.length === 0) {
       Promise.resolve().then(() => {
         setIsLoadingExamples(true);
+        return aiService.getWordExamples(word.text || word.word);
+      })
+      .then((data) => {
+        setExamples(data || []);
+      })
+      .catch((err) => {
+        console.error("Failed to load examples", err);
+      })
+      .finally(() => {
+        setIsLoadingExamples(false);
       });
-      aiService.generateExamples(word.text || word.word)
-        .then(res => {
-          setExamples(res);
-          setIsLoadingExamples(false);
-        })
-        .catch(err => {
-          console.error("Failed to generate examples:", err);
-          setIsLoadingExamples(false);
-        });
     }
   }, [showExamples, word, examples.length]);
 
   // TTS audio trigger using browser API
-  const speakWord = (e) => {
-    e.stopPropagation();
+  const handlePlayAudio = () => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(word.text || word.word);
       utterance.lang = 'zh-CN';
@@ -58,6 +61,8 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
     }
     onSave(word);
   };
+
+  const displayTranslation = getCleanTranslation(word);
 
   return (
     <div className="w-full bg-white border border-slate-100 rounded-2xl p-5 shadow-md flex flex-col gap-4 animate-scale-in relative">
@@ -76,7 +81,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
             {hskLabel}
           </span>
           <button 
-            onClick={speakWord}
+            onClick={handlePlayAudio}
             className="text-slate-400 hover:text-blue-600 p-1 rounded-lg hover:bg-slate-50 transition-colors"
             title="Nghe phát âm"
           >
@@ -130,8 +135,8 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
       </div>
 
       {/* Translation */}
-      <p className="text-sm text-slate-650 font-medium select-text italic">
-        "{word.translation || word.definitions}"
+      <p className="text-sm text-slate-700 font-bold select-text leading-relaxed">
+        "{displayTranslation}"
       </p>
 
       {/* Action triggers */}
