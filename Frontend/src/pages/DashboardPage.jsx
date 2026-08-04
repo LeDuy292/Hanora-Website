@@ -682,47 +682,6 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Trophy Room / Achievements block */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-5 shadow-sm">
-            <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-500 fill-amber-500/10" />
-                  Phòng Danh Hiệu (Achievements)
-                </h3>
-                <p className="text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Huy hiệu vinh danh cá nhân và cột mốc học tập</p>
-              </div>
-              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100/50 px-2.5 py-1 rounded-full flex items-center gap-1">
-                <Award className="w-3.5 h-3.5" />
-                {unlockedCount} / {achievements.length} Đạt được
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {achievements.map((achievement) => {
-                const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
-                const progressText = achievement.target > 0 ? `${achievement.progress}/${achievement.target}` : '—';
-
-                return (
-                  <div key={achievement.code} className={`p-4 rounded-xl border flex flex-col justify-between h-[150px] relative overflow-hidden group ${achievement.unlocked ? 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md' : 'bg-slate-50/50 border-slate-100/60 opacity-65'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className={`p-2 rounded-xl border ${achievement.unlocked ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-slate-100 border-slate-150 text-slate-400'}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span className="text-[8px] font-bold">{achievement.unlocked ? 'Đạt' : 'Khóa'}</span>
-                    </div>
-                    <div className="space-y-0.5 mt-2">
-                      <h4 className="text-[11px] font-extrabold text-slate-800">{achievement.name}</h4>
-                      <p className="text-[9px] text-slate-500 leading-tight line-clamp-2">{achievement.description}</p>
-                    </div>
-                    <div className="border-t border-slate-100 pt-1.5 mt-2 flex justify-between text-[8px] text-slate-400 font-bold">
-                      <span>+{achievement.xpReward} XP</span>
-                      <span className={achievement.unlocked ? 'text-blue-600 font-extrabold' : 'text-slate-550'}>{progressText}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
         </div>
 
@@ -947,6 +906,48 @@ export function DashboardPage() {
 
         </div>
 
+      </div>
+
+      {/* ===== FULL WIDTH BOTTOM SECTION: TROPHY ROOM / ACHIEVEMENTS ===== */}
+      <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-5 shadow-sm mt-6">
+        <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+          <div>
+            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-amber-500 fill-amber-500/10" />
+              Phòng Danh Hiệu (Achievements)
+            </h3>
+            <p className="text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Huy hiệu vinh danh cá nhân và cột mốc học tập</p>
+          </div>
+          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100/50 px-2.5 py-1 rounded-full flex items-center gap-1">
+            <Award className="w-3.5 h-3.5" />
+            {unlockedCount} / {achievements.length} Đạt được
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {achievements.map((achievement) => {
+            const Icon = ACHIEVEMENT_ICONS[achievement.code] || Award;
+            const progressText = achievement.target > 0 ? `${achievement.progress}/${achievement.target}` : '—';
+
+            return (
+              <div key={achievement.code} className={`p-4 rounded-xl border flex flex-col justify-between h-[150px] relative overflow-hidden group ${achievement.unlocked ? 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-md' : 'bg-slate-50/50 border-slate-100/60 opacity-65'}`}>
+                <div className="flex justify-between items-start">
+                  <div className={`p-2 rounded-xl border ${achievement.unlocked ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-slate-100 border-slate-150 text-slate-400'}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <span className="text-[8px] font-bold">{achievement.unlocked ? 'Đạt' : 'Khóa'}</span>
+                </div>
+                <div className="space-y-0.5 mt-2">
+                  <h4 className="text-[11px] font-extrabold text-slate-800">{achievement.name}</h4>
+                  <p className="text-[9px] text-slate-500 leading-tight line-clamp-2">{achievement.description}</p>
+                </div>
+                <div className="border-t border-slate-100 pt-1.5 mt-2 flex justify-between text-[8px] text-slate-400 font-bold">
+                  <span>+{achievement.xpReward} XP</span>
+                  <span className={achievement.unlocked ? 'text-blue-600 font-extrabold' : 'text-slate-550'}>{progressText}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

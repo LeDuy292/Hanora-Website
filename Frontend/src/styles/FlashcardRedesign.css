@@ -12,19 +12,11 @@
 }
 
 .flashcard-container {
-  display: grid;
-  grid-template-columns: 7fr 3fr;
-  gap: 2.5rem;
-  max-width: 1800px;
+  display: block;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 2rem;
   min-height: calc(100vh - 80px);
-}
-
-@media (max-width: 1280px) {
-  .flashcard-container {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Header & Stats */

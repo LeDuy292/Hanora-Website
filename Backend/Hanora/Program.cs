@@ -16,7 +16,12 @@ namespace Hanora
             var builder = WebApplication.CreateBuilder(args);
 
             // Database
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                connectionString = "Host=reseau.proxy.rlwy.net;Port=32993;Database=railway;Username=postgres;Password=yMEnWyNEDKcPQRgdrnzlXclATiyOjZjo";
+            }
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
             dataSourceBuilder.MapEnum<BusinessObjects.Models.ChannelType>("channel_type_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.DocumentStatus>("document_status_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.FlashcardMode>("flashcard_mode_enum");
