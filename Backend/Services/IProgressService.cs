@@ -33,6 +33,7 @@ public record DashboardDto
     public List<RecentDocumentDto> RecentDocuments { get; init; } = new();
     public WeeklyStatsDto WeeklyStats { get; init; } = new();
     public List<AchievementDto> Achievements { get; init; } = new();
+    public List<string> ActiveDaysThisWeek { get; init; } = new();
 }
 
 public record DailyGoalDto
@@ -181,6 +182,11 @@ public class ProgressService : IProgressService
 
         var achievements = await BuildAchievementsAsync(userId, savedWords, streak);
 
+        DateOnly startOfWeek = today.AddDays(-(7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7);
+        DateOnly endOfWeek = startOfWeek.AddDays(6);
+        var activeDates = await _repo.GetActiveDatesInRangeAsync(userId, startOfWeek, endOfWeek);
+        var activeDaysThisWeek = activeDates.Select(d => d.ToString("yyyy-MM-dd")).ToList();
+
         return new DashboardDto
         {
             Streak = streak,
@@ -198,6 +204,7 @@ public class ProgressService : IProgressService
             RecentDocuments = recentDocs,
             WeeklyStats = weekly,
             Achievements = achievements,
+            ActiveDaysThisWeek = activeDaysThisWeek,
         };
     }
 
