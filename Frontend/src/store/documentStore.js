@@ -8,6 +8,10 @@ export const useDocumentStore = create(
     (set, get) => ({
       documents: DEFAULT_DOCUMENTS,
       activeDocumentId: "demo-1",
+      folders: [
+        { id: 'f-1', name: 'SS8201' },
+        { id: 'f-2', name: 'Google AI Studio' }
+      ],
 
       getActiveDocument: () => {
         const state = get();
@@ -16,7 +20,37 @@ export const useDocumentStore = create(
 
       setActiveDocument: (id) => set({ activeDocumentId: id }),
 
-      addDocument: (title, content) => {
+      addFolder: (name) => {
+        const cleanName = (name || '').trim();
+        if (!cleanName) return null;
+        const newFolder = {
+          id: 'f-' + Date.now(),
+          name: cleanName
+        };
+        set((state) => ({
+          folders: [...(state.folders || []), newFolder]
+        }));
+        return newFolder;
+      },
+
+      renameFolder: (id, newName) => {
+        const cleanName = (newName || '').trim();
+        if (!cleanName) return;
+        set((state) => ({
+          folders: (state.folders || []).map(f => f.id === id ? { ...f, name: cleanName } : f)
+        }));
+      },
+
+      deleteFolder: (id) => set((state) => ({
+        folders: (state.folders || []).filter(f => f.id !== id),
+        documents: state.documents.map(doc => doc.folderId === id ? { ...doc, folderId: null } : doc)
+      })),
+
+      moveDocumentToFolder: (docId, folderId) => set((state) => ({
+        documents: state.documents.map(doc => String(doc.id) === String(docId) ? { ...doc, folderId } : doc)
+      })),
+
+      addDocument: (title, content, folderId = null) => {
         const id = "doc-" + Date.now();
         const analysis = analyzeChineseText(content);
         
@@ -26,6 +60,7 @@ export const useDocumentStore = create(
           content,
           date: new Date().toISOString().split('T')[0],
           progress: 0,
+          folderId: folderId || null,
           ...analysis
         };
 
