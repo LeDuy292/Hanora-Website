@@ -308,3 +308,85 @@ export function splitSentences(text) {
   const matches = text.match(sentenceEndings);
   return matches ? matches.map(s => s.trim()).filter(Boolean) : [text];
 }
+
+/**
+ * Recursively unwraps any level of nested or escaped JSON strings
+ * to extract only the clean Vietnamese meaning text.
+ */
+export function extractPlainMeaning(val) {
+  if (!val) return "";
+  let current = val;
+
+  for (let i = 0; i < 10; i++) {
+    if (!current) break;
+
+    // String handling
+    if (typeof current === 'string') {
+      let trimmed = current.trim();
+      // Remove double quotes wrapping if stringified string
+      if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+        try {
+          trimmed = JSON.parse(trimmed);
+        } catch (e) {}
+      }
+
+      if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+        try {
+          current = JSON.parse(trimmed);
+          continue;
+        } catch (e) {
+          if (trimmed.includes('"meaning"')) {
+            const matches = [...trimmed.matchAll(/"meaning"\s*:\s*"([^"]+)"/g)];
+            if (matches.length > 0) {
+              const candidate = matches[matches.length - 1][1];
+              if (candidate && !candidate.includes('"meaning"')) {
+                return candidate.replace(/\\"/g, '"').trim();
+              }
+            }
+          }
+          break;
+        }
+      } else {
+        current = trimmed;
+        break;
+      }
+    }
+
+    // Array handling
+    if (Array.isArray(current)) {
+      if (current.length === 0) return "";
+      const vnDef = current.find(d => d && typeof d === 'object' && (d.lang === 'vn' || d.lang === 'vi' || d.lang === 'vietnamese'));
+      if (vnDef) {
+        current = vnDef.meaning || vnDef.translation || vnDef;
+      } else {
+        const first = current[0];
+        current = (first && typeof first === 'object') ? (first.meaning || first.translation || first) : first;
+      }
+      continue;
+    }
+
+    // Object handling
+    if (typeof current === 'object') {
+      current = current.meaning || current.translation || "";
+      continue;
+    }
+
+    break;
+  }
+
+  let finalStr = String(current || "").trim();
+
+  // Final fallback regex if JSON structure remains in string form
+  if (finalStr.includes('"meaning"') || finalStr.includes('\\"')) {
+    const matches = [...finalStr.matchAll(/"meaning"\s*:\s*"([^"]+)"/g)];
+    if (matches.length > 0) {
+      const candidate = matches[matches.length - 1][1];
+      if (candidate) {
+        finalStr = candidate;
+      }
+    }
+    finalStr = finalStr.replace(/\\"/g, '"').replace(/^\[|\]$/g, '').trim();
+  }
+
+  return finalStr;
+}

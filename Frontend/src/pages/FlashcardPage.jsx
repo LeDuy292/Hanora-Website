@@ -837,24 +837,30 @@ export function FlashcardPage() {
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+                  <div className="border-t border-slate-100 pt-4 flex items-center justify-between gap-2.5">
                     <button 
                       onClick={() => {
                         setActiveDeck({ id: deck.id, title: deck.name });
                         setStudyMode('flashcard');
                         fetchUserFlashcards(deck.id);
                       }}
-                      className="flex-grow flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-100/80 text-slate-700 font-bold py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-xs"
+                      title="Đọc lướt và xem thẻ nhanh"
                     >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Học thẻ</span>
+                      <Layers className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Đọc thẻ</span>
                     </button>
                     <button 
-                      onClick={() => navigate('/quiz')}
-                      className="flex-grow flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
+                      onClick={() => {
+                        setActiveDeck({ id: deck.id, title: deck.name });
+                        setStudyMode('review');
+                        fetchUserFlashcards(deck.id);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
+                      title="Chế độ học từ vựng SRS và tích lũy XP"
                     >
-                      <Target className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Kiểm tra AI</span>
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Học từ</span>
                     </button>
                   </div>
                 </div>
@@ -1040,41 +1046,46 @@ export function FlashcardPage() {
       <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
         <button 
           onClick={() => setStudyMode('flashcard')}
-          className={`flex-1 text-center py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'flashcard' ? 'bg-white text-blue-650 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            studyMode === 'flashcard' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Lật Thẻ
+          <Layers className="w-3.5 h-3.5" />
+          <span>Đọc thẻ</span>
         </button>
         <button 
           onClick={() => setStudyMode('review')}
-          className={`flex-1 text-center py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'review' ? 'bg-white text-blue-650 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            studyMode === 'review' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Ôn tập SRS
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Học từ (SRS)</span>
         </button>
         <button 
           onClick={() => setStudyMode('write')}
-          className={`flex-1 text-center py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'write' ? 'bg-white text-blue-650 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            studyMode === 'write' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Write Mode
+          <Edit3 className="w-3.5 h-3.5" />
+          <span>Luyện viết</span>
         </button>
         <button 
           onClick={() => setStudyMode('match')}
-          className={`flex-1 text-center py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'match' ? 'bg-white text-blue-650 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            studyMode === 'match' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Match Game
+          <Award className="w-3.5 h-3.5" />
+          <span>Ghép từ</span>
         </button>
         <button 
           onClick={() => navigate('/quiz')}
-          className="flex-1 text-center py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 transition"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 transition"
         >
-          AI Test
+          <Target className="w-3.5 h-3.5 text-blue-500" />
+          <span>Kiểm tra AI</span>
         </button>
       </div>
 
@@ -1204,25 +1215,18 @@ export function FlashcardPage() {
                   {/* 5. Navigation Bar */}
                   <div className="nav-bar mt-4">
                     <div className="nav-group">
-                      <button className={`nav-btn ${isShuffled ? 'active' : ''}`} onClick={handleToggleShuffle}>
+                      <button className={`nav-btn ${isShuffled ? 'active' : ''}`} onClick={handleToggleShuffle} title="Trộn thứ tự thẻ">
                         <Shuffle className="w-4 h-4" />
                         Trộn
                       </button>
-                      <button className={`nav-btn ${isPlaying ? 'active' : ''}`} onClick={() => setIsPlaying(!isPlaying)}>
+                      <button className={`nav-btn ${isPlaying ? 'active' : ''}`} onClick={() => setIsPlaying(!isPlaying)} title="Tự động lật và chuyển thẻ">
                         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                         Tự động
                       </button>
                     </div>
 
-                    <div className="nav-group">
-                      <button 
-                        className={`nav-btn known-quick-btn transition-all duration-200 ${isMarkedKnown ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`} 
-                        onClick={handleMarkAsKnown}
-                      >
-                        <CheckCircle2 className={`w-4 h-4 ${isMarkedKnown ? 'text-white fill-blue-700' : 'text-blue-500'}`} />
-                        <span>Đã thuộc</span>
-                        <kbd className={`hidden sm:inline-block ml-1.5 px-1 py-0.5 text-[9px] font-mono rounded ${isMarkedKnown ? 'text-blue-100 bg-blue-700 border-blue-800' : 'text-slate-400 bg-slate-50 border border-slate-200'}`}>K</kbd>
-                      </button>
+                    <div className="hidden sm:flex items-center text-xs font-semibold text-slate-400">
+                      <span>Mẹo: Dùng phím <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 rounded">Trái</kbd> <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 rounded">Phải</kbd> để chuyển thẻ</span>
                     </div>
 
                     <div className="nav-group">

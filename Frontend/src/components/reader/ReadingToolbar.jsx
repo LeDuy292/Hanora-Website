@@ -12,7 +12,7 @@ export function ReadingToolbar({ onUploadClick }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm page-transition">
+    <div className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-4 bg-white/95 backdrop-blur-md border border-slate-200/80 p-4 rounded-2xl shadow-sm page-transition">
       {/* File selector dropdown */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">Văn bản đọc:</span>

@@ -112,6 +112,10 @@ public class DocumentProcessingService : IDocumentProcessingService
 
         try
         {
+            doc.Status = DocumentStatus.RecognizingOcr;
+            doc.UpdatedAt = DateTime.UtcNow;
+            await docRepo.UpdateAsync(doc);
+
             using var fileStream = await s3Service.DownloadFileAsync(fileUrl);
             
             var (extractedText, pages, errorMessage) = await ocrService.ExtractLayoutAsync(fileStream, fileName, contentType);
@@ -123,6 +127,10 @@ public class DocumentProcessingService : IDocumentProcessingService
             }
             else
             {
+                doc.Status = DocumentStatus.AnalyzingContent;
+                doc.UpdatedAt = DateTime.UtcNow;
+                await docRepo.UpdateAsync(doc);
+
                 if (pages != null && pages.Any())
                 {
                     var blocks = layoutService.AnalyzeLayout(pages);
@@ -159,6 +167,25 @@ public class DocumentProcessingService : IDocumentProcessingService
                 }
 
                 doc.Status = DocumentStatus.Ready;
+
+                // Push user notification upon completion
+                try
+                {
+                    var db = serviceProvider.GetRequiredService<DataAccessObjects.AppDbContext>();
+                    db.UserNotifications.Add(new UserNotification
+                    {
+                        UserId = doc.UserId,
+                        Title = "Xử lý tài liệu hoàn tất",
+                        Message = $"Tài liệu '{doc.Title}' đã hoàn thành nhận diện chữ Hán và phân tích nội dung. Bạn có thể mở đọc ngay bây giờ!",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await db.SaveChangesAsync();
+                }
+                catch (Exception notifEx)
+                {
+                    _logger.LogWarning(notifEx, "Could not create UserNotification for doc {DocId}", documentId);
+                }
             }
         }
         catch (Exception ex)
