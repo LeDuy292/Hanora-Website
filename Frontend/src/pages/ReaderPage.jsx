@@ -8,10 +8,13 @@ import {
 import { toast } from '../store/notificationStore';
 import WordCard from '../components/WordCard';
 import UploadModal from '../components/UploadModal';
+import CreateDocModal from '../components/CreateDocModal';
 import { DocumentSelectModal } from '../components/DocumentSelectModal';
 import VisualDocumentReader from '../components/reader/VisualDocumentReader';
+import FloatingVerticalToolbar from '../components/reader/FloatingVerticalToolbar';
 import { pinyin } from 'pinyin-pro';
 import { useVocabularyStore } from '../store/vocabularyStore';
+import { useDocumentStore } from '../store/documentStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { apiRequest } from '../services/apiClient';
@@ -23,7 +26,8 @@ import {
   FileText, Pin, Save, Download, X, Upload, ChevronLeft, ChevronRight,
   Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare,
   Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send,
-  Copy, Trash2, Undo2, Redo2
+  Copy, Trash2, Undo2, Redo2, Folder, FolderPlus, Plus, Filter,
+  MoreVertical, Edit2, PlusCircle
 } from 'lucide-react';
 
 const HIGHLIGHT_COLORS = [
@@ -130,7 +134,9 @@ const ReaderPage = () => {
   const [isLoadingVocab, setIsLoadingVocab] = useState(false);
   const [fontSize, setFontSize] = useState(24);
   const [showPinyin, setShowPinyin] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(!id);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isCreateDocModalOpen, setIsCreateDocModalOpen] = useState(false);
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [documentsList, setDocumentsList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -139,6 +145,14 @@ const ReaderPage = () => {
   const showVisualReader = Boolean(visualDocumentType);
   const readerContainerRef = useRef(null);
   const navigate = useNavigate();
+
+  // Document Store & Folder Management
+  const { folders, addFolder, renameFolder, deleteFolder, moveDocumentToFolder, documents: storeDocs } = useDocumentStore();
+  const [activeFolderId, setActiveFolderId] = useState(null); // null = All
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [activeDocMenuId, setActiveDocMenuId] = useState(null);
+  const [activeFolderMenuId, setActiveFolderMenuId] = useState(null);
 
   // Settings
   const [fontMode, setFontMode] = useState('sans'); // sans, serif, kaiti
@@ -1343,11 +1357,32 @@ const ReaderPage = () => {
   const validCurrentPage = showVisualReader ? currentPage : Math.min(currentPage, textTotalPages);
   const currentSegments = segments.slice((validCurrentPage - 1) * WORDS_PER_PAGE, validCurrentPage * WORDS_PER_PAGE);
 
+  // Combine server documents and local stored documents
+  const allDocsList = useMemo(() => {
+    const map = new Map();
+    (documentsList || []).forEach(d => map.set(String(d.id), d));
+    (storeDocs || []).forEach(d => {
+      if (!map.has(String(d.id))) {
+        map.set(String(d.id), d);
+      }
+    });
+    return Array.from(map.values());
+  }, [documentsList, storeDocs]);
+
   // Document selectors filtered list
-  const filteredDropdownDocs = documentsList.filter(d =>
-    d.title.toLowerCase().includes(docSearchQuery.toLowerCase())
+  const filteredDropdownDocs = allDocsList.filter(d =>
+    (d.title || '').toLowerCase().includes(docSearchQuery.toLowerCase())
   );
-  const recentDropdownDocs = documentsList.slice(0, 4);
+  const recentDropdownDocs = allDocsList.slice(0, 4);
+
+  // Filtered documents for library grid
+  const filteredGridDocs = useMemo(() => {
+    return allDocsList.filter(d => {
+      const matchesSearch = (d.title || '').toLowerCase().includes(docSearchQuery.toLowerCase());
+      const matchesFolder = activeFolderId === null ? true : String(d.folderId) === String(activeFolderId);
+      return matchesSearch && matchesFolder;
+    });
+  }, [allDocsList, docSearchQuery, activeFolderId]);
 
   // Count saved words in current document
   const savedWordsInDoc = vocabList.filter(w => String(w.documentId) === String(id)).length;
@@ -1407,6 +1442,15 @@ const ReaderPage = () => {
       <UploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
+      />
+
+      <CreateDocModal
+        isOpen={isCreateDocModalOpen}
+        onClose={() => setIsCreateDocModalOpen(false)}
+        onCreated={(newDoc) => {
+          if (newDoc?.id) navigate(`/reader/${newDoc.id}`);
+        }}
+        activeFolderId={activeFolderId}
       />
 
       <DocumentSelectModal
@@ -1899,234 +1943,330 @@ const ReaderPage = () => {
         >
           <div className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-white transition-colors duration-250 sm:rounded-3xl ${activeTheme.sheet}`}>
             {!document && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12 bg-white rounded-3xl">
-                <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-6">
-                  <FileText className="w-10 h-10" />
+              <div className="flex-1 flex flex-col bg-slate-50/50 p-4 sm:p-6 overflow-y-auto min-h-0">
+                {/* 1. Red Outlined Search Bar (2/3 width, tight top spacing) */}
+                <div className="w-full max-w-2xl mx-auto mt-0 mb-6 relative shrink-0">
+                  <div className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-2xl p-2 shadow-sm">
+                    <div className="relative flex-1 flex items-center">
+                      <span className="text-xs font-bold text-slate-700 pl-3 pr-2 shrink-0 hidden sm:inline">Tìm kiếm Tài Liệu</span>
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          placeholder="Nhập tên tài liệu..."
+                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          value={docSearchQuery}
+                          onChange={(e) => setDocSearchQuery(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Filter button */}
+                    <button
+                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 border border-slate-200/60"
+                      title="Lọc tài liệu"
+                    >
+                      <Filter className="w-4 h-4" />
+                    </button>
+
+                    {/* Plus (+) Button in Circle */}
+                    <div className="relative shrink-0">
+                      <button
+                        onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                        className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all"
+                        title="Thêm tài liệu"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+
+                      {isPlusMenuOpen && (
+                        <div className="absolute right-0 top-11 z-50 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-150">
+                          <button
+                            onClick={() => {
+                              setIsPlusMenuOpen(false);
+                              setIsUploadModalOpen(true);
+                            }}
+                            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                          >
+                            <Upload className="w-4 h-4 text-blue-500" />
+                            <span>Tải tài liệu lên (PDF, Ảnh...)</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setIsPlusMenuOpen(false);
+                              setIsCreateDocModalOpen(true);
+                            }}
+                            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                          >
+                            <FileText className="w-4 h-4 text-emerald-500" />
+                            <span>Tạo bản Doc mới</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-2xl font-black text-slate-855 mb-2">Chưa chọn tài liệu học tập</h2>
-                <p className="text-slate-505 mb-8 max-w-sm text-sm">Vui lòng tải lên một file tiếng Trung hoặc chọn một tài liệu từ danh sách để bắt đầu tra cứu và học.</p>
-                <button
-                  onClick={() => setIsUploadModalOpen(true)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md shadow-blue-650/20 hover:bg-blue-700 transition-colors"
-                >
-                  Tải lên tài liệu ngay
-                </button>
+
+                {/* 2. Main Content Grid: Folder Sidebar + Notebook Grid */}
+                <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
+                  {/* Left Folder Sidebar */}
+                  <div className="w-full md:w-64 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm shrink-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Folder className="w-4 h-4 text-blue-500" />
+                        Thư mục lưu trữ
+                      </span>
+                      <button
+                        onClick={() => {
+                          const name = prompt("Nhập tên thư mục mới:");
+                          if (name && name.trim()) {
+                            addFolder(name.trim());
+                            useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
+                          }
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition-colors"
+                        title="Tạo thư mục mới"
+                      >
+                        <FolderPlus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+                      {/* All Documents */}
+                      <button
+                        onClick={() => setActiveFolderId(null)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                          activeFolderId === null
+                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="truncate">Tất cả tài liệu</span>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                          {allDocsList.length}
+                        </span>
+                      </button>
+
+                      {/* User Folders */}
+                      {(folders || []).map(f => {
+                        const folderDocsCount = allDocsList.filter(d => String(d.folderId) === String(f.id)).length;
+                        return (
+                          <div key={f.id} className="relative group">
+                            <div
+                              role="button"
+                              onClick={() => setActiveFolderId(f.id)}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                activeFolderId === f.id
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                <Folder className="w-4 h-4 text-slate-400 shrink-0 group-hover:text-blue-500" />
+                                <span className="truncate">{f.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                                  {folderDocsCount}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveFolderMenuId(activeFolderMenuId === f.id ? null : f.id);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors opacity-0 group-hover:opacity-100"
+                                >
+                                  <MoreVertical className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {activeFolderMenuId === f.id && (
+                              <div className="absolute right-2 top-9 z-50 w-36 bg-white rounded-xl border border-slate-200 shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
+                                <button
+                                  onClick={() => {
+                                    setActiveFolderMenuId(null);
+                                    const newName = prompt("Đổi tên thư mục:", f.name);
+                                    if (newName && newName.trim()) renameFolder(f.id, newName.trim());
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Đổi tên</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveFolderMenuId(null);
+                                    if (confirm(`Xóa thư mục "${f.name}"?`)) deleteFolder(f.id);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>Xóa</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const name = prompt("Nhập tên thư mục mới:");
+                        if (name && name.trim()) {
+                          addFolder(name.trim());
+                          useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
+                        }
+                      }}
+                      className="mt-3 w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Thêm thư mục</span>
+                    </button>
+                  </div>
+
+                  {/* Right Notebook Grid */}
+                  <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col min-h-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm font-bold text-slate-800">
+                        {activeFolderId ? folders.find(f => f.id === activeFolderId)?.name || 'Thư mục' : 'Tất cả tài liệu'}
+                      </span>
+                      <span className="text-xs text-slate-400 font-semibold">
+                        {filteredGridDocs.length} Tài liệu
+                      </span>
+                    </div>
+
+                    {filteredGridDocs.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 overflow-y-auto pr-1 scrollbar-thin flex-1">
+                        {filteredGridDocs.map(doc => (
+                          <div
+                            key={doc.id}
+                            onClick={() => navigate(`/reader/${doc.id}`)}
+                            className="group relative cursor-pointer flex flex-col items-center select-none"
+                          >
+                            {/* Notebook Cover Illustration */}
+                            <div className="w-full aspect-[3/4] bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200 relative overflow-hidden flex flex-col justify-between p-3 border border-blue-300/40">
+                              {/* Left Spiral Rings */}
+                              <div className="absolute left-1.5 top-0 bottom-0 flex flex-col justify-around py-2 z-10">
+                                {[...Array(9)].map((_, i) => (
+                                  <div key={i} className="w-2.5 h-1 bg-slate-800 rounded-full shadow-inner border border-slate-400/50" />
+                                ))}
+                              </div>
+
+                              {/* Notebook Label Box */}
+                              <div className="ml-3 mt-4 bg-white/90 backdrop-blur-xs rounded-lg p-2.5 border border-white/60 shadow-xs">
+                                <p className="text-[11px] font-extrabold text-slate-800 line-clamp-3 leading-snug">
+                                  {doc.title}
+                                </p>
+                              </div>
+
+                              {/* Notebook Bottom Info */}
+                              <div className="ml-3 flex items-center justify-between text-[9px] text-white/90 font-bold">
+                                <span>{doc.date || doc.createdAt?.split('T')[0] || '2026'}</span>
+                              </div>
+                            </div>
+
+                            {/* Notebook Title & Menu under Card */}
+                            <div className="w-full mt-2 flex items-center justify-between px-1">
+                              <span className="text-xs font-semibold text-slate-700 truncate flex-1 mr-1">
+                                {doc.title}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveDocMenuId(activeDocMenuId === doc.id ? null : doc.id);
+                                }}
+                                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Doc Options Menu */}
+                            {activeDocMenuId === doc.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 bottom-8 z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1 animate-in fade-in zoom-in-95 duration-150"
+                              >
+                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chuyển thư mục</div>
+                                {(folders || []).map(f => (
+                                  <button
+                                    key={f.id}
+                                    onClick={() => {
+                                      moveDocumentToFolder(doc.id, f.id);
+                                      setActiveDocMenuId(null);
+                                      useToastStore.getState().addToast(`Đã chuyển "${doc.title}" sang ${f.name}`, 'success');
+                                    }}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 truncate"
+                                  >
+                                    {f.name}
+                                  </button>
+                                ))}
+                                <div className="border-t border-slate-100 my-1" />
+                                <button
+                                  onClick={() => {
+                                    setActiveDocMenuId(null);
+                                    handleDeleteDocument(doc.id, doc.title);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>Xóa tài liệu</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                        <FileText className="w-12 h-12 mb-3 opacity-30" />
+                        <p className="text-sm font-semibold">Chưa có tài liệu nào trong mục này</p>
+                        <p className="text-xs text-slate-400 mt-1">Bấm nút (+) ở thanh tìm kiếm để tải file hoặc tạo bản Doc mới</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
             {document && (
               <>
-                {/* Canvas Drawing Tools */}
-                <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex flex-col 2xl:flex-row 2xl:items-center gap-1.5 sm:gap-2 shrink-0 ${activeTheme.toolbar}`}>
-                  <div className="w-full 2xl:w-auto overflow-x-auto scrollbar-thin">
-                    <div className="inline-flex min-w-max items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-sm">
-                    {/* Pointer */}
-                    <button
-                      onClick={() => {
-                        setActiveTool('pointer');
-                        setIsColorMenuOpen(false);
-                      }}
-                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'pointer' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="Con trỏ chuột tra cứu (Pointer)"
-                    >
-                      <MousePointer className="w-3.5 h-3.5" />
-                    </button>
+                {/* Floating Vertical Canvas Drawing Tools */}
+                <FloatingVerticalToolbar
+                  activeTool={activeTool}
+                  setActiveTool={setActiveTool}
+                  activeColor={activeColor}
+                  setActiveColor={setActiveColor}
+                  penColor={penColor}
+                  setPenColor={setPenColor}
+                  penWidth={penWidth}
+                  setPenWidth={setPenWidth}
+                  penStyle={penStyle}
+                  setPenStyle={setPenStyle}
+                  onUndo={handleUndoStroke}
+                  onRedo={handleRedoStroke}
+                  canUndo={currentPageStrokes.length > 0}
+                  canRedo={currentRedoStrokes.length > 0}
+                />
 
-                    {/* Highlight Dropdown */}
-                    <div className="relative group">
-                      <button
-                        onClick={() => {
-                          setActiveTool('highlight');
-                          setIsColorMenuOpen(prev => !prev);
-                        }}
-                        className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTool === 'highlight' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                        title="Bôi màu Highlight văn bản (H)"
-                      >
-                        <Highlighter className="w-3.5 h-3.5" />
-                        <span
-                          className="w-3 h-3 rounded-full border border-slate-350 inline-block shadow-sm"
-                          style={{ backgroundColor: activeColor }}
-                        />
-                      </button>
-                      <div className="hidden">
-                        {HIGHLIGHT_COLORS.map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              setActiveColor(c.value);
-                              setActiveTool('highlight');
-                              setIsColorMenuOpen(false);
-                            }}
-                            className="min-h-[40px] flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full border border-slate-200 inline-block shadow-sm"
-                                style={{ backgroundColor: c.value }}
-                              />
-                              <span>{c.name.split(' ')[0]}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Pencil */}
-                    <button
-                      onClick={() => {
-                        setActiveTool('pencil');
-                        setIsColorMenuOpen(false);
-                      }}
-                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'pencil' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="Viết vẽ tay (Pencil)"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Eraser */}
-                    <button
-                      onClick={() => {
-                        setActiveTool('eraser');
-                        setIsColorMenuOpen(false);
-                      }}
-                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'eraser' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="Tẩy nét vẽ (Eraser)"
-                    >
-                      <Eraser className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Text Note */}
-                    <button
-                      onClick={() => {
-                        setActiveTool('textNote');
-                        setIsColorMenuOpen(false);
-                      }}
-                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'textNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="Thêm Ghi chú văn bản (Text Note)"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Sticky Note */}
-                    <button
-                      onClick={() => {
-                        setActiveTool('stickyNote');
-                        setIsColorMenuOpen(false);
-                      }}
-                      className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-all flex items-center justify-center ${activeTool === 'stickyNote' ? 'bg-white text-blue-600 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                      title="Thêm Ghi chú nổi (Sticky Note)"
-                    >
-                      <Pin className="w-3.5 h-3.5" />
-                    </button>
-                    </div>
-                  </div>
-
-                  {activeTool === 'highlight' && isColorMenuOpen && (
-                    <div className="w-full 2xl:flex-1 min-w-0 bg-white border border-slate-200/80 rounded-2xl px-3 py-2 shadow-sm">
-                      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin">
-                        <Palette className="w-4 h-4 text-slate-400 shrink-0" />
-                        {HIGHLIGHT_COLORS.map(color => (
-                          <button
-                            key={color.id}
-                            onClick={() => {
-                              setActiveColor(color.value);
-                              setActiveTool('highlight');
-                              setIsColorMenuOpen(false);
-                            }}
-                            className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all flex items-center justify-center ${activeColor === color.value ? 'ring-2 ring-blue-500 ring-offset-2 border-white' : 'border-slate-200 hover:ring-2 hover:ring-slate-300'}`}
-                            title={color.name}
-                            aria-label={color.name}
-                          >
-                            <span
-                              className="w-7 h-7 rounded-full border border-slate-200 shadow-sm"
-                              style={{ backgroundColor: color.value }}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTool === 'pencil' && (
-                    <div className="w-full 2xl:flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[minmax(210px,1fr)_auto] xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto] items-center gap-2 bg-white border border-slate-200/80 rounded-2xl px-2 sm:px-3 py-2 shadow-sm">
-                      <div className="min-w-0 flex items-center gap-1 overflow-x-auto scrollbar-thin md:pr-2 md:border-r md:border-slate-200">
-                        <Palette className="w-3.5 h-3.5 text-slate-400" />
-                        {DRAWING_COLORS.map(color => (
-                          <button
-                            key={color.id}
-                            onClick={() => setPenColor(color.value)}
-                            className={`w-8 h-8 rounded-full border transition-all ${penColor === color.value ? 'ring-2 ring-blue-500 ring-offset-2 border-white' : 'border-slate-200 hover:ring-2 hover:ring-slate-300'}`}
-                            style={{ backgroundColor: color.value }}
-                            title={color.name}
-                            aria-label={color.name}
-                          />
-                        ))}
-                      </div>
-
-                      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin md:pr-2 md:border-r md:border-slate-200">
-                        {PEN_WIDTHS.map(width => (
-                          <button
-                            key={width.value}
-                            onClick={() => setPenWidth(width.value)}
-                            className={`min-w-[40px] min-h-[36px] px-2 rounded-xl text-[11px] font-black transition-all ${penWidth === width.value ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-                            title={`Do day ${width.label}`}
-                          >
-                            {width.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center gap-1 md:pr-2 md:border-r md:border-slate-200">
-                        <Type className="w-3.5 h-3.5 text-slate-400" />
-                        <select
-                          value={penStyle}
-                          onChange={(e) => setPenStyle(e.target.value)}
-                          className="min-h-[40px] bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
-                          title="Kieu net"
-                        >
-                          {PEN_STYLES.map(style => (
-                            <option key={style.id} value={style.id}>{style.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-1 justify-start md:justify-end">
-                        <button
-                          onClick={handleUndoStroke}
-                          disabled={currentPageStrokes.length === 0}
-                          className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-all"
-                          title="Undo net ve"
-                        >
-                          <Undo2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={handleRedoStroke}
-                          disabled={currentRedoStrokes.length === 0}
-                          className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-all"
-                          title="Redo net ve"
-                        >
-                          <Redo2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex w-full items-center justify-end gap-2 overflow-x-auto scrollbar-thin 2xl:w-auto 2xl:overflow-visible">
-                    <button
-                      onClick={handleSaveAnnotations}
-                      className="min-h-[40px] min-w-[44px] sm:min-h-[44px] sm:min-w-[150px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/10 active:scale-95"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Lưu ghi chú</span>
-                    </button>
-                    <button
-                      onClick={handleExportDocx}
-                      className="min-h-[40px] min-w-[44px] sm:min-h-[44px] sm:min-w-[170px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                    >
-                      <Download className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="hidden sm:inline">Xuất Word (.docx)</span>
-                    </button>
-                  </div>
+                <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-end gap-2 shrink-0 ${activeTheme.toolbar}`}>
+                  <button
+                    onClick={handleSaveAnnotations}
+                    className="min-h-[38px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Lưu ghi chú</span>
+                  </button>
+                  <button
+                    onClick={handleExportDocx}
+                    className="min-h-[38px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Xuất Word (.docx)</span>
+                  </button>
                 </div>
 
                 {/* Reader page content */}

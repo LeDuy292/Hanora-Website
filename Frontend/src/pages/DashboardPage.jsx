@@ -245,6 +245,48 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* Actionable Today's Recommendations (Step 9 optimization) */}
+      {(reviewToday > 0 || recentDocuments.length > 0) && (
+        <div className="p-4 sm:p-5 bg-rose-50/90 dark:bg-slate-900 border border-red-200/80 dark:border-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-red-500/20 shrink-0">
+              ⚡
+            </div>
+            <div>
+              <h4 className="font-black text-slate-900 dark:text-white text-sm tracking-tight">Gợi ý hành động hôm nay</h4>
+              <p className="text-xs text-slate-700 dark:text-slate-200 font-semibold mt-0.5">
+                {reviewToday > 0 ? (
+                  <>Bạn có <strong className="text-red-600 dark:text-red-400 font-extrabold">{reviewToday} từ</strong> đến lịch ôn tập Spaced Repetition.</>
+                ) : recentDocuments.length > 0 ? (
+                  <>Tài liệu <strong className="text-slate-900 dark:text-white font-extrabold">"{recentDocuments[0].title}"</strong> còn {100 - (recentDocuments[0].progressPercent || 0)}% chưa hoàn thành.</>
+                ) : (
+                  <>Duy trì <strong className="text-red-600 dark:text-red-400 font-extrabold">{streak} ngày</strong> học liên tục để đạt mục tiêu daily!</>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {reviewToday > 0 && (
+              <button
+                onClick={() => navigate('/practice')}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition-all"
+              >
+                Ôn ngay (3 phút)
+              </button>
+            )}
+            {recentDocuments.length > 0 && (
+              <button
+                onClick={() => handleOpenDoc(recentDocuments[0].id)}
+                className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs transition-all"
+              >
+                Đọc tiếp
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Grid: Stat Summary Blocks */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 

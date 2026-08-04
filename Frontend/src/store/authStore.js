@@ -85,7 +85,12 @@ export const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { user } = await authApi.login(email, password);
-          set({ user: mapUser(user, get().user || {}), isAuthenticated: true, isLoading: false });
+          const mapped = mapUser(user, get().user || {});
+          set({
+            user: { ...mapped, needsOnboarding: false, isNewAccount: false },
+            isAuthenticated: true,
+            isLoading: false
+          });
           get().refreshStats();
           return true;
         } catch (err) {
@@ -97,8 +102,13 @@ export const useAuthStore = create(
       register: async (username, email, password) => {
         set({ isLoading: true, error: null });
         try {
-          const { user } = await authApi.register(username, email, password);
-          set({ user: mapUser(user), isAuthenticated: true, isLoading: false });
+          const { user, isNewUser } = await authApi.register(username, email, password);
+          const mapped = mapUser(user);
+          set({
+            user: { ...mapped, needsOnboarding: true, isNewAccount: true },
+            isAuthenticated: true,
+            isLoading: false
+          });
           get().refreshStats();
           return true;
         } catch (err) {
@@ -110,8 +120,19 @@ export const useAuthStore = create(
       googleLogin: async (idToken) => {
         set({ isLoading: true, error: null });
         try {
-          const { user } = await authApi.googleLogin(idToken);
-          set({ user: mapUser(user, get().user || {}), isAuthenticated: true, isLoading: false });
+          const res = await authApi.googleLogin(idToken);
+          const { user, isNewUser } = res || {};
+          const mapped = mapUser(user, get().user || {});
+          const isFirstTime = Boolean(isNewUser);
+          set({
+            user: {
+              ...mapped,
+              needsOnboarding: isFirstTime,
+              isNewAccount: isFirstTime
+            },
+            isAuthenticated: true,
+            isLoading: false
+          });
           get().refreshStats();
           return true;
         } catch (err) {

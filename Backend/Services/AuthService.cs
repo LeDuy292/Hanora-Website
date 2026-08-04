@@ -26,7 +26,7 @@ namespace Services
         int? DailyMinutesGoal
     );
 
-    public record AuthResult(bool Success, string? Token, UserDto? User, string? Error);
+    public record AuthResult(bool Success, string? Token, UserDto? User, string? Error, bool IsNewUser = false);
 
     public record UserDto(long Id, string Username, string Email, string? DisplayName, string? AvatarUrl, DateTime CreatedAt, string Role, bool IsActive);
 
@@ -62,8 +62,10 @@ namespace Services
             var user = await _userRepo.GetByGoogleIdAsync(payload.Subject)
                        ?? await _userRepo.GetByEmailAsync(payload.Email);
 
+            bool isNewUser = false;
             if (user == null)
             {
+                isNewUser = true;
                 // Generate unique username from email prefix
                 var baseUsername = payload.Email.Split('@')[0].ToLower();
                 user = new User
@@ -87,7 +89,7 @@ namespace Services
                 await _userRepo.UpdateAsync(user);
             }
 
-            return new AuthResult(true, GenerateJwt(user), ToDto(user), null);
+            return new AuthResult(true, GenerateJwt(user), ToDto(user), null, isNewUser);
         }
 
         public async Task<AuthResult> LoginAsync(string email, string password)
@@ -105,7 +107,7 @@ namespace Services
             user.UpdatedAt = DateTime.UtcNow;
             await _userRepo.UpdateAsync(user);
 
-            return new AuthResult(true, GenerateJwt(user), ToDto(user), null);
+            return new AuthResult(true, GenerateJwt(user), ToDto(user), null, IsNewUser: false);
         }
 
         public async Task<AuthResult> RegisterAsync(string username, string email, string password)
@@ -123,7 +125,7 @@ namespace Services
             };
             user = await _userRepo.CreateAsync(user);
 
-            return new AuthResult(true, GenerateJwt(user), ToDto(user), null);
+            return new AuthResult(true, GenerateJwt(user), ToDto(user), null, IsNewUser: true);
         }
 
         private string GenerateJwt(User user)
