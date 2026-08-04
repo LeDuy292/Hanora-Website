@@ -15,6 +15,15 @@ namespace Hanora
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Windows Event Log requires elevated permissions on some development machines.
+            // If it cannot write, logging itself turns otherwise valid API requests into 500 errors.
+            if (builder.Environment.IsDevelopment())
+            {
+                builder.Logging.ClearProviders();
+                builder.Logging.AddConsole();
+                builder.Logging.AddDebug();
+            }
+
             // Database
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrEmpty(connectionString))
@@ -121,6 +130,7 @@ namespace Hanora
             var allowedCorsOrigins = new[]
                 {
                     "http://localhost:5173",
+                    "http://127.0.0.1:5173",
                     "http://localhost:3000",
                     "https://hanora-website.vercel.app"
                 }
@@ -134,13 +144,7 @@ namespace Hanora
             {
                 options.AddPolicy("FrontendPolicy", policy =>
                 {
-                    policy.WithOrigins(
-                            "http://localhost:5173",
-                            "http://localhost:3000",
-                            "https://hanora-website.vercel.app",
-                            "https://hanora.id.vn",
-                            "https://www.hanora.id.vn"
-                        )
+                    policy.WithOrigins(allowedCorsOrigins)
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials()
@@ -189,183 +193,42 @@ namespace Hanora
                 ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
             });
 
-            // Run database updates at startup
-            using (var scope = app.Services.CreateScope())
-            {
-                try
-                {
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    context.Database.ExecuteSqlRaw(@"
-                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS average_pronunciation_score NUMERIC(5,2) DEFAULT 0.00;
-                        ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS total_pronunciation_attempts INTEGER DEFAULT 0;
-                        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'User';
-                        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS annotations_json TEXT;
-                        ALTER TABLE documents ADD COLUMN IF NOT EXISTS ocr_json_url TEXT;
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS han_viet VARCHAR(100);
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS collocations TEXT;
-                        ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS grammar_patterns TEXT;
-
-                        -- New additions for XP, Leaderboard, Decks, and Notifications
-                        CREATE TABLE IF NOT EXISTS flashcard_decks (
-                            id            BIGSERIAL    PRIMARY KEY,
-                            user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            name          VARCHAR(255) NOT NULL,
-                            source        VARCHAR(255),
-                            document_id   BIGINT       REFERENCES documents(id) ON DELETE SET NULL,
-                            created_at    TIMESTAMPTZ  DEFAULT NOW(),
-                            updated_at    TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        ALTER TABLE flashcard_decks ADD COLUMN IF NOT EXISTS description TEXT;
-
-                        ALTER TABLE flashcards DROP CONSTRAINT IF EXISTS flashcards_user_vocabulary_id_key;
-                        ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS deck_id BIGINT REFERENCES flashcard_decks(id) ON DELETE CASCADE;
-                        CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcards_user_vocab_deck ON flashcards(user_vocabulary_id, deck_id);
-
-                        CREATE TABLE IF NOT EXISTS user_notifications (
-                            id          BIGSERIAL    PRIMARY KEY,
-                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            title       VARCHAR(255) NOT NULL,
-                            message     TEXT         NOT NULL,
-                            is_read     BOOLEAN      DEFAULT FALSE,
-                            created_at  TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        CREATE TABLE IF NOT EXISTS leaderboard_rewards (
-                            id            BIGSERIAL   PRIMARY KEY,
-                            user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            rank          INTEGER     NOT NULL,
-                            xp_rewarded   INTEGER     NOT NULL,
-                            week_start    DATE        NOT NULL,
-                            rewarded_at   TIMESTAMPTZ DEFAULT NOW(),
-                            UNIQUE (user_id, week_start)
-                        );
-
-                        CREATE TABLE IF NOT EXISTS chat_sessions (
-                            id          BIGSERIAL    PRIMARY KEY,
-                            user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            title       VARCHAR(255) NOT NULL,
-                            is_pinned   BOOLEAN      DEFAULT FALSE,
-                            created_at  TIMESTAMPTZ  DEFAULT NOW(),
-                            updated_at  TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        CREATE TABLE IF NOT EXISTS chat_messages (
-                            id          BIGSERIAL    PRIMARY KEY,
-                            session_id  BIGINT       NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-                            role        VARCHAR(10)  NOT NULL,
-                            content     TEXT         NOT NULL,
-                            created_at  TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
-                        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
-
-                        CREATE TABLE IF NOT EXISTS translation_reviews (
-                            id                   BIGSERIAL    PRIMARY KEY,
-                            source_type          VARCHAR(40)  NOT NULL,
-                            source_entity_id     BIGINT,
-                            user_id              BIGINT       REFERENCES users(id) ON DELETE SET NULL,
-                            source_language      VARCHAR(10)  NOT NULL DEFAULT 'ZH',
-                            target_language      VARCHAR(10)  NOT NULL DEFAULT 'VI',
-                            source_text          TEXT         NOT NULL,
-                            current_translation  TEXT,
-                            proposed_translation TEXT,
-                            ai_explanation       TEXT,
-                            example_text         TEXT,
-                            pinyin               VARCHAR(255),
-                            word_type            VARCHAR(50),
-                            warning_type         VARCHAR(50)  NOT NULL DEFAULT 'new_word',
-                            confidence_score     NUMERIC(5,2),
-                            report_count         INTEGER      NOT NULL DEFAULT 0,
-                            priority             INTEGER      NOT NULL DEFAULT 0,
-                            status               VARCHAR(20)  NOT NULL DEFAULT 'Pending',
-                            admin_note           TEXT,
-                            reviewed_by          BIGINT       REFERENCES users(id) ON DELETE SET NULL,
-                            reviewed_at          TIMESTAMPTZ,
-                            created_at           TIMESTAMPTZ  DEFAULT NOW(),
-                            updated_at           TIMESTAMPTZ  DEFAULT NOW()
-                        );
-
-                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_status_priority
-                            ON translation_reviews(status, priority DESC, created_at DESC);
-                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_source
-                            ON translation_reviews(source_type, source_entity_id);
-                        CREATE INDEX IF NOT EXISTS idx_translation_reviews_warning
-                            ON translation_reviews(warning_type, created_at DESC);
-
-                        CREATE TABLE IF NOT EXISTS translation_review_history (
-                            id              BIGSERIAL   PRIMARY KEY,
-                            review_id       BIGINT      NOT NULL REFERENCES translation_reviews(id) ON DELETE CASCADE,
-                            admin_id        BIGINT      REFERENCES users(id) ON DELETE SET NULL,
-                            action          VARCHAR(40) NOT NULL,
-                            previous_status VARCHAR(20),
-                            new_status      VARCHAR(20),
-                            note            TEXT,
-                            snapshot_json   JSONB,
-                            created_at      TIMESTAMPTZ DEFAULT NOW()
-                        );
-
-                        CREATE INDEX IF NOT EXISTS idx_translation_review_history_review
-                            ON translation_review_history(review_id, created_at DESC);
-                    ");
-
-                    var adminEmail = builder.Configuration["AdminAccount:Email"]?.Trim().ToLowerInvariant();
-                    var adminPassword = builder.Configuration["AdminAccount:Password"];
-                    if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
-                    {
-                        var adminUsername = builder.Configuration["AdminAccount:Username"]?.Trim().ToLowerInvariant();
-                        if (string.IsNullOrWhiteSpace(adminUsername))
-                            adminUsername = "admin";
-
-                        var adminDisplayName = builder.Configuration["AdminAccount:DisplayName"]?.Trim();
-                        if (string.IsNullOrWhiteSpace(adminDisplayName))
-                            adminDisplayName = "Hanora Admin";
-
-                        var admin = context.Users.FirstOrDefault(u => u.Email == adminEmail);
-                        if (admin == null)
-                        {
-                            admin = new BusinessObjects.Models.User
-                            {
-                                Username = adminUsername,
-                                Email = adminEmail,
-                                DisplayName = adminDisplayName,
-                                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                                Role = "Admin",
-                                IsActive = true,
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow
-                            };
-                            context.Users.Add(admin);
-                        }
-                        else
-                        {
-                            admin.Username = string.IsNullOrWhiteSpace(admin.Username) ? adminUsername : admin.Username;
-                            admin.DisplayName = adminDisplayName;
-                            admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
-                            admin.Role = "Admin";
-                            admin.IsActive = true;
-                            admin.UpdatedAt = DateTime.UtcNow;
-                        }
-
-                        context.SaveChanges();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error running database migrations: {ex.Message}");
-                }
-            }
-
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
-            // Ensure CORS is applied before HttpsRedirection short-circuits
+            // Apply CORS before static files so locally stored documents and OCR JSON
+            // also receive Access-Control-Allow-Origin headers.
             app.UseCors("FrontendPolicy");
+
+            // Serve static files (local file upload fallback for dev when S3 is unavailable).
+            // Ensure static file responses include CORS headers so the React dev server
+            // (running on a different origin) can fetch PDFs and OCR JSON.
+            var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            Directory.CreateDirectory(wwwrootPath);
+            app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
+            {
+                OnPrepareResponse = ctx =>
+                {
+                    var origin = ctx.Context.Request.Headers["Origin"].ToString();
+                    if (!string.IsNullOrEmpty(origin))
+                    {
+                        var normalized = origin.Trim().TrimEnd('/');
+                        if (allowedCorsOrigins.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                        {
+                            ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", origin);
+                            ctx.Context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
+                            ctx.Context.Response.Headers.Append("Vary", "Origin");
+                            return;
+                        }
+                    }
+
+                    // Fallback: allow any origin for static files if no matching origin found.
+                    ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                }
+            });
 
             // Avoid HTTP->HTTPS redirects in development so the React dev
             // server (http://localhost:5173) can call the HTTP API directly.

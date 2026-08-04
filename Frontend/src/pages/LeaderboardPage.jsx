@@ -191,8 +191,8 @@ export function LeaderboardPage() {
                 </div>
 
                 <div className="flex justify-center items-end gap-3 md:gap-8 pt-8">
-                  {podiumOrder.map((user) => (
-                    <div key={user.userId} className="flex flex-col items-center w-28 md:w-36 transition-transform duration-300 hover:-translate-y-1">
+                  {podiumOrder.map((user, idx) => (
+                    <div key={`${user.userId}-${idx}`} className="flex flex-col items-center w-28 md:w-36 transition-transform duration-300 hover:-translate-y-1">
                       
                       {/* Avatar & Crown block */}
                       <div className="relative mb-3 flex flex-col items-center">
@@ -261,9 +261,9 @@ export function LeaderboardPage() {
                   </div>
                 )}
                 
-                {rankings.map((row) => (
+                {rankings.map((row, idx) => (
                   <div 
-                    key={row.userId} 
+                    key={`${row.userId}-${idx}`} 
                     className={`flex items-center justify-between p-4 transition-colors hover:bg-slate-50/50 group border-l-4 border-transparent ${
                       row.userId === user?.id ? 'bg-blue-50/20 border-l-blue-500' : 'hover:border-l-slate-200'
                     }`}

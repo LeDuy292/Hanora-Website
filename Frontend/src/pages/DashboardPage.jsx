@@ -268,29 +268,32 @@ export function DashboardPage() {
 
       {/* Greeting & Level XP Progress Header (No Import Button) */}
           {user && (
-            <div className="p-6 sm:p-8 bg-white border border-slate-100 rounded-3xl relative overflow-hidden shadow-sm">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="p-6 sm:p-8 bg-white border border-slate-100 rounded-3xl relative overflow-hidden shadow-sm space-y-5">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-sky-400/5 rounded-full blur-3xl pointer-events-none"></div>
 
-              <div className="space-y-4">
-                <span className="text-blue-600 text-xs font-extrabold uppercase tracking-widest block">
+              <div className="space-y-3 relative z-10">
+                <span className="text-blue-600 text-xs sm:text-sm font-black uppercase tracking-widest block">
                   Bảng điều khiển học tập
                 </span>
-                <h2 className="text-2xl font-extrabold font-display text-slate-800">
+                <h2 className="text-3xl sm:text-4xl font-black font-display text-slate-850 tracking-tight">
                   Chào mừng trở lại, {user.name}!
                 </h2>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Cấp độ của bạn: <span className="text-blue-600 font-bold">Level {level}</span> ({xp} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
+                <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-3xl">
+                  Cấp độ hiện tại của bạn: <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 font-black px-2.5 py-0.5 rounded-lg text-xs mx-1">Level {level}</span> ({xp.toLocaleString()} XP). Duy trì thói quen học tập hàng ngày để mở khóa huy hiệu vinh danh.
                 </p>
 
                 {/* Level progress bar */}
-                <div className="space-y-2 pt-1 max-w-xl">
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                    <span>Tiến trình lên Level {level + 1}</span>
-                    <span>{xp} / {nextLevelXp} XP</span>
+                <div className="space-y-2 pt-2 max-w-3xl">
+                  <div className="flex justify-between items-center text-xs text-slate-600 font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                      Tiến trình lên Level {level + 1}
+                    </span>
+                    <span className="font-extrabold text-blue-600">{xp.toLocaleString()} / {nextLevelXp.toLocaleString()} XP</span>
                   </div>
-                  <div className="h-2.5 bg-slate-100 border border-slate-200/50 rounded-full overflow-hidden">
+                  <div className="h-3.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden p-0.5 shadow-inner">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-400 rounded-full transition-all duration-500 shadow-sm"
                       style={{ width: `${levelProgressPercent}%` }}
                     ></div>
                   </div>
@@ -453,7 +456,11 @@ export function DashboardPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={timerState === 'paused' ? resumeTimer : startTimer}
+                          onClick={() => {
+                            localStorage.setItem('hanora_timer_hidden', 'false');
+                            if (timerState === 'paused') resumeTimer();
+                            else startTimer();
+                          }}
                           className="flex-1 flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white py-1 px-1 rounded-lg font-bold transition text-[9px]"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
@@ -697,7 +704,7 @@ export function DashboardPage() {
                   const displayRank = index + 1;
                   return (
                     <div 
-                      key={row.userId} 
+                      key={`${row.userId || 'user'}-${index}`} 
                       className={`flex items-center justify-between px-4 py-3 rounded-2xl transition border ${
                         isCurrentUser 
                           ? 'bg-blue-50/50 border-blue-200 shadow-sm' 

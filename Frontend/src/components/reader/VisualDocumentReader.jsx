@@ -2,6 +2,7 @@
 import { Loader2 } from 'lucide-react';
 import { pinyin } from 'pinyin-pro';
 import PdfVisualReader from './PdfVisualReader';
+import { resolveDocumentAssetUrl } from '../../lib/api';
 
 const normalizePages = (payload) => {
   if (!payload) return [];
@@ -277,13 +278,16 @@ const VisualDocumentReader = ({
   onWordMouseLeave,
 }) => {
   if (!fileUrl) return null;
+  const resolvedFileUrl = resolveDocumentAssetUrl(fileUrl);
+  const resolvedOcrJsonUrl = resolveDocumentAssetUrl(ocrJsonUrl);
+
   if (fileType === 'pdf') {
     return (
       <PdfVisualReader
         documentId={documentId}
-        fileUrl={fileUrl}
+        fileUrl={resolvedFileUrl}
         onWordClick={onWordClick}
-        ocrJsonUrl={ocrJsonUrl}
+        ocrJsonUrl={resolvedOcrJsonUrl}
         currentPage={currentPage}
         onPageChange={onPageChange}
         showPinyin={showPinyin}
@@ -309,8 +313,8 @@ const VisualDocumentReader = ({
   if (fileType === 'image') {
     return (
       <ImageOcrReader
-        fileUrl={fileUrl}
-        ocrJsonUrl={ocrJsonUrl}
+        fileUrl={resolvedFileUrl}
+        ocrJsonUrl={resolvedOcrJsonUrl}
         onWordClick={onWordClick}
         showPinyin={showPinyin}
         annotations={annotations}
