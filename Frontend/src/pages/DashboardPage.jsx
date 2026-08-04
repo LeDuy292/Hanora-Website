@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Flame,
   Clock,
+  Target,
   Bookmark,
   Layers,
   TrendingUp,
@@ -265,13 +266,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ===== Outer 2-Column Dashboard Grid ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* ===== LEFT COLUMN: USER PROGRESS (8/12) ===== */}
-        <div className="lg:col-span-8 space-y-6">
-          
-          {/* Greeting & Level XP Progress Header (No Import Button) */}
+      {/* Greeting & Level XP Progress Header (No Import Button) */}
           {user && (
             <div className="p-6 sm:p-8 bg-white border border-slate-100 rounded-3xl relative overflow-hidden shadow-sm">
               <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -353,292 +348,255 @@ export function DashboardPage() {
 
           </div>
 
-          {/* Grid: Circular Goal vs 7-day Streak Calendar */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-            
-            {/* Goal Ring & Study Timer Card (col-span-5) */}
-            <div className="md:col-span-5 bg-white border border-slate-100 rounded-3xl p-5 flex flex-col justify-between items-center text-center gap-4 shadow-sm relative min-h-[350px]">
-              
-              {/* Header */}
-              <div className="w-full flex justify-between items-start border-b border-slate-50 pb-3">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <span>Mục Tiêu Mỗi Ngày</span>
-                    {!isEditingGoal && (
-                      <button 
-                        onClick={() => {
-                          setTempGoal(targetMinutes);
-                          setIsCustomGoal(![30, 60, 90, 120].includes(targetMinutes));
-                          setIsEditingGoal(true);
-                        }}
-                        className="text-[10px] text-blue-600 hover:text-blue-700 ml-1.5 font-bold hover:underline"
-                      >
-                        (Sửa mục tiêu)
-                      </button>
-                    )}
-                  </h3>
-                </div>
-                <span className="text-[9px] font-black text-slate-400 tracking-wider bg-slate-50 px-2 py-0.5 rounded-md">Hôm nay</span>
+      {/* ===== MAIN DASHBOARD GRID ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans">
+        
+        {/* ===== TOP ROW LEFT: DAILY GOAL & MY RANK (4/12) ===== */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* 1. Daily Goal Card */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <div className="flex items-center gap-2">
+                <Target className="w-4.5 h-4.5 text-blue-600" />
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Mục tiêu hôm nay</h3>
               </div>
+              <button 
+                onClick={() => setIsEditingGoal(!isEditingGoal)} 
+                className="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-xl transition border border-blue-100/50"
+              >
+                {isEditingGoal ? 'Đóng' : 'Thay đổi'}
+              </button>
+            </div>
 
-              {isEditingGoal ? (
-                // Edit daily goal section
-                <div className="flex flex-col gap-4 py-4 w-full max-w-md mx-auto text-left" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Chọn mục tiêu học mỗi ngày</span>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    {[30, 60, 90, 120].map((mins) => (
-                      <label key={mins} className="flex items-center gap-2.5 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2.5 rounded-xl transition text-xs font-bold text-slate-700">
-                        <input
-                          type="radio"
-                          name="dailyGoalPreset"
-                          checked={!isCustomGoal && tempGoal === mins}
-                          onChange={() => {
-                            setTempGoal(mins);
-                            setIsCustomGoal(false);
-                          }}
-                          className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                        />
-                        <span>{mins} phút {mins === 90 ? '(Mặc định)' : ''}</span>
-                      </label>
-                    ))}
-                    <label className="flex items-center gap-2.5 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2.5 rounded-xl transition text-xs font-bold text-slate-700">
+            {isEditingGoal ? (
+              <div className="flex flex-col gap-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Chọn phút học mỗi ngày</span>
+                <div className="grid grid-cols-2 gap-2 mt-0.5">
+                  {[30, 60, 90, 120].map((mins) => (
+                    <label key={mins} className="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2 rounded-xl transition text-xs font-bold text-slate-700">
                       <input
                         type="radio"
                         name="dailyGoalPreset"
-                        checked={isCustomGoal}
-                        onChange={() => setIsCustomGoal(true)}
-                        className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                        checked={!isCustomGoal && tempGoal === mins}
+                        onChange={() => {
+                          setTempGoal(mins);
+                          setIsCustomGoal(false);
+                        }}
+                        className="text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300"
                       />
-                      <span>Khác (tùy chỉnh)</span>
+                      <span>{mins} phút</span>
                     </label>
-                  </div>
-
-                  {isCustomGoal && (
-                    <div className="flex items-center gap-2 mt-2 px-1">
-                      <input 
-                        type="number" 
-                        min="1" 
-                        max="1440" 
-                        value={tempGoal} 
-                        onChange={(e) => setTempGoal(parseInt(e.target.value) || 0)} 
-                        className="w-20 px-3 py-1.5 text-xs border border-slate-250 rounded-lg text-center font-bold text-slate-800 focus:outline-none focus:border-blue-500"
-                      />
-                      <span className="text-xs text-slate-400 font-bold">phút học mỗi ngày</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 mt-2">
-                    <button onClick={() => setIsEditingGoal(false)} className="px-3.5 py-1.5 text-xs bg-white border border-slate-200 text-slate-500 rounded-xl font-bold">Hủy</button>
-                    <button 
-                      onClick={async () => {
-                        if (tempGoal <= 0) return;
-                        try {
-                          const updatedDashboard = await progressApi.setGoal(tempGoal);
-                          setData(updatedDashboard);
-                          setIsEditingGoal(false);
-                          await useAuthStore.getState().refreshStats();
-                          toast.success("Cập nhật mục tiêu thành công!");
-                        } catch (err) {
-                          toast.error(err.message);
-                        }
-                      }}
-                      className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded-xl font-bold"
-                    >
-                      Lưu mục tiêu
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ) : (
-                // Double layout: Left side (Progress Ring) & Right side (Countdown Timer)
-                <div className="flex flex-col sm:flex-row items-center justify-around gap-4 py-4 w-full flex-grow">
-                  
-                  {/* Left Side: Biểu đồ thời gian đã học */}
-                  <div className="flex flex-col items-center text-center gap-2 shrink-0">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Đã học hôm nay</span>
-                    <div className="relative w-28 h-28 flex items-center justify-center select-none">
+
+                <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 mt-1">
+                  <button onClick={() => setIsEditingGoal(false)} className="px-3 py-1 text-xs bg-white border border-slate-200 text-slate-500 rounded-xl font-bold">Hủy</button>
+                  <button 
+                    onClick={async () => {
+                      if (tempGoal <= 0) return;
+                      try {
+                        const updatedDashboard = await progressApi.setGoal(tempGoal);
+                        setData(updatedDashboard);
+                        setIsEditingGoal(false);
+                        await useAuthStore.getState().refreshStats();
+                        toast.success("Cập nhật mục tiêu thành công!");
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="px-3.5 py-1 text-xs bg-blue-600 text-white rounded-xl font-bold"
+                  >
+                    Lưu
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-around gap-4 py-2 w-full">
+                <div className="flex items-center justify-around w-full">
+                  <div className="flex flex-col items-center text-center gap-1 shrink-0">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Đã học</span>
+                    <div className="relative w-24 h-24 flex items-center justify-center select-none">
                       <svg className="w-full h-full transform -rotate-90 z-10 relative" viewBox="0 0 130 130">
                         <circle cx="65" cy="65" r={radius} className="stroke-slate-100 fill-transparent" strokeWidth={strokeWidth} />
                         <circle cx="65" cy="65" r={radius} className="stroke-blue-600 fill-transparent transition-all duration-1000 ease-out" strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" />
                       </svg>
                       <div className="absolute flex flex-col items-center justify-center z-20 w-full h-full">
-                        <span className="text-xl font-black text-slate-800 font-display leading-tight">{progressPercent}%</span>
+                        <span className="text-lg font-black text-slate-800 font-display leading-tight">{progressPercent}%</span>
                       </div>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-700 mt-0.5">
+                    <div className="text-[10px] font-bold text-slate-700 mt-0.5">
                       {Math.round(totalMinsTodayCalculated)} / {targetMinutes} phút
                     </div>
                   </div>
 
-                  {/* Divider line */}
-                  <div className="hidden sm:block h-28 w-px bg-slate-100"></div>
+                  <div className="h-24 w-px bg-slate-100"></div>
 
-                  {/* Right Side: Đồng hồ đếm ngược thời gian mục tiêu */}
-                  <div className="flex flex-col items-center text-center gap-2 flex-grow max-w-[190px]">
+                  <div className="flex flex-col items-center text-center gap-1.5 max-w-[150px]">
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                      {totalMinsTodayCalculated >= targetMinutes ? "Học vượt mục tiêu" : "Đếm ngược"}
+                      {totalMinsTodayCalculated >= targetMinutes ? "Vượt mục tiêu" : "Đếm ngược"}
                     </span>
-                    
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-3 w-full flex flex-col items-center shadow-inner">
-                      {totalMinsTodayCalculated >= targetMinutes ? (
-                        <>
-                          <span className="text-base font-black text-emerald-600 font-mono tracking-tight leading-tight">
-                            +{formatTime(Math.max(0, Math.round((totalMinsTodayCalculated - targetMinutes) * 60)))}
-                          </span>
-                          <span className="text-[7.5px] font-bold mt-0.5 px-1 py-0.5 rounded-full bg-emerald-50 text-emerald-600 uppercase tracking-wider animate-pulse">
-                            Học vượt
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-base font-black text-blue-600 font-mono tracking-tight leading-tight">
-                            {formatTime(Math.max(0, Math.round((targetMinutes - totalMinsTodayCalculated) * 60)))}
-                          </span>
-                          <span className={`text-[7.5px] font-bold mt-0.5 px-1 py-0.5 rounded-full uppercase tracking-wider ${timerState === 'running' ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-amber-50 text-amber-600'}`}>
-                            {timerState === 'running' ? 'Đếm ngược' : 'Tạm dừng'}
-                          </span>
-                        </>
-                      )}
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-2.5 w-full flex flex-col items-center shadow-inner">
+                      <span className="text-sm font-black text-blue-600 font-mono tracking-tight leading-tight">
+                        {formatTime(Math.max(0, Math.round((targetMinutes - totalMinsTodayCalculated) * 60)))}
+                      </span>
                     </div>
 
-                    {/* Controls Row */}
-                    <div className="w-full flex gap-1.5 mt-0.5">
+                    <div className="w-full flex gap-1 mt-0.5">
                       {timerState === 'running' ? (
-                        <>
-                          <button
-                            onClick={pauseTimer}
-                            className="flex-1 flex items-center justify-center gap-0.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
-                          >
-                            <Pause className="w-2.5 h-2.5 fill-current" />
-                            <span>Tạm dừng</span>
-                          </button>
-                          <button
-                            onClick={handleFinishTimer}
-                            className="flex-1 flex items-center justify-center gap-0.5 bg-red-600 hover:bg-red-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
-                          >
-                            <Square className="w-2.5 h-2.5 fill-current" />
-                            <span>Kết thúc</span>
-                          </button>
-                        </>
+                        <button
+                          onClick={pauseTimer}
+                          className="flex-1 flex items-center justify-center gap-0.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-1 px-1 rounded-lg font-bold transition text-[9px]"
+                        >
+                          <Pause className="w-2.5 h-2.5 fill-current" />
+                          <span>Tạm dừng</span>
+                        </button>
                       ) : (
-                        <>
-                          <button
-                            onClick={timerState === 'paused' ? resumeTimer : startTimer}
-                            className="flex-1 flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
-                          >
-                            <Play className="w-2.5 h-2.5 fill-current" />
-                            <span>{timerState === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}</span>
-                          </button>
-                          {timerState === 'paused' && (
-                            <button
-                              onClick={handleFinishTimer}
-                              className="flex-1 flex items-center justify-center gap-0.5 bg-red-600 hover:bg-red-700 text-white py-1.5 px-1.5 rounded-xl font-bold transition text-[10px]"
-                            >
-                              <Square className="w-2.5 h-2.5 fill-current" />
-                              <span>Kết thúc</span>
-                            </button>
-                          )}
-                        </>
+                        <button
+                          onClick={timerState === 'paused' ? resumeTimer : startTimer}
+                          className="flex-1 flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white py-1 px-1 rounded-lg font-bold transition text-[9px]"
+                        >
+                          <Play className="w-2.5 h-2.5 fill-current" />
+                          <span>{timerState === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}</span>
+                        </button>
                       )}
                     </div>
-
                   </div>
-
                 </div>
-              )}
 
-              {/* Bottom Status text */}
-              {!isEditingGoal && (
-                <div className="text-[10px] text-slate-550 font-semibold leading-relaxed px-1 border-t border-slate-50 pt-2 text-center w-full">
-                  {totalMinsTodayCalculated >= targetMinutes ? (
-                    <span className="text-blue-600 font-bold">
-                      🎉 Đã đạt mục tiêu ngày! +1 XP/10 phút học thêm.
-                    </span>
-                  ) : (
-                    <span>
-                      Còn {Math.max(0, Math.ceil(targetMinutes - totalMinsTodayCalculated))} phút nữa để đạt mục tiêu.
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+                {!isEditingGoal && (
+                  <div className="text-[9.5px] text-slate-500 font-semibold border-t border-slate-50 pt-2 text-center w-full">
+                    {totalMinsTodayCalculated >= targetMinutes ? (
+                      <span className="text-blue-600 font-bold">🎉 Đã đạt mục tiêu ngày!</span>
+                    ) : (
+                      <span>Còn {Math.max(0, Math.ceil(targetMinutes - totalMinsTodayCalculated))} phút nữa để hoàn thành.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-            {/* Streak Calendar Card (col-span-7) */}
-            <div className="md:col-span-7 relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
-              <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
-
-              <div className="flex flex-col xl:flex-row justify-between items-start gap-6 relative z-10">
-                <div className="max-w-xl">
-                  <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-bold">
-                    Chuỗi ngày học
+          {/* 2. My Personal Rank Card */}
+          <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-3xl p-5 shadow-lg text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <span className="text-[9px] text-blue-100 font-bold uppercase tracking-widest block">Thứ hạng cá nhân</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-black">
+                    {leaderboardData?.currentUser ? `#${leaderboardData.currentUser.rank}` : '—'}
                   </span>
-                  <div className="flex items-center gap-6 mt-2">
-                    <div className="flex flex-col">
-                      <h3 className="text-[5rem] font-extrabold tracking-tighter text-white leading-[1]">
-                        {streak}
-                      </h3>
-                      <p className="text-sm font-bold uppercase tracking-wider text-blue-100/90 mt-1">
-                        NGÀY LIÊN TIẾP
-                      </p>
-                    </div>
-                    <div className="rounded-[2rem] bg-white/10 p-4 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FFB03A] to-[#FF8116] shadow-[0_4px_12px_rgba(255,129,22,0.5)]">
-                        <Flame className="h-6 w-6 text-white drop-shadow-sm" fill="currentColor" />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Panda Image / Mascot */}
-                <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
-                  <img src={streakBadgeImg} alt="Mascot" className="w-[100px] h-[100px] object-cover rounded-[1.5rem]" />
+                  <span className="text-[10px] text-blue-100/90 font-bold">
+                    / {leaderboardData?.rankings ? leaderboardData.rankings.length + (leaderboardData.top3?.length || 0) : '0'} người học
+                  </span>
                 </div>
               </div>
-
-              <div className="mt-8 rounded-[1.5rem] bg-white/10 border border-white/15 p-5 backdrop-blur-md relative z-10">
-                <div className="flex justify-between items-center mb-5">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-white">
-                      TUẦN NÀY
-                    </p>
-                    <p className="text-[11px] text-blue-100 mt-1 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
-                  </div>
-                  <div className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
-                    {streak} NGÀY
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center px-1">
-                  {streakDisplayDays.map((day, idx) => (
-                    <div key={idx} className="flex flex-col items-center gap-2">
-                      <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm transition shadow-sm ${
-                        day.completed 
-                          ? 'bg-white text-[#1E5BDB]' 
-                          : day.isPast
-                            ? 'bg-red-500/20 border border-red-500/50 text-red-200'
-                            : 'border border-white/20 bg-white/5 text-blue-100'
-                      }`}>
-                        {day.completed ? (
-                          <Check className="h-5 w-5" strokeWidth={3} />
-                        ) : day.isPast ? (
-                          <X className="h-5 w-5" strokeWidth={3} />
-                        ) : (
-                          <span className="font-bold">{day.name}</span>
-                        )}
-                      </div>
-                      <span className="text-[10px] sm:text-[11px] font-bold text-blue-100">
-                        {day.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-5 text-xs sm:text-[13px] leading-relaxed text-blue-100/90 font-medium relative z-10">
-                Tiếp tục học mỗi ngày và giữ chuỗi ổn định. Bạn đang trên đường xây dựng thói quen học tiếng Trung bền vững.
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/20 shadow-xs">
+                <Award className="w-5 h-5 text-yellow-300" />
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-2.5 border-t border-white/10 pt-3 text-xs font-bold">
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Cấp độ</span>
+                <span className="text-sm">{level}</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Tổng điểm XP</span>
+                <span className="text-sm">{xp.toLocaleString()} XP</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Từ vựng đã lưu</span>
+                <span className="text-sm">{wordsSaved} từ</span>
+              </div>
+              <div>
+                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Chuỗi ngày (Streak)</span>
+                <span className="text-sm">{streak} ngày</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 mt-3.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 w-fit">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>↑ Tiếp tục học để tăng hạng tuần này</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ===== TOP ROW RIGHT: STREAK & CHART (8/12) ===== */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Streak Calendar Card */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
+
+            <div className="flex flex-col xl:flex-row justify-between items-start gap-6 relative z-10">
+              <div className="max-w-xl">
+                <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-bold">
+                  Chuỗi ngày học liên tiếp
+                </span>
+                <div className="flex items-center gap-6 mt-2">
+                  <div className="flex flex-col">
+                    <h3 className="text-[4.5rem] font-extrabold tracking-tighter text-white leading-[1]">
+                      {streak}
+                    </h3>
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-100/90 mt-1">
+                      NGÀY LIÊN TIẾP
+                    </p>
+                  </div>
+                  <div className="rounded-[2rem] bg-white/10 p-3.5 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b from-[#FFB03A] to-[#FF8116] shadow-[0_4px_12px_rgba(255,129,22,0.5)]">
+                      <Flame className="h-5.5 w-5.5 text-white drop-shadow-sm" fill="currentColor" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] bg-gradient-to-b from-[#7FB2FF]/30 to-[#4E8DFF]/30 p-2 border border-white/20 shadow-inner backdrop-blur-md hidden sm:block overflow-hidden relative">
+                <img src={streakBadgeImg} alt="Mascot" className="w-[90px] h-[90px] object-cover rounded-[1.5rem]" />
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[1.5rem] bg-white/10 border border-white/15 p-4.5 backdrop-blur-md relative z-10">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-white">
+                    TUẦN NÀY
+                  </p>
+                  <p className="text-[11px] text-blue-100 mt-0.5 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
+                </div>
+                <div className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
+                  {streak} NGÀY
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center px-1">
+                {streakDisplayDays.map((day, idx) => (
+                  <div key={idx} className="flex flex-col items-center gap-1.5">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-xs transition shadow-sm ${
+                      day.completed 
+                        ? 'bg-white text-[#1E5BDB]' 
+                        : day.isPast
+                          ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                          : 'border border-white/20 bg-white/5 text-blue-100'
+                    }`}>
+                      {day.completed ? (
+                        <Check className="h-4.5 w-4.5" strokeWidth={3} />
+                      ) : day.isPast ? (
+                        <X className="h-4.5 w-4.5" strokeWidth={3} />
+                      ) : (
+                        <span className="font-bold">{day.name}</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-100">
+                      {day.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Vocabulary Growth SVG Line Chart */}
@@ -682,228 +640,196 @@ export function DashboardPage() {
             </div>
           </div>
 
-
         </div>
 
-        {/* ===== RIGHT COLUMN: LEADERBOARD & COMPETITION (4/12) ===== */}
-        <div className="lg:col-span-4 space-y-6">
-          
-          {/* 1. MY RANK CARD (Top Preference) */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 shadow-lg text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-            
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <span className="text-[9px] text-blue-100 font-bold uppercase tracking-widest block">Hạng của bạn</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-4xl font-black">
-                    {leaderboardData?.currentUser ? `#${leaderboardData.currentUser.rank}` : '—'}
-                  </span>
-                  <span className="text-[10px] text-blue-100/90 font-bold">
-                    / {leaderboardData?.rankings ? leaderboardData.rankings.length + (leaderboardData.top3?.length || 0) : '0'} người
-                  </span>
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/20">
-                <Award className="w-5 h-5 text-yellow-300" />
-              </div>
-            </div>
+      </div>
 
-            <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-3 text-xs font-bold">
-              <div>
-                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Cấp độ</span>
-                <span className="text-sm">{level}</span>
-              </div>
-              <div>
-                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Tổng XP</span>
-                <span className="text-sm">{xp} XP</span>
-              </div>
-              <div>
-                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Từ đã lưu</span>
-                <span className="text-sm">{wordsSaved} từ</span>
-              </div>
-              <div>
-                <span className="text-blue-100/70 text-[9px] uppercase tracking-wider block font-black">Ngày Streak</span>
-                <span className="text-sm">{streak} ngày</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 mt-4 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 w-fit">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>↑ Giữ vững phong độ tuần này</span>
-            </div>
-          </div>
-
-          {/* 2. LEADERBOARD TOP 10 CARD */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-              <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wide">
-                <Trophy className="w-4 h-4 text-yellow-500 fill-yellow-500/10" />
-                Bảng Xếp Hạng
+      {/* ===== MIDDLE ROW: SPACIOUS LEADERBOARD & REWARDS ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans mt-6">
+        
+        {/* LEADERBOARD (8/12 - SPACIOUS WIDE VIEW) */}
+        <div className="lg:col-span-8 bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500 fill-yellow-500/10" />
+                Bảng Xếp Hạng Người Học
               </h3>
-              
-              {/* Short Period Selector Tabs */}
-              <div className="flex bg-slate-50 border border-slate-100 rounded-xl p-0.5">
-                {[
-                  { id: 'today', label: 'Hôm nay' },
-                  { id: 'weekly', label: 'Tuần' },
-                  { id: 'monthly', label: 'Tháng' },
-                  { id: 'global', label: 'Tất cả' }
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setLeaderboardPeriod(p.id)}
-                    className={`px-2.5 py-1 rounded-lg text-[9px] font-black transition-all ${
-                      leaderboardPeriod === p.id 
-                        ? 'bg-white text-blue-605 shadow-xs border border-slate-200/30' 
-                        : 'text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">Xếp hạng tính theo tổng điểm kinh nghiệm (XP)</p>
             </div>
-
-            {/* Top 10 list */}
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-0.5">
-              {leaderboardLoading ? (
-                <div className="text-center py-8 text-slate-400 text-xs font-bold animate-pulse">
-                  Đang tải xếp hạng...
-                </div>
-              ) : (
-                <>
-                  {[
-                    ...(leaderboardData?.top3 || []),
-                    ...(leaderboardData?.rankings || [])
-                  ].slice(0, 10).map((row, index) => {
-                    const isCurrentUser = row.userId === user?.id;
-                    const displayRank = index + 1;
-                    return (
-                      <div 
-                        key={row.userId} 
-                        className={`flex items-center justify-between p-2 rounded-xl transition border ${
-                          isCurrentUser 
-                            ? 'bg-blue-50/40 border-blue-200 shadow-xs' 
-                            : 'bg-slate-50/30 border-transparent hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={`w-5 text-center text-[10px] font-black ${
-                            displayRank === 1 ? 'text-yellow-500 text-xs' : displayRank === 2 ? 'text-slate-400' : displayRank === 3 ? 'text-amber-600' : 'text-slate-405'
-                          }`}>
-                            #{displayRank}
-                          </span>
-                          
-                          {/* Avatar */}
-                          <div className="w-7.5 h-7.5 rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shrink-0">
-                            {row.avatarUrl ? (
-                              <img src={row.avatarUrl} alt={row.displayName} className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                              <div className="w-full h-full rounded-full bg-slate-250 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase">
-                                {row.displayName.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <span className={`text-[11px] font-bold block truncate max-w-[110px] ${isCurrentUser ? 'text-blue-600' : 'text-slate-800'}`}>
-                              {row.displayName}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[8px] font-black text-slate-400">Lvl {row.level}</span>
-                              <span className="text-[8px] text-slate-400 font-bold flex items-center gap-0.5">
-                                &bull; {row.streak} ngày
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* XP score */}
-                        <div className="text-right">
-                          <span className="text-[11px] font-black text-slate-805 block">
-                            {row.score.toLocaleString()} XP
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Highlight current user if not in top 10 */}
-                  {leaderboardData?.currentUser && leaderboardData.currentUser.rank > 10 && (
-                    <>
-                      <div className="text-center text-slate-300 font-bold py-1 select-none tracking-widest">...</div>
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/40 border border-blue-200 shadow-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="w-5 text-center text-[10px] font-black text-blue-600">
-                            #{leaderboardData.currentUser.rank}
-                          </span>
-                          <div className="w-7.5 h-7.5 rounded-full border border-blue-100 overflow-hidden flex items-center justify-center shrink-0 bg-blue-100 text-blue-600 text-[10px] font-black">
-                            B
-                          </div>
-                          <div>
-                            <span className="text-[11px] font-black text-blue-600 block">Bạn</span>
-                            <span className="text-[8px] font-bold text-slate-400">Lvl {level} &bull; {streak} ngày</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[11px] font-black text-blue-600 block">
-                            {leaderboardData.currentUser.score.toLocaleString()} XP
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
+            
+            {/* Period Selector Tabs */}
+            <div className="flex bg-slate-50 border border-slate-150 rounded-2xl p-1 self-start sm:self-auto">
+              {[
+                { id: 'today', label: 'Hôm nay' },
+                { id: 'weekly', label: 'Tuần này' },
+                { id: 'monthly', label: 'Tháng này' },
+                { id: 'global', label: 'Tất cả' }
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setLeaderboardPeriod(p.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                    leaderboardPeriod === p.id 
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* 3. WEEKLY REWARDS CARD */}
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-5 text-white shadow-xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/5 rounded-full blur-3xl pointer-events-none"></div>
+          {/* Top 10 list — SPACIOUS DESIGN */}
+          <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+            {leaderboardLoading ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-bold animate-pulse">
+                Đang cập nhật bảng xếp hạng...
+              </div>
+            ) : (
+              <>
+                {[
+                  ...(leaderboardData?.top3 || []),
+                  ...(leaderboardData?.rankings || [])
+                ].slice(0, 10).map((row, index) => {
+                  const isCurrentUser = row.userId === user?.id;
+                  const displayRank = index + 1;
+                  return (
+                    <div 
+                      key={row.userId} 
+                      className={`flex items-center justify-between px-4 py-3 rounded-2xl transition border ${
+                        isCurrentUser 
+                          ? 'bg-blue-50/50 border-blue-200 shadow-sm' 
+                          : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        {/* Rank Badge */}
+                        <div className="w-8 text-center shrink-0">
+                          {displayRank === 1 ? (
+                            <span className="text-lg">🥇</span>
+                          ) : displayRank === 2 ? (
+                            <span className="text-lg">🥈</span>
+                          ) : displayRank === 3 ? (
+                            <span className="text-lg">🥉</span>
+                          ) : (
+                            <span className="text-xs font-black text-slate-400">#{displayRank}</span>
+                          )}
+                        </div>
+                        
+                        {/* Avatar */}
+                        <div className="w-10 h-10 rounded-full border border-slate-150 p-0.5 overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
+                          {row.avatarUrl ? (
+                            <img src={row.avatarUrl} alt={row.displayName} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 uppercase">
+                              {row.displayName.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Display Name & Details */}
+                        <div className="min-w-0">
+                          <span className={`text-sm font-extrabold block truncate ${isCurrentUser ? 'text-blue-600' : 'text-slate-800'}`}>
+                            {row.displayName} {isCurrentUser && <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-100 px-2 py-0.5 rounded-md ml-2">BẠN</span>}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-md border border-slate-200/60">
+                              Lvl {row.level}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
+                              <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/20 inline" /> {row.streak} ngày streak
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* XP score */}
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-black text-slate-800 block">
+                          {row.score.toLocaleString()} <span className="text-xs text-blue-600">XP</span>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Highlight current user if not in top 10 */}
+                {leaderboardData?.currentUser && leaderboardData.currentUser.rank > 10 && (
+                  <>
+                    <div className="text-center text-slate-300 font-bold py-1 select-none tracking-widest">...</div>
+                    <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-blue-50/60 border border-blue-200 shadow-sm">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <span className="w-8 text-center text-xs font-black text-blue-600">
+                          #{leaderboardData.currentUser.rank}
+                        </span>
+                        <div className="w-10 h-10 rounded-full border border-blue-200 overflow-hidden flex items-center justify-center shrink-0 bg-blue-100 text-blue-600 text-xs font-black">
+                          B
+                        </div>
+                        <div>
+                          <span className="text-sm font-extrabold text-blue-600 block">Bạn</span>
+                          <span className="text-[10px] font-bold text-slate-500">Lvl {level} &bull; {streak} ngày streak</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-black text-blue-600 block">
+                          {leaderboardData.currentUser.score.toLocaleString()} XP
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* WEEKLY REWARDS CARD (4/12) */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 text-white shadow-xl h-full flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-3xl pointer-events-none"></div>
             
             <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-yellow-450/20 border border-yellow-450/30 flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-yellow-400 fill-yellow-400/20" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-yellow-400/20 border border-yellow-400/30 flex items-center justify-center">
+                  <Crown className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-wide">Giải Thưởng Tuần</h3>
-                  <p className="text-[9px] text-white/40 font-medium">Nhận giải 00:00 Thứ Hai hàng tuần</p>
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">Giải Thưởng Tuần</h3>
+                  <p className="text-[10px] text-white/50 font-medium">Quy đổi 00:00 Thứ Hai hàng tuần</p>
                 </div>
               </div>
 
               {/* Reward list */}
-              <div className="space-y-2.5 pt-1.5 text-[11px] font-semibold text-slate-350">
-                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2">
-                  <span className="flex items-center gap-1.5">🥇 <span>Top 1</span></span>
-                  <span className="text-yellow-400 font-black">+1,000 XP</span>
+              <div className="space-y-2.5 pt-2 text-xs font-semibold text-slate-300">
+                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3">
+                  <span className="flex items-center gap-2">🥇 <span className="font-extrabold text-white">Top 1</span></span>
+                  <span className="text-yellow-400 font-black text-sm">+1,000 XP</span>
                 </div>
-                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
-                  <span className="flex items-center gap-1.5">🥈 <span>Top 2</span></span>
-                  <span className="font-bold">+700 XP</span>
+                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3">
+                  <span className="flex items-center gap-2">🥈 <span className="font-extrabold text-white">Top 2</span></span>
+                  <span className="font-bold text-slate-200">+700 XP</span>
                 </div>
-                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
-                  <span className="flex items-center gap-1.5">🥉 <span>Top 3</span></span>
-                  <span className="font-bold">+500 XP</span>
+                <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3">
+                  <span className="flex items-center gap-2">🥉 <span className="font-extrabold text-white">Top 3</span></span>
+                  <span className="font-bold text-slate-200">+500 XP</span>
                 </div>
-                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
-                  <span className="flex items-center gap-1.5">🎖️ <span>Top 4-5</span></span>
-                  <span className="font-bold">+300 XP</span>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-2xl p-3">
+                  <span className="flex items-center gap-2">🎖️ <span>Top 4-5</span></span>
+                  <span className="font-bold text-slate-400">+300 XP</span>
                 </div>
-                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2">
-                  <span className="flex items-center gap-1.5">🎖️ <span>Top 6-10</span></span>
-                  <span className="font-bold">+200 XP</span>
+                <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-2xl p-3">
+                  <span className="flex items-center gap-2">🎖️ <span>Top 6-10</span></span>
+                  <span className="font-bold text-slate-400">+200 XP</span>
                 </div>
-              </div>
-              
-              <div className="text-[9.5px] text-white/45 font-medium leading-relaxed mt-1 text-center border-t border-white/5 pt-2">
-                Phần thưởng sẽ được trao lúc 00:00 thứ Hai hàng tuần.
               </div>
             </div>
-          </div>
 
+            <div className="text-[10px] text-white/40 font-medium leading-relaxed text-center border-t border-white/10 pt-3 mt-4 relative z-10">
+              Phần thưởng XP sẽ tự động cộng vào tài khoản khi tuần kết thúc.
+            </div>
+          </div>
         </div>
 
       </div>
