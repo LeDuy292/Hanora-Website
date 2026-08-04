@@ -192,6 +192,16 @@ public class StatsService : IStatsService
         {
             await AwardXpAsync(userId, 20, "Đọc dịch đủ 15 phút");
         }
+
+        // Award extra XP for studying beyond daily goal (+1 XP per 10 minutes)
+        int goalTarget = await _statsRepo.GetDailyGoalMinutesAsync(userId);
+        int oldExtra = Math.Max(0, oldMinutes - goalTarget);
+        int newExtra = Math.Max(0, newMinutes - goalTarget);
+        int extraXpToAward = (newExtra / 10) - (oldExtra / 10);
+        if (extraXpToAward > 0)
+        {
+            await AwardXpAsync(userId, extraXpToAward, $"Học vượt mục tiêu ({newExtra} phút)");
+        }
     }
 
     public async Task TrackPronunciationScoreAsync(long userId, double score)
