@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Flame, Sparkles, LogOut, Menu, X } from 'lucide-react';
+import { Flame, Sparkles, LogOut, Menu, X, Clock } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useTimerStore } from '../../store/timerStore';
 import logoImg from '../../assets/logo.png';
 
 export function Header({ offsetTop }) {
   const { user, logout, refreshProfile } = useAuthStore();
+  const toggleWidget = useTimerStore((s) => s.toggleWidget);
+  const isTimerHidden = useTimerStore((s) => s.isHidden);
+  const timerState = useTimerStore((s) => s.timerState);
 
   useEffect(() => {
     if (user) {
@@ -75,8 +79,7 @@ export function Header({ offsetTop }) {
         {user ? (
           <div className="flex items-center gap-4">
             <div className="hidden xl:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
-               <div className="flex items-center gap-1.5 text-white">
-
+              <div className="flex items-center gap-1.5 text-white">
                 <Flame className="w-4 h-4 fill-white/20" />
                 <span>{user.streak ?? 0} NGÀY</span>
               </div>
@@ -85,6 +88,19 @@ export function Header({ offsetTop }) {
                 <span>{user.xp ?? 0} XP</span>
               </div>
             </div>
+
+            <button
+              onClick={toggleWidget}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-sm ${
+                timerState === 'running'
+                  ? 'bg-white text-blue-600 border-white shadow-blue-500/20'
+                  : 'bg-white/15 text-white border-white/20 hover:bg-white/25'
+              }`}
+              title={isTimerHidden ? "Bật đồng hồ học tập nổi" : "Ẩn đồng hồ học tập nổi"}
+            >
+              <Clock className={`w-3.5 h-3.5 ${timerState === 'running' ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
+              <span>Đồng hồ</span>
+            </button>
 
             <NavLink
               to="/profile"

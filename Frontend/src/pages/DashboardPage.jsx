@@ -66,6 +66,7 @@ export function DashboardPage() {
   const pauseTimer = useTimerStore((s) => s.pauseTimer);
   const resumeTimer = useTimerStore((s) => s.resumeTimer);
   const finishTimer = useTimerStore((s) => s.finishTimer);
+  const showWidget = useTimerStore((s) => s.showWidget);
 
   const formatTime = (totalSeconds) => {
     const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
@@ -403,7 +404,11 @@ export function DashboardPage() {
                         setData(updatedDashboard);
                         setIsEditingGoal(false);
                         await useAuthStore.getState().refreshStats();
-                        toast.success("Cập nhật mục tiêu thành công!");
+                        showWidget();
+                        if (timerState === 'inactive') {
+                          startTimer();
+                        }
+                        toast.success(`Đã lưu mục tiêu ${tempGoal} phút/ngày và bật đồng hồ học tập nổi!`);
                       } catch (err) {
                         toast.error(err.message);
                       }
@@ -457,7 +462,7 @@ export function DashboardPage() {
                       ) : (
                         <button
                           onClick={() => {
-                            localStorage.setItem('hanora_timer_hidden', 'false');
+                            showWidget();
                             if (timerState === 'paused') resumeTimer();
                             else startTimer();
                           }}
