@@ -217,6 +217,23 @@ const ReaderPage = () => {
   // Document Store & Folder Management
   const { folders, addFolder, renameFolder, deleteFolder, moveDocumentToFolder, documents: storeDocs } = useDocumentStore();
   const [activeFolderId, setActiveFolderId] = useState(null); // null = All
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [activeDocMenuId, setActiveDocMenuId] = useState(null);
+  const [activeFolderMenuId, setActiveFolderMenuId] = useState(null);
+
+  // Settings
+  const [fontMode, setFontMode] = useState('sans'); // sans, serif, kaiti
+  const themeMode = 'light';
+  const readMode = 'normal';
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState('dict'); // dict, chat, stats
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
+  const [readerSidebarTop, setReaderSidebarTop] = useState(216);
+  const [readerSidebarBottom, setReaderSidebarBottom] = useState(8);
 
   // Document Dropdown list
   const [docSearchQuery, setDocSearchQuery] = useState('');
