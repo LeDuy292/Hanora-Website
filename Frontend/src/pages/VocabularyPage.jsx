@@ -721,88 +721,6 @@ export function VocabularyPage() {
             )}
           </div>
 
-          {/* Pagination — TOP POSITION */}
-          {filteredVocabulary.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-4 border border-slate-200/80 rounded-2xl p-4 bg-white shadow-sm font-sans">
-              
-              {/* Left spacer for centering the middle column */}
-              <div className="hidden sm:block"></div>
-              
-              {/* Pagination arrows and indexes */}
-              <div className="flex flex-col items-center justify-center gap-1.5 col-span-1">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                      currentPage === 1 
-                        ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed shadow-none' 
-                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 active:scale-95 shadow-sm'
-                    }`}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  {pageNumbers.map((pNum, index) => {
-                    if (pNum === '...') {
-                      return (
-                        <span key={`ellipsis-${index}`} className="w-9 h-9 flex items-center justify-center text-slate-400 text-xs font-bold select-none">
-                          ...
-                        </span>
-                      );
-                    }
-                    const isActive = currentPage === pNum;
-                    return (
-                      <button
-                        key={pNum}
-                        onClick={() => setCurrentPage(pNum)}
-                        className={`w-9 h-9 rounded-xl border flex items-center justify-center text-xs font-bold transition-all active:scale-95 ${
-                          isActive
-                            ? 'bg-blue-50 border-blue-500/30 text-blue-600 ring-2 ring-blue-500/10'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'
-                        }`}
-                      >
-                        {pNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                      currentPage === totalPages 
-                        ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed shadow-none' 
-                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 active:scale-95 shadow-sm'
-                    }`}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-none">
-                  Trang {currentPage} / {totalPages}
-                </div>
-              </div>
-
-              {/* Items per page selector dropdown */}
-              <div className="flex justify-center sm:justify-end">
-                <div className="relative">
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 h-9 rounded-xl focus:outline-none transition-colors cursor-pointer shadow-sm"
-                  >
-                    <option value={10}>10 / trang</option>
-                    <option value={20}>20 / trang</option>
-                    <option value={50}>50 / trang</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* MAIN VOCABULARY DATATABLE */}
           <div id="vocabulary-table" className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm font-sans">
             <div className="overflow-x-auto">
@@ -960,6 +878,88 @@ export function VocabularyPage() {
               </table>
             </div>
           </div>
+
+          {/* Pagination — BOTTOM POSITION */}
+          {filteredVocabulary.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-4 border border-slate-200/80 rounded-2xl p-4 bg-white shadow-sm font-sans">
+              
+              {/* Left spacer for centering the middle column */}
+              <div className="hidden sm:block"></div>
+              
+              {/* Pagination arrows and indexes */}
+              <div className="flex flex-col items-center justify-center gap-1.5 col-span-1">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                      currentPage === 1 
+                        ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed shadow-none' 
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 active:scale-95 shadow-sm'
+                    }`}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  {pageNumbers.map((pNum, index) => {
+                    if (pNum === '...') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="w-9 h-9 flex items-center justify-center text-slate-400 text-xs font-bold select-none">
+                          ...
+                        </span>
+                      );
+                    }
+                    const isActive = currentPage === pNum;
+                    return (
+                      <button
+                        key={pNum}
+                        onClick={() => setCurrentPage(pNum)}
+                        className={`w-9 h-9 rounded-xl border flex items-center justify-center text-xs font-bold transition-all active:scale-95 ${
+                          isActive
+                            ? 'bg-blue-50 border-blue-500/30 text-blue-600 ring-2 ring-blue-500/10'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'
+                        }`}
+                      >
+                        {pNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                      currentPage === totalPages 
+                        ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed shadow-none' 
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 active:scale-95 shadow-sm'
+                    }`}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-none">
+                  Trang {currentPage} / {totalPages}
+                </div>
+              </div>
+
+              {/* Items per page selector dropdown */}
+              <div className="flex justify-center sm:justify-end">
+                <div className="relative">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 h-9 rounded-xl focus:outline-none transition-colors cursor-pointer shadow-sm"
+                  >
+                    <option value={10}>10 / trang</option>
+                    <option value={20}>20 / trang</option>
+                    <option value={50}>50 / trang</option>
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar Area */}
