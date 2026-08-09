@@ -139,7 +139,7 @@ export function PronunciationPage() {
                 {lesson.level}
               </span>
               <span className="text-slate-400 flex items-center gap-1 font-bold text-[13px]">
-                <span className="material-symbols-outlined text-[16px]">schedule</span> 
+                <span className="material-symbols-outlined notranslate text-[16px]" translate="no">schedule</span> 
                 {lesson.duration}
               </span>
             </div>
@@ -156,7 +156,7 @@ export function PronunciationPage() {
               onClick={() => handleStartPractice(lesson.id)}
               className="w-full py-2.5 bg-slate-50 text-[#2088E2] font-black rounded-full hover:bg-[#2088E2] hover:text-white transition-all flex items-center justify-center gap-2 text-[15px] active:scale-95 shadow-sm"
             >
-              <span className="material-symbols-outlined text-[20px]">record_voice_over</span>
+              <span className="material-symbols-outlined notranslate text-[20px]" translate="no">record_voice_over</span>
               Luyện tập ngay
             </button>
           </div>
@@ -171,7 +171,7 @@ export function PronunciationPage() {
                   {challenge.level} - Thử thách
                 </span>
                 <span className="text-slate-400 flex items-center gap-1 font-bold text-[13px]">
-                  <span className="material-symbols-outlined text-[16px]">wb_sunny</span> 
+                  <span className="material-symbols-outlined notranslate text-[16px]" translate="no">wb_sunny</span> 
                   Bonus Point
                 </span>
               </div>
@@ -204,7 +204,7 @@ export function PronunciationPage() {
         {/* Custom Card based on User Snippet 100% */}
         <button className="border-2 border-dashed border-slate-200 p-6 rounded-[24px] flex flex-col items-center justify-center gap-4 hover:border-[#2088E2] hover:bg-white transition-all min-h-[250px] group shadow-sm active:scale-95 bg-white/50">
           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 group-hover:bg-blue-100 group-hover:text-[#2088E2] transition-colors">
-            <span className="material-symbols-outlined text-[28px]">add</span>
+            <span className="material-symbols-outlined notranslate text-[28px]" translate="no">add</span>
           </div>
           <div className="text-center">
             <p className="font-bold text-slate-700 text-[16px] mb-1">Thêm nội dung riêng</p>
@@ -218,7 +218,7 @@ export function PronunciationPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowComingSoon(false)}>
           <div className="bg-white rounded-[24px] p-8 max-w-sm w-full shadow-2xl text-center flex flex-col items-center" onClick={e => e.stopPropagation()}>
             <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-[16px] flex items-center justify-center mb-5 border border-blue-100">
-              <span className="material-symbols-outlined text-[32px]">construction</span>
+              <span className="material-symbols-outlined notranslate text-[32px]" translate="no">construction</span>
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2 font-display">Đang Phát Triển</h3>
             <p className="text-slate-500 text-sm mb-8 leading-relaxed">
