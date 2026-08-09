@@ -2835,41 +2835,6 @@ const ReaderPage = () => {
 
                     </div>
                   </div>
-
-                  {/* Pagination bar */}
-                  {!showVisualReader && textTotalPages > 1 && (
-                    <div className="mt-2 shrink-0 flex flex-col items-center justify-center border-t border-slate-100/60 pt-3 pb-1">
-                      <div className="flex items-center gap-6">
-                        <button
-                          onClick={() => {
-                            setCurrentPage(p => Math.max(1, p - 1));
-                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          disabled={validCurrentPage === 1}
-                          className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          title="Trang trước"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-
-                        <span className="text-xs font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80 shadow-sm">
-                          Trang {validCurrentPage} / {textTotalPages}
-                        </span>
-
-                        <button
-                          onClick={() => {
-                            setCurrentPage(p => Math.min(textTotalPages, p + 1));
-                            readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          disabled={validCurrentPage === textTotalPages}
-                          className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          title="Trang tiếp theo"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </>
             )}
