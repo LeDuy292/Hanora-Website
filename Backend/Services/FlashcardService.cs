@@ -564,14 +564,19 @@ public class FlashcardService : IFlashcardService
         var masteredWords = decks.Sum(d => d.Flashcards.Count(f => f.LearnStatus == "mastered"));
         var learningWords = decks.Sum(d => d.Flashcards.Count(f => f.LearnStatus != "new" && f.LearnStatus != "mastered"));
 
-        // Calculate words due for review (SRS)
+        // Calculate words due for review (SRS) - deduplicated by unique UserVocabulary
         var now = DateTime.UtcNow;
-        var dueForReview = decks.Sum(d => d.Flashcards.Count(f =>
-        {
-            if (f.UserVocabulary == null || f.UserVocabulary.LastReviewed == null) return false;
-            var daysToAdd = f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1;
-            return f.UserVocabulary.LastReviewed.Value.AddDays(daysToAdd) <= now;
-        }));
+        var dueForReview = decks
+            .SelectMany(d => d.Flashcards)
+            .Where(f =>
+            {
+                if (f.UserVocabulary == null || f.UserVocabulary.LastReviewed == null) return false;
+                var daysToAdd = f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1;
+                return f.UserVocabulary.LastReviewed.Value.AddDays(daysToAdd) <= now;
+            })
+            .Select(f => f.UserVocabularyId)
+            .Distinct()
+            .Count();
 
         // Calculate total XP from flashcard activities
         var userStats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);

@@ -168,8 +168,20 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
-  const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies } = useVocabularyStore();
+  const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies, fetchUserFlashcards } = useVocabularyStore();
   const { addXp } = useAuthStore();
+
+  // Fetch latest saved vocabulary from backend when page mounts
+  useEffect(() => {
+    fetchUserFlashcards();
+  }, [fetchUserFlashcards]);
+
+  // Close action dropdown menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = () => setOpenActionMenu(null);
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
@@ -278,9 +290,20 @@ export function VocabularyPage() {
   // Star state inside this UI (synchronizes with store where applicable)
   const [localStarred, setLocalStarred] = useState({});
 
-  // Map user vocabulary to consistent structure
+  // Map user vocabulary to consistent structure (deduplicated by unique word text)
   const fullVocabularyDataset = useMemo(() => {
-    return vocabList.map((w, index) => {
+    const seenWords = new Set();
+    const uniqueVocab = [];
+    for (const w of vocabList) {
+      const cleanText = (w?.text || '').trim();
+      if (!cleanText) continue;
+      if (!seenWords.has(cleanText)) {
+        seenWords.add(cleanText);
+        uniqueVocab.push(w);
+      }
+    }
+
+    return uniqueVocab.map((w, index) => {
       const state = w.srsLevel >= 4 ? 'known' : w.srsLevel > 0 ? 'learning' : 'not_started';
       
       return {
@@ -288,7 +311,7 @@ export function VocabularyPage() {
         userVocabularyId: w.userVocabularyId || w.vocabularyNotebookId || w.userVocabId || w.id,
         flashcardId: w.id,
         flashcardCount: w.flashcardCount ?? (w.id ? 1 : 0),
-        selectionKey: String(w.userVocabularyId || w.vocabularyNotebookId || w.userVocabId || w.id || `${w.text}-${w.documentId || 'none'}-${w.dateAdded || index}-${index}`),
+        selectionKey: `vocab-item-${index}-${w.userVocabularyId || w.id || w.text || 'word'}`,
         text: normalizeVietnameseText(w.text),
         pinyin: normalizeVietnameseText(w.pinyin) || "pīnyīn",
         translation: normalizeVietnameseText(w.translation) || "nghĩa",
@@ -450,16 +473,17 @@ export function VocabularyPage() {
       messageParts.join('\n'),
       async () => {
         try {
-          const result = await deleteVocabulary(id, { deleteFlashcards: false });
+          const result = await deleteVocabulary(id, { deleteFlashcards: true });
+          if (row.text) removeWord(row.text);
           setSelectedRows(prev => prev.filter(key => key !== row.selectionKey));
           setOpenActionMenu(null);
-          toast.success(result?.message || 'Đã xóa từ vựng thành công.');
+          toast.success(result?.message || 'Đã xóa từ vựng khỏi Sổ tay của bạn.');
         } catch (error) {
           console.error(error);
           toast.error(error.message || 'Không thể xóa từ vựng.');
         }
       },
-      'Xóa từ vựng'
+      'Xóa từ vựng khỏi Sổ tay'
     );
   };
 
@@ -470,25 +494,28 @@ export function VocabularyPage() {
     }
 
     const message = [
-      'Bạn có chắc muốn xóa ' + selectedVocabularyCount + ' từ đã chọn khỏi Sổ tay từ vựng?',
+      'Bạn có chắc muốn xóa ' + selectedVocabularyCount + ' từ đã chọn khỏi Sổ tay từ vựng của bạn?',
       '',
-      'Các từ này sẽ không bị xóa khỏi tài liệu gốc.'
+      'Từ vựng chỉ bị xóa khỏi Sổ tay cá nhân của bạn, không ảnh hưởng đến từ điển chung hay tài liệu gốc.'
     ].join('\n');
 
     toast.confirm(
       message,
       async () => {
         try {
-          const result = await deleteVocabularies(selectedVocabularyIds, { deleteFlashcards: false });
+          const result = await deleteVocabularies(selectedVocabularyIds, { deleteFlashcards: true });
+          selectedVocabularyRows.forEach(row => {
+            if (row.text) removeWord(row.text);
+          });
           setSelectedRows([]);
           setOpenActionMenu(null);
-          toast.success(result?.message || ('Đã xóa ' + selectedVocabularyCount + ' từ vựng thành công.'));
+          toast.success(result?.message || ('Đã xóa ' + selectedVocabularyCount + ' từ vựng khỏi Sổ tay thành công.'));
         } catch (error) {
           console.error(error);
           toast.error(error.message || 'Không thể xóa các từ vựng đã chọn.');
         }
       },
-      'Xóa nhiều từ vựng'
+      'Xóa từ vựng khỏi Sổ tay'
     );
   };
 
@@ -780,14 +807,14 @@ export function VocabularyPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setOpenActionMenu(openActionMenu === row.userVocabularyId ? null : row.userVocabularyId);
+                                    setOpenActionMenu(openActionMenu === row.selectionKey ? null : row.selectionKey);
                                   }}
                                   className="p-1.5 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-100 transition-colors"
                                   title="Thao tác khác"
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
-                                {openActionMenu === row.userVocabularyId && (
+                                {openActionMenu === row.selectionKey && (
                                   <div className="absolute right-0 top-8 z-30 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 text-left shadow-xl shadow-slate-900/10 font-sans">
                                     <button
                                       onClick={(e) => {
