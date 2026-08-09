@@ -228,6 +228,7 @@ const ReaderPage = () => {
   const themeMode = 'light';
   const readMode = 'normal';
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pdfZoomState, setPdfZoomState] = useState({ scale: 1, fitMode: 'custom' });
   const [sidebarTab, setSidebarTab] = useState('dict'); // dict, chat, stats
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -320,6 +321,7 @@ const ReaderPage = () => {
   }, [bubbleMenu.visible, bubbleMenu.x, bubbleMenu.y]);
 
   const canvasRef = useRef(null);
+  const visualDocReaderRef = useRef(null);
   const drawingPageRef = useRef(1);
   const longPressTimerRef = useRef(null);
   const visualSelectionRef = useRef(null);
@@ -2527,6 +2529,9 @@ const ReaderPage = () => {
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
+                  )}
+                  {showVisualReader && (
+                    <div id="pdf-reader-controls" className="min-w-0 flex-1" />
                   )}
                   <div className="flex items-center justify-end gap-2">
                     <button
