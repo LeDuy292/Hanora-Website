@@ -7,8 +7,15 @@ let globalTimerInterval = null;
 export const useTimerStore = create((set, get) => ({
   timerState: 'inactive', // 'inactive' | 'running' | 'paused'
   elapsedSeconds: 0,
+  countdownTargetSeconds: 25 * 60, // Default 25 minutes Pomodoro/Session countdown
   isHidden: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_hidden') === 'true' : false,
   isMinimized: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_minimized') === 'true' : false,
+
+  setCountdownTargetSeconds: (secs) => set({ countdownTargetSeconds: secs }),
+
+  addExtraSeconds: (secs = 60) => set((state) => ({ 
+    countdownTargetSeconds: state.countdownTargetSeconds + secs 
+  })),
 
   showWidget: () => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'false');
