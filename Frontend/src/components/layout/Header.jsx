@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Flame, Sparkles, LogOut, Menu, X, Clock } from 'lucide-react';
+import { Flame, Sparkles, LogOut, Menu, X, Clock, HelpCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useTimerStore } from '../../store/timerStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
+import { useTourStore } from '../../store/tourStore';
 import logoImg from '../../assets/logo.png';
 
 export function Header({ offsetTop }) {
@@ -51,12 +53,14 @@ export function Header({ offsetTop }) {
       </div>
 
       {/* Center: Navigation links list */}
-      <nav className="hidden xl:flex items-center gap-8 2xl:gap-10">
+      <nav data-tour="nav-menu" className="hidden xl:flex items-center gap-8 2xl:gap-10">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
+            data-tour-nav={item.to}
+            id={item.to === '/dashboard' ? 'dashboard-menu' : item.to === '/reader' ? 'translation-menu' : item.to === '/vocabulary' ? 'vocabulary-menu' : item.to === '/flashcards' ? 'flashcard-menu' : undefined}
             className={({ isActive }) =>
               `relative font-medium text-[15px] py-2 transition-all duration-300 group tracking-tight ${isActive
                 ? 'text-white'
@@ -90,6 +94,8 @@ export function Header({ offsetTop }) {
             </div>
 
             <button
+              id="pomodoro-button"
+              data-tour="timer-button"
               onClick={toggleWidget}
               className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-sm ${
                 timerState === 'running'
@@ -100,6 +106,17 @@ export function Header({ offsetTop }) {
             >
               <Clock className={`w-3.5 h-3.5 ${timerState === 'running' ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
               <span>Đồng hồ</span>
+            </button>
+
+            <button
+              onClick={() => {
+                useTourStore.getState().resetTour();
+              }}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              title="Xem hướng dẫn sử dụng website"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Hướng dẫn</span>
             </button>
 
             <NavLink

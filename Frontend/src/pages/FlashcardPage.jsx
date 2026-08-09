@@ -881,6 +881,8 @@ export function FlashcardPage() {
 
                   <div className="border-t border-slate-100 pt-4 flex items-center justify-between gap-2.5">
                     <button 
+                      id="select-deck"
+                      data-tour="select-deck-btn"
                       onClick={() => {
                         setActiveDeck({ id: deck.id, title: deck.name });
                         setStudyMode('flashcard');
@@ -1372,7 +1374,7 @@ export function FlashcardPage() {
               </div>
 
               {/* Review Buttons */}
-              <div className="flex gap-4">
+              <div id="srs-rating" className="flex gap-4">
                 <button 
                   onClick={() => handleReviewFeedback(false)}
                   className="flex-1 py-3 bg-rose-50 border border-rose-200 hover:bg-rose-100/50 text-rose-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition active:scale-95"

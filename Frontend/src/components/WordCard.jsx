@@ -577,6 +577,8 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       {/* Action Buttons */}
       <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
         <button 
+          id="save-word"
+          data-tour="save-word-btn"
           onClick={handleSaveToNotebook}
           disabled={isSaving}
           className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider active:scale-95 disabled:opacity-50"
