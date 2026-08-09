@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Flame,
+  Sparkles,
   Clock,
   Target,
   Bookmark,
@@ -162,13 +163,21 @@ export function DashboardPage() {
   const wordsSaved = data?.wordsSaved ?? 0;
   const reviewToday = data?.reviewToday ?? 0;
 
-  const targetMinutes = data?.dailyGoal?.target ?? 90;
+  const timerTargetMins = Math.ceil((countdownTargetSeconds || 0) / 60);
+  const targetMinutes = timerTargetMins > 0 ? timerTargetMins : (data?.dailyGoal?.target ?? user?.targetDailyMinutes ?? 90);
   const todayMins = data?.dailyGoal?.current ?? 0;
   const currentSessionMinutes = timerState !== 'inactive' ? elapsedSeconds / 60 : 0;
   const totalMinsTodayCalculated = todayMins + currentSessionMinutes;
   const progressPercent = targetMinutes > 0
     ? Math.min(Math.round((totalMinsTodayCalculated / targetMinutes) * 100), 100)
     : 0;
+
+  // Automatically synchronize timer countdown target with daily goal minutes
+  useEffect(() => {
+    if (targetMinutes && targetMinutes > 0 && timerState === 'inactive') {
+      useTimerStore.getState().setCountdownTargetSeconds(targetMinutes * 60);
+    }
+  }, [targetMinutes, timerState]);
 
   const growthChart = data?.growthChart ?? [];
   const achievements = data?.achievements ?? [];
@@ -278,43 +287,134 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ===== TOP ROW: LEVEL XP HEADER CARD ===== */}
+      {/* ===== TOP ROW: LEVEL XP & INTEGRATED TODAY'S GOAL HEADER CARD ===== */}
       {user && (
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col justify-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-sky-400/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div id="dashboard-header" data-tour="header-banner" className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-7 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-500/10 via-sky-400/5 to-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div className="space-y-4 relative z-10">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl sm:text-3xl font-black font-display text-slate-850 tracking-tight">
-                Chào mừng trở lại, {user.name}!
-              </h2>
-              <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 font-black px-3.5 py-1 rounded-xl text-xs shrink-0 shadow-xs">
-                Level {level}
-              </span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center relative z-10">
+            {/* Left: User Welcome & Level XP Progress (7/12) */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-2xl sm:text-3xl font-black font-display text-slate-850 tracking-tight flex items-center gap-2">
+                  <span>Chào mừng trở lại, {user.name}!</span>
+                  <span className="text-xl animate-bounce">👋</span>
+                </h2>
+                <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-600 font-black px-3.5 py-1.5 rounded-2xl text-xs shrink-0 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500 fill-blue-500/20" />
+                  Level {level}
+                </span>
+              </div>
+
+              {/* Level progress bar & XP numbers */}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center text-xs text-slate-600 font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    Tiến trình lên Level {level + 1}
+                  </span>
+                  <span className="font-extrabold text-blue-600">{xp.toLocaleString()} / {nextLevelXp.toLocaleString()} XP</span>
+                </div>
+                <div className="h-3.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden p-0.5 shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-400 rounded-full transition-all duration-500 shadow-sm"
+                    style={{ width: `${levelProgressPercent}%` }}
+                  ></div>
+                </div>
+              </div>
             </div>
 
-            {/* Level progress bar & XP numbers */}
-            <div className="space-y-2 pt-1">
-              <div className="flex justify-between items-center text-xs text-slate-600 font-bold">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                  Tiến trình lên Level {level + 1}
-                </span>
-                <span className="font-extrabold text-blue-600">{xp.toLocaleString()} / {nextLevelXp.toLocaleString()} XP</span>
+            {/* Right: Integrated Today's Goal Progress Card (5/12) */}
+            <div className="lg:col-span-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] transition-all">
+              <div className="pointer-events-none absolute -right-6 -bottom-6 h-28 w-28 rounded-full bg-white/10 blur-xl"></div>
+              
+              <div className="flex items-center justify-between gap-3 relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-md">
+                    <Target className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-blue-100">
+                    Mục Tiêu Học Hôm Nay
+                  </span>
+                </div>
+                <button
+                  id="edit-goal"
+                  onClick={() => setIsEditingGoal(!isEditingGoal)}
+                  className="px-3 py-1 bg-white/15 hover:bg-white text-white hover:text-blue-600 border border-white/20 rounded-xl text-xs font-bold transition-all backdrop-blur-md shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>{isEditingGoal ? 'Hủy' : 'Sửa mục tiêu'}</span>
+                </button>
               </div>
-              <div className="h-3.5 bg-slate-100 border border-slate-200/60 rounded-full overflow-hidden p-0.5 shadow-inner">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-400 rounded-full transition-all duration-500 shadow-sm"
-                  style={{ width: `${levelProgressPercent}%` }}
-                ></div>
-              </div>
+
+              {isEditingGoal ? (
+                <div className="relative z-10 pt-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-[11px] font-extrabold text-blue-100 uppercase tracking-wider block">Chọn số phút học mỗi ngày</span>
+                  <div id="study-duration" data-tour="goal-presets" className="grid grid-cols-4 gap-2">
+                    {[30, 60, 90, 120].map((mins) => (
+                      <button
+                        key={mins}
+                        onClick={() => setTempGoal(mins)}
+                        className={`py-1.5 rounded-xl text-xs font-black transition-all ${
+                          tempGoal === mins
+                            ? 'bg-white text-blue-600 shadow-md scale-105'
+                            : 'bg-white/10 hover:bg-white/20 text-white border border-white/15'
+                        }`}
+                      >
+                        {mins}P
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button 
+                      onClick={async () => {
+                        if (tempGoal <= 0) return;
+                        try {
+                          const updatedDashboard = await progressApi.setGoal(tempGoal);
+                          setData(updatedDashboard);
+                          setIsEditingGoal(false);
+                          await useAuthStore.getState().refreshStats();
+                          useTimerStore.getState().resetTimer();
+                          useTimerStore.getState().setCountdownTargetSeconds(tempGoal * 60);
+                          showWidget();
+                          toast.success(`Đã đặt lại mục tiêu mới ${tempGoal} phút/ngày!`);
+                        } catch (err) {
+                          toast.error(err.message);
+                        }
+                      }}
+                      className="w-full py-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-xs shadow-md transition cursor-pointer"
+                    >
+                      Lưu mục tiêu mới
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative z-10 space-y-2 pt-2">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl font-black font-display tracking-tight text-white">
+                      {Math.round(totalMinsTodayCalculated)} <span className="text-xs font-bold text-blue-100">/ {targetMinutes} phút</span>
+                    </div>
+                    <span className="text-xs font-black text-blue-100 bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20">
+                      {Math.min(100, Math.round((totalMinsTodayCalculated / Math.max(1, targetMinutes)) * 100))}%
+                    </span>
+                  </div>
+
+                  {/* Mini Progress Bar inside banner */}
+                  <div className="h-2.5 bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/15">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-300 to-teal-200 rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${Math.min(100, Math.round((totalMinsTodayCalculated / Math.max(1, targetMinutes)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* ===== 4 TOP QUICK STAT CARDS ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 font-sans">
+      <div id="stats" data-tour="stat-cards" className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 font-sans">
         {/* Card 1: Chuỗi học tập */}
         <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-200">
           <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 border border-orange-100/60">
@@ -344,8 +444,28 @@ export function DashboardPage() {
           onClick={() => navigate('/vocabulary')}
           className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-blue-300 hover:shadow-md cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100/60 group-hover:scale-105 transition-transform">
-            <Bookmark className="w-5 h-5 fill-sky-600/20" />
+          <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-slate-200/50 group-hover:scale-105 transition-transform shadow-xs flex select-none bg-slate-50">
+            {/* Green spine */}
+            <div className="w-[18%] h-full bg-emerald-500 shrink-0 flex flex-col items-center justify-center gap-0.5">
+              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
+              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
+              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
+            </div>
+            {/* Cover body */}
+            <div className="flex-1 bg-[#c9b99a] flex flex-col items-center justify-between py-1 px-0.5 relative">
+              <div className="absolute inset-0 opacity-[0.07]"
+                style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, #000 3px, #000 4px)' }}
+              />
+              <div className="self-end relative z-10 mr-0.5">
+                <svg className="w-2.5 h-2.5 text-[#b0a080]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              </div>
+              <div className="w-full space-y-0.5 relative z-10 px-0.5">
+                <div className="h-[1px] bg-[#b0a080] w-full" />
+                <div className="h-[1px] bg-[#b0a080]/65 w-2/3" />
+              </div>
+            </div>
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sổ tay từ vựng</span>
@@ -357,7 +477,7 @@ export function DashboardPage() {
 
         {/* Card 4: Cần ôn tập SRS (Clickable) */}
         <div 
-          onClick={() => navigate('/review')}
+          onClick={() => navigate('/flashcards')}
           className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-amber-300 hover:shadow-md cursor-pointer group"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100/60 group-hover:scale-105 transition-transform">
@@ -383,7 +503,7 @@ export function DashboardPage() {
         <div className="lg:col-span-8 space-y-6">
 
           {/* 1. CHUỖI NGÀY HỌC LIÊN TIẾP */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
+          <div id="streak" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-700 via-blue-600 to-indigo-700 p-6 shadow-xl text-white">
             <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"></div>
 
             <div className="flex flex-col xl:flex-row justify-between items-start gap-6 relative z-10">
@@ -453,215 +573,45 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* 2. SUB-GRID TRONG CỘT TRÁI: MỤC TIÊU HÔM NAY & TĂNG TRƯỞNG TỪ VỰNG */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Daily Goal Card */}
-            <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
-              <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                <div className="flex items-center gap-2">
-                  <Target className="w-4.5 h-4.5 text-blue-600" />
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Mục tiêu hôm nay</h3>
-                </div>
-                <button 
-                  onClick={() => setIsEditingGoal(!isEditingGoal)} 
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-xl transition border border-blue-100/50"
-                >
-                  {isEditingGoal ? 'Đóng' : 'Thay đổi'}
-                </button>
-              </div>
+          {/* 2. TĂNG TRƯỞNG TỪ VỰNG */}
+          <div id="vocabulary-growth" className="bg-white border border-slate-100 rounded-3xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                Tăng Trưởng Từ Vựng
+              </h3>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">7 ngày qua</span>
+            </div>
 
-              {isEditingGoal ? (
-                <div className="flex flex-col gap-3 py-1 text-left" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Chọn phút học mỗi ngày</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[30, 60, 90, 120].map((mins) => (
-                      <label key={mins} className="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100/70 border border-slate-150 p-2 rounded-xl transition text-xs font-bold text-slate-700">
-                        <input
-                          type="radio"
-                          name="dailyGoalPreset"
-                          checked={!isCustomGoal && tempGoal === mins}
-                          onChange={() => {
-                            setTempGoal(mins);
-                            setIsCustomGoal(false);
-                          }}
-                          className="text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-slate-300"
-                        />
-                        <span>{mins} phút</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-end gap-2 border-t border-slate-100 pt-2">
-                    <button onClick={() => setIsEditingGoal(false)} className="px-3 py-1 text-xs bg-white border border-slate-200 text-slate-500 rounded-xl font-bold">Hủy</button>
-                    <button 
-                      onClick={async () => {
-                        if (tempGoal <= 0) return;
-                        try {
-                          const updatedDashboard = await progressApi.setGoal(tempGoal);
-                          setData(updatedDashboard);
-                          setIsEditingGoal(false);
-                          await useAuthStore.getState().refreshStats();
-                          showWidget();
-                          if (timerState === 'inactive') {
-                            startTimer();
-                          }
-                          toast.success(`Đã lưu mục tiêu ${tempGoal} phút/ngày!`);
-                        } catch (err) {
-                          toast.error(err.message);
-                        }
-                      }}
-                      className="px-3.5 py-1 text-xs bg-blue-600 text-white rounded-xl font-bold"
-                    >
-                      Lưu
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-2 w-full space-y-3">
-                  {/* Circular Countdown Clock */}
-                  <div className="relative w-44 h-44 sm:w-48 sm:h-48 rounded-full bg-white shadow-xl border border-slate-100 flex flex-col items-center justify-center p-2.5 select-none overflow-hidden my-1">
-                    
-                    {/* SVG Gradient Circular Stroke Ring */}
-                    <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none p-1.5" viewBox="0 0 170 170">
-                      <defs>
-                        <linearGradient id="dashboardPurpleRing" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#9333EA" />
-                          <stop offset="50%" stopColor="#3B82F6" />
-                          <stop offset="100%" stopColor="#06B6D4" />
-                        </linearGradient>
-                      </defs>
-                      <circle cx="85" cy="85" r="76" className="stroke-slate-100 fill-transparent" strokeWidth="5" />
-                      <circle
-                        cx="85"
-                        cy="85"
-                        r="76"
-                        stroke="url(#dashboardPurpleRing)"
-                        className="fill-transparent transition-all duration-1000 ease-linear"
-                        strokeWidth="5"
-                        strokeDasharray={2 * Math.PI * 76}
-                        strokeDashoffset={2 * Math.PI * 76 - (2 * Math.PI * 76 * Math.min(100, ((countdownTargetSeconds - Math.max(0, countdownTargetSeconds - elapsedSeconds)) / countdownTargetSeconds) * 100)) / 100}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-
-                    <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-1">
-                      {/* 1. +1 min Pill Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addExtraSeconds(60);
-                          toast.success("Đã thêm +1 phút!");
-                        }}
-                        className="text-[10px] font-extrabold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition shadow-2xs active:scale-95 flex items-center gap-0.5 cursor-pointer"
-                        title="Thêm 1 phút"
-                      >
-                        +1 min
-                      </button>
-
-                      {/* 2. Center Countdown Digits */}
-                      <div className="py-0.5">
-                        <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-slate-900 leading-none">
-                          {(() => {
-                            const rem = Math.max(0, countdownTargetSeconds - elapsedSeconds);
-                            const m = Math.floor(rem / 60);
-                            const s = rem % 60;
-                            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                          })()}
-                        </span>
-                      </div>
-
-                      {/* 3. Solid Purple Horizontal Line Divider */}
-                      <div className="w-20 h-[2px] bg-purple-600 rounded-full my-1 shadow-xs"></div>
-
-                      {/* 4. Controls Row: Pause/Play (Purple circle) & Reset (Gray circle) */}
-                      <div className="flex items-center gap-2 pt-0.5">
-                        {timerState === 'running' ? (
-                          <button
-                            onClick={pauseTimer}
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-md hover:shadow-purple-500/30 transition transform active:scale-95"
-                            title="Tạm dừng"
-                          >
-                            <Pause className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              showWidget();
-                              if (timerState === 'paused') resumeTimer();
-                              else startTimer();
-                            }}
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-md hover:shadow-purple-500/30 transition transform active:scale-95"
-                            title="Bắt đầu"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            resetTimer();
-                            toast.info("Đã đặt lại đồng hồ.");
-                          }}
-                          className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200/80 flex items-center justify-center transition transform active:scale-95"
-                          title="Đặt lại"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Goal Progress Footer text */}
-                  <div className="text-[10px] text-slate-500 font-semibold border-t border-slate-100 pt-2 text-center w-full flex items-center justify-between px-1">
-                    <span>Mục tiêu: <strong className="text-slate-800">{targetMinutes} phút</strong></span>
-                    <span>Đã học: <strong className="text-blue-600">{Math.round(totalMinsTodayCalculated)} phút</strong></span>
-                  </div>
+            <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-4 border border-slate-100/80 shadow-sm overflow-hidden select-none min-h-[160px] flex items-center">
+              {activePoint && (
+                <div className="absolute bg-slate-900 border border-slate-800/80 text-white px-2 py-1 rounded-xl shadow-xl pointer-events-none z-20 flex flex-col items-center text-center leading-none" style={{ left: `${(activePoint.x / 500) * 100}%`, top: `${(activePoint.y / 130) * 100 - 15}%`, transform: 'translate(-50%, -100%)' }}>
+                  <span className="text-[7px] text-slate-400 font-extrabold tracking-widest">{activePoint.day} ({activePoint.date})</span>
+                  <span className="text-[10px] text-yellow-300 font-black mt-1">+{activePoint.count} từ</span>
                 </div>
               )}
+              <svg viewBox="0 0 500 130" className="w-full overflow-visible">
+                <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
+                <defs>
+                  <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#3B82F6" /><stop offset="100%" stopColor="#8B5CF6" /></linearGradient>
+                  <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" /><stop offset="100%" stopColor="#3B82F6" stopOpacity="0" /></linearGradient>
+                </defs>
+                {activePoint && <line x1={activePoint.x} y1="10" x2={activePoint.x} y2="100" stroke="#3B82F6" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.35" />}
+                {chartPoints.length > 0 && <path d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`} fill="url(#chartProgressGlow)" />}
+                {chartPoints.length > 0 && <path d={bezierPath} fill="none" stroke="url(#chartStrokeGradient)" strokeWidth="3.2" strokeLinecap="round" className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]" />}
+                {chartPoints.map((p, idx) => (
+                  <circle key={idx} cx={p.x} cy={p.y} r={activePoint?.idx === idx ? "5.5" : "4"} className={`fill-white stroke-[2.5] transition-all duration-200 ${activePoint?.idx === idx ? 'stroke-blue-600 scale-110' : 'stroke-blue-500/80'}`} />
+                ))}
+                {chartPoints.map((p, idx) => (
+                  <text key={idx} x={p.x} y="118" className={`text-[8px] font-bold transition-all duration-200 ${activePoint?.idx === idx ? 'fill-slate-800 font-black' : 'fill-slate-400 font-semibold'}`} textAnchor="middle">{p.day}</text>
+                ))}
+                {chartPoints.map((p, idx) => (
+                  <rect key={`hover-${idx}`} x={p.x - 30} y="0" width="60" height="125" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })} onMouseLeave={() => setActivePoint(null)} />
+                ))}
+              </svg>
             </div>
-
-            {/* Vocabulary Growth SVG Line Chart */}
-            <div className="bg-white border border-slate-100 rounded-3xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                  Tăng Trưởng Từ Vựng
-                </h3>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-lg">7 ngày</span>
-              </div>
-
-              <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-3 border border-slate-100/80 shadow-sm overflow-hidden select-none min-h-[140px] flex items-center">
-                {activePoint && (
-                  <div className="absolute bg-slate-900 border border-slate-800/80 text-white px-2 py-1 rounded-xl shadow-xl pointer-events-none z-20 flex flex-col items-center text-center leading-none" style={{ left: `${(activePoint.x / 500) * 100}%`, top: `${(activePoint.y / 130) * 100 - 15}%`, transform: 'translate(-50%, -100%)' }}>
-                    <span className="text-[7px] text-slate-400 font-extrabold tracking-widest">{activePoint.day} ({activePoint.date})</span>
-                    <span className="text-[10px] text-yellow-300 font-black mt-1">+{activePoint.count} từ</span>
-                  </div>
-                )}
-                <svg viewBox="0 0 500 130" className="w-full overflow-visible">
-                  <line x1="30" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                  <line x1="30" y1="60" x2="480" y2="60" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                  <line x1="30" y1="100" x2="480" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-                  <defs>
-                    <linearGradient id="chartStrokeGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#3B82F6" /><stop offset="100%" stopColor="#8B5CF6" /></linearGradient>
-                    <linearGradient id="chartProgressGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3B82F6" stopOpacity="0.18" /><stop offset="100%" stopColor="#3B82F6" stopOpacity="0" /></linearGradient>
-                  </defs>
-                  {activePoint && <line x1={activePoint.x} y1="10" x2={activePoint.x} y2="100" stroke="#3B82F6" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.35" />}
-                  {chartPoints.length > 0 && <path d={`${bezierPath} L ${chartPoints[chartPoints.length - 1].x},100 L ${chartPoints[0].x},100 Z`} fill="url(#chartProgressGlow)" />}
-                  {chartPoints.length > 0 && <path d={bezierPath} fill="none" stroke="url(#chartStrokeGradient)" strokeWidth="3.2" strokeLinecap="round" className="drop-shadow-[0_4px_12px_rgba(59,130,246,0.25)]" />}
-                  {chartPoints.map((p, idx) => (
-                    <circle key={idx} cx={p.x} cy={p.y} r={activePoint?.idx === idx ? "5.5" : "4"} className={`fill-white stroke-[2.5] transition-all duration-200 ${activePoint?.idx === idx ? 'stroke-blue-600 scale-110' : 'stroke-blue-500/80'}`} />
-                  ))}
-                  {chartPoints.map((p, idx) => (
-                    <text key={idx} x={p.x} y="118" className={`text-[8px] font-bold transition-all duration-200 ${activePoint?.idx === idx ? 'fill-slate-800 font-black' : 'fill-slate-400 font-semibold'}`} textAnchor="middle">{p.day}</text>
-                  ))}
-                  {chartPoints.map((p, idx) => (
-                    <rect key={`hover-${idx}`} x={p.x - 30} y="0" width="60" height="125" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActivePoint({ x: p.x, y: p.y, count: p.count, day: p.day, date: p.date, idx })} onMouseLeave={() => setActivePoint(null)} />
-                  ))}
-                </svg>
-              </div>
-            </div>
-
           </div>
 
         </div>
@@ -670,7 +620,7 @@ export function DashboardPage() {
         <div className="lg:col-span-4 space-y-6">
 
           {/* BẢNG XẾP HẠNG */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col justify-between relative overflow-hidden h-full">
+          <div id="leaderboard" className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col justify-between relative overflow-hidden h-full">
             
             {/* Header & Period Tabs */}
             <div className="space-y-3 border-b border-slate-100 pb-3">
@@ -787,7 +737,7 @@ export function DashboardPage() {
       </div>
 
       {/* ===== BOTTOM STANDALONE SECTION: PHÒNG DANH HIỆU (ĐỨNG 1 MÌNH CẢ BẢNG) ===== */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-7 space-y-6 shadow-sm relative overflow-hidden font-sans">
+      <div id="achievements" className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-7 space-y-6 shadow-sm relative overflow-hidden font-sans">
         <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-150 text-amber-500 flex items-center justify-center shrink-0 shadow-xs">

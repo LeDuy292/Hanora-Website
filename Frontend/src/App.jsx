@@ -11,6 +11,8 @@ import { FloatingStudyTimer } from './components/ui/FloatingStudyTimer';
 import { SmartReviewPromptModal } from './components/vocabulary/SmartReviewPromptModal';
 import { useVocabularyStore } from './store/vocabularyStore';
 
+import { TourProvider } from './components/tour/TourController';
+
 function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -104,6 +106,7 @@ function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 antialiased font-sans">
       <AppRoutes />
       <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+      <TourProvider />
       <ToastContainer />
       <FloatingStudyTimer />
       <SmartReviewPromptModal
