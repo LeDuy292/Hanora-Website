@@ -7,12 +7,39 @@ let globalTimerInterval = null;
 export const useTimerStore = create((set, get) => ({
   timerState: 'inactive', // 'inactive' | 'running' | 'paused'
   elapsedSeconds: 0,
+  isHidden: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_hidden') === 'true' : false,
+  isMinimized: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_minimized') === 'true' : false,
+
+  showWidget: () => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'false');
+    set({ isHidden: false });
+  },
+
+  hideWidget: () => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'true');
+    set({ isHidden: true });
+  },
+
+  toggleWidget: () => {
+    const next = !get().isHidden;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', String(next));
+    set({ isHidden: next });
+  },
+
+  setIsMinimized: (val) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_minimized', String(val));
+    set({ isMinimized: val });
+  },
 
   startTimer: () => {
     const { timerState } = get();
-    if (timerState === 'running') return;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'false');
+    if (timerState === 'running') {
+      set({ isHidden: false });
+      return;
+    }
 
-    set({ timerState: 'running' });
+    set({ timerState: 'running', isHidden: false });
 
     if (globalTimerInterval) clearInterval(globalTimerInterval);
     globalTimerInterval = setInterval(() => {
@@ -33,9 +60,10 @@ export const useTimerStore = create((set, get) => ({
 
   resumeTimer: () => {
     const { timerState } = get();
+    if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'false');
     if (timerState !== 'paused') return;
 
-    set({ timerState: 'running' });
+    set({ timerState: 'running', isHidden: false });
 
     if (globalTimerInterval) clearInterval(globalTimerInterval);
     globalTimerInterval = setInterval(() => {

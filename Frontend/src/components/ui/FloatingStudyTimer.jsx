@@ -12,16 +12,15 @@ export const FloatingStudyTimer = () => {
   const {
     timerState,
     elapsedSeconds,
+    isHidden,
+    isMinimized,
     startTimer,
     pauseTimer,
     resumeTimer,
-    finishTimer
+    finishTimer,
+    hideWidget,
+    setIsMinimized
   } = useTimerStore();
-
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isHidden, setIsHidden] = useState(() => {
-    return localStorage.getItem('hanora_timer_hidden') === 'true';
-  });
 
   // Drag position state (defaults to bottom right offset)
   const [position, setPosition] = useState(() => {
@@ -41,14 +40,6 @@ export const FloatingStudyTimer = () => {
       refreshStats();
     }
   }, [isAuthenticated, refreshStats]);
-
-  // Un-hide timer automatically when timer starts running
-  useEffect(() => {
-    if (timerState === 'running' && isHidden) {
-      setIsHidden(false);
-      localStorage.setItem('hanora_timer_hidden', 'false');
-    }
-  }, [timerState, isHidden]);
 
   // Drag Event Handlers
   useEffect(() => {
@@ -110,9 +101,8 @@ export const FloatingStudyTimer = () => {
 
   const handleClose = (e) => {
     e.stopPropagation();
-    setIsHidden(true);
-    localStorage.setItem('hanora_timer_hidden', 'true');
-    toast.info("Đã ẩn đồng hồ học tập. Bắt đầu tính giờ tại trang Tiến trình để mở lại.");
+    hideWidget();
+    toast.info("Đã ẩn đồng hồ học tập. Bắt đầu tính giờ hoặc nhấp biểu tượng đồng hồ trên thanh điều hướng để mở lại.");
   };
 
   if (!isAuthenticated || isHidden) return null;

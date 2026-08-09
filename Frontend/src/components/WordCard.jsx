@@ -47,6 +47,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   const fetchDecks = useVocabularyStore(state => state.fetchDecks);
   const bulkAddCards = useVocabularyStore(state => state.bulkAddCards);
   const isWordSaved = useVocabularyStore(state => state.isWordSaved);
+  const fetchUserVocabulary = useVocabularyStore(state => state.fetchUserVocabulary);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showDeckModal, setShowDeckModal] = useState(false);
@@ -673,6 +674,8 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                       words: [data.word]
                     };
                     await bulkAddCards(payload);
+                    await fetchUserVocabulary();
+                    await fetchDecks();
                     setShowDeckModal(false);
                     toast.success("Đã thêm từ vào bộ Flashcard thành công!");
                   } catch (e) {

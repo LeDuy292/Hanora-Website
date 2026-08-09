@@ -49,6 +49,8 @@ export function FlashcardPage() {
   const [customDecks, setCustomDecks] = useState([]);
   const [isLoadingDecks, setIsLoadingDecks] = useState(false);
   const [selectedDeck, setSelectedDeck] = useState(null);
+  const [activeDeckCards, setActiveDeckCards] = useState([]);
+  const [isLoadingDeckCards, setIsLoadingDeckCards] = useState(false);
 
   // Search/Filter/Sort states
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +160,40 @@ export function FlashcardPage() {
     };
     initPageData();
   }, []);
+
+  useEffect(() => {
+    const syncDeckCards = async () => {
+      setSelectedDeck(null);
+      setCurrentIndex(0);
+      setIsFlipped(false);
+      setShowRating(false);
+      setIsMarkedKnown(false);
+      setIsSessionComplete(false);
+      setShuffledList([]);
+      setIsShuffled(false);
+
+      if (activeDeck === null) {
+        setActiveDeckCards([]);
+        await store.fetchUserFlashcards(); // Restore entire vocabulary list in store
+      } else {
+        const isNumericDeck = activeDeck.id && !isNaN(Number(activeDeck.id));
+        if (isNumericDeck) {
+          setIsLoadingDeckCards(true);
+          try {
+            const data = await apiRequest(`/flashcard?deckId=${activeDeck.id}`, { auth: true });
+            setActiveDeckCards(data || []);
+          } catch (err) {
+            console.error("Error loading active deck cards:", err);
+          } finally {
+            setIsLoadingDeckCards(false);
+          }
+        } else {
+          setActiveDeckCards(vocabList);
+        }
+      }
+    };
+    syncDeckCards();
+  }, [activeDeck?.id]);
 
   const handleOpenEditModal = (deck) => {
     setEditingDeck(deck);
@@ -472,16 +508,18 @@ export function FlashcardPage() {
     const list = [];
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const newWords = vocabList.filter(v => v.srsLevel === 0 || !v.srsLevel);
-    const dueWords = vocabList.filter(v => (v.nextReviewDate && v.nextReviewDate <= todayStr) || (v.srsLevel > 0 && v.srsLevel < 4));
-    const hardWords = vocabList.filter(v => (v.hardCount && v.hardCount > 0) || v.srsLevel === 1 || v.status === 'hard');
-    const knownWords = vocabList.filter(v => v.srsLevel >= 4 || v.status === 'mastered');
+    const sourceList = activeDeck !== null ? activeDeckCards : vocabList;
 
-    list.push({ id: 'all', title: 'Tất cả từ vựng', icon: '📖', count: vocabList.length, getWords: () => vocabList });
-    list.push({ id: 'new', title: 'Từ mới', icon: '🆕', count: newWords.length, getWords: () => newWords });
-    list.push({ id: 'due', title: 'Từ cần ôn (SRS)', icon: '⏰', count: dueWords.length, getWords: () => dueWords });
-    list.push({ id: 'hard', title: 'Từ thường trả lời sai', icon: '⚠️', count: hardWords.length, getWords: () => hardWords });
-    list.push({ id: 'known', title: 'Từ đã ghi nhớ', icon: '✅', count: knownWords.length, getWords: () => knownWords });
+    const newWords = sourceList.filter(v => v.srsLevel === 0 || !v.srsLevel);
+    const dueWords = sourceList.filter(v => (v.nextReviewDate && v.nextReviewDate <= todayStr) || (v.srsLevel > 0 && v.srsLevel < 4));
+    const hardWords = sourceList.filter(v => (v.hardCount && v.hardCount > 0) || v.srsLevel === 1 || v.status === 'hard');
+    const knownWords = sourceList.filter(v => v.srsLevel >= 4 || v.status === 'mastered');
+
+    list.push({ id: 'all', title: 'Tất cả từ vựng', icon: '📖', count: sourceList.length });
+    list.push({ id: 'new', title: 'Từ mới', icon: '🆕', count: newWords.length });
+    list.push({ id: 'due', title: 'Từ cần ôn (SRS)', icon: '⏰', count: dueWords.length });
+    list.push({ id: 'hard', title: 'Từ thường trả lời sai', icon: '⚠️', count: hardWords.length });
+    list.push({ id: 'known', title: 'Từ đã ghi nhớ', icon: '✅', count: knownWords.length });
 
     return { 
       decks: list, 
@@ -492,24 +530,42 @@ export function FlashcardPage() {
         knownCount: knownWords.length 
       } 
     };
-  }, [vocabList]);
+  }, [vocabList, activeDeckCards, activeDeck]);
 
   // Initial Selection inside player
   useEffect(() => {
-    if (!selectedDeck && vocabList.length > 0) {
+    if (!selectedDeck && decks.length > 0) {
       setSelectedDeck(decks[0]);
     }
-  }, [decks, selectedDeck, vocabList]);
+  }, [decks, selectedDeck]);
 
   // Active word list management
   const activeList = useMemo(() => {
     if (!selectedDeck) return [];
-    const source = selectedDeck.getWords();
+    
+    const sourceList = activeDeck !== null ? activeDeckCards : vocabList;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let source = [];
+    if (selectedDeck.id === 'all') {
+      source = sourceList;
+    } else if (selectedDeck.id === 'new') {
+      source = sourceList.filter(v => v.srsLevel === 0 || !v.srsLevel);
+    } else if (selectedDeck.id === 'due') {
+      source = sourceList.filter(v => (v.nextReviewDate && v.nextReviewDate <= todayStr) || (v.srsLevel > 0 && v.srsLevel < 4));
+    } else if (selectedDeck.id === 'hard') {
+      source = sourceList.filter(v => (v.hardCount && v.hardCount > 0) || v.srsLevel === 1 || v.status === 'hard');
+    } else if (selectedDeck.id === 'known') {
+      source = sourceList.filter(v => v.srsLevel >= 4 || v.status === 'mastered');
+    } else {
+      source = sourceList;
+    }
+
     if (isShuffled) {
       return shuffledList.filter(word => source.some(s => s.text === word.text));
     }
     return source;
-  }, [selectedDeck, isShuffled, shuffledList, vocabList]);
+  }, [selectedDeck?.id, isShuffled, shuffledList, vocabList, activeDeckCards, activeDeck]);
 
   const currentWord = activeList[currentIndex];
   const progressPercent = activeList.length > 0 ? ((currentIndex + 1) / activeList.length) * 100 : 0;
@@ -884,7 +940,6 @@ export function FlashcardPage() {
                       onClick={() => {
                         setActiveDeck({ id: deck.id, title: deck.name });
                         setStudyMode('flashcard');
-                        fetchUserFlashcards(deck.id);
                       }}
                       className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-100/80 text-slate-700 font-bold py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-xs"
                       title="Đọc lướt và xem thẻ nhanh"
@@ -896,7 +951,6 @@ export function FlashcardPage() {
                       onClick={() => {
                         setActiveDeck({ id: deck.id, title: deck.name });
                         setStudyMode('review');
-                        fetchUserFlashcards(deck.id);
                       }}
                       className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
                       title="Chế độ học từ vựng SRS và tích lũy XP"

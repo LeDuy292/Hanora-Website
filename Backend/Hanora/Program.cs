@@ -127,28 +127,63 @@ namespace Hanora
                 .GetSection("Cors:AllowedOrigins")
                 .Get<string[]>() ?? Array.Empty<string>();
 
+            var corsString = builder.Configuration["Cors:AllowedOrigins"] ?? builder.Configuration["CORS_ALLOWED_ORIGINS"];
+            var extraOrigins = new List<string>(configuredCorsOrigins);
+            if (!string.IsNullOrWhiteSpace(corsString))
+            {
+                var split = corsString.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                extraOrigins.AddRange(split);
+            }
+
             var allowedCorsOrigins = new[]
                 {
                     "http://localhost:5173",
                     "http://127.0.0.1:5173",
                     "http://localhost:3000",
-                    "https://hanora-website.vercel.app"
+                    "http://localhost:5187",
+                    "https://hanora-website.vercel.app",
+                    "https://www.hanora.id.vn",
+                    "https://hanora.id.vn"
                 }
-                .Concat(configuredCorsOrigins)
+                .Concat(extraOrigins)
                 .Where(origin => !string.IsNullOrWhiteSpace(origin))
                 .Select(origin => origin.Trim().TrimEnd('/'))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("FrontendPolicy", policy =>
                 {
-                    policy.WithOrigins(allowedCorsOrigins)
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials()
-                        .WithExposedHeaders("Content-Disposition");
+                    policy.SetIsOriginAllowed(origin =>
+                    {
+                        if (string.IsNullOrWhiteSpace(origin)) return false;
+                        var normalized = origin.Trim().TrimEnd('/');
+
+                        if (allowedCorsOrigins.Contains(normalized)) return true;
+
+                        try
+                        {
+                            var uri = new Uri(normalized);
+                            var host = uri.Host;
+
+                            if (host.Equals("hanora.id.vn", StringComparison.OrdinalIgnoreCase) ||
+                                host.EndsWith(".hanora.id.vn", StringComparison.OrdinalIgnoreCase) ||
+                                host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                                host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return true;
+                            }
+                        }
+                        catch { }
+
+                        return false;
+                    })
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials()
+                    .WithExposedHeaders("Content-Disposition");
                 });
             });
 
@@ -188,10 +223,13 @@ namespace Hanora
             var app = builder.Build();
 
             // Support reverse proxies (like Railway)
-            app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+            var forwardedOptions = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
             {
                 ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-            });
+            };
+            forwardedOptions.KnownNetworks.Clear();
+            forwardedOptions.KnownProxies.Clear();
+            app.UseForwardedHeaders(forwardedOptions);
 
             if (app.Environment.IsDevelopment())
             {
@@ -216,7 +254,26 @@ namespace Hanora
                     if (!string.IsNullOrEmpty(origin))
                     {
                         var normalized = origin.Trim().TrimEnd('/');
-                        if (allowedCorsOrigins.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                        var isAllowed = allowedCorsOrigins.Contains(normalized);
+                        if (!isAllowed)
+                        {
+                            try
+                            {
+                                var uri = new Uri(normalized);
+                                var host = uri.Host;
+                                if (host.Equals("hanora.id.vn", StringComparison.OrdinalIgnoreCase) ||
+                                    host.EndsWith(".hanora.id.vn", StringComparison.OrdinalIgnoreCase) ||
+                                    host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                                    host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                    host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    isAllowed = true;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (isAllowed)
                         {
                             ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", origin);
                             ctx.Context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");

@@ -325,6 +325,23 @@ public class VocabularyService : IVocabularyService
             }
             await _db.SaveChangesAsync();
 
+            var existingFlashcard = await _db.Flashcards
+                .FirstOrDefaultAsync(f => f.UserVocabularyId == saveResult.UserVocabularyId && f.DeckId == null);
+            if (existingFlashcard == null)
+            {
+                var flashcard = new Flashcard
+                {
+                    UserVocabularyId = saveResult.UserVocabularyId,
+                    DeckId = null,
+                    LearnStatus = "new",
+                    FlipStatus = "active",
+                    CreatedAt = DateTime.UtcNow,
+                    LastStudiedAt = DateTime.UtcNow
+                };
+                _db.Flashcards.Add(flashcard);
+                await _db.SaveChangesAsync();
+            }
+
             await _statsService.AwardXpAsync(userId, 2, "Lưu từ mới vào Sổ tay");
         }
 

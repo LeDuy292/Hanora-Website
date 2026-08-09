@@ -348,6 +348,22 @@ export const useVocabularyStore = create(
         }
       },
 
+      fetchUserVocabulary: async () => {
+        set({ isLoading: true });
+        try {
+          const data = await apiRequest('/vocabulary', { auth: true });
+          if (data) {
+            set({ 
+              vocabList: data,
+              isLoading: false
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching user vocabulary:", error);
+          set({ isLoading: false });
+        }
+      },
+
       fetchUserFlashcards: async (deckId = null) => {
         set({ quizLoading: true });
         try {

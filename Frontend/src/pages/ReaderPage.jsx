@@ -207,6 +207,7 @@ const ReaderPage = () => {
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [documentsList, setDocumentsList] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [gridPage, setGridPage] = useState(1);
   const visualDocumentType = getVisualDocumentType(document);
   const visualOcrJsonUrl = document?.ocrJsonUrl || document?.OcrJsonUrl || null;
   const showVisualReader = Boolean(visualDocumentType);
@@ -238,6 +239,10 @@ const ReaderPage = () => {
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const docDropdownRef = useRef(null);
+
+  useEffect(() => {
+    setGridPage(1);
+  }, [docSearchQuery, activeFolderId]);
 
   // Document-specific progress statistics
   const [readingSeconds, setReadingSeconds] = useState(0);
@@ -2251,95 +2256,161 @@ const ReaderPage = () => {
                       </span>
                     </div>
 
-                    {filteredGridDocs.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 overflow-y-auto pr-1 scrollbar-thin flex-1">
-                        {filteredGridDocs.map(doc => (
-                          <div
-                            key={doc.id}
-                            onClick={() => navigate(`/reader/${doc.id}`)}
-                            className="group relative cursor-pointer flex flex-col items-center select-none"
-                          >
-                            {/* Notebook Cover Illustration */}
-                            <div className="w-full aspect-[3/4] bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200 relative overflow-hidden flex flex-col justify-between p-3 border border-blue-300/40">
-                              {/* Left Spiral Rings */}
-                              <div className="absolute left-1.5 top-0 bottom-0 flex flex-col justify-around py-2 z-10">
-                                {[...Array(9)].map((_, i) => (
-                                  <div key={i} className="w-2.5 h-1 bg-slate-800 rounded-full shadow-inner border border-slate-400/50" />
-                                ))}
-                              </div>
+                    {(() => {
+                      const GRID_DOCS_PER_PAGE = 12;
+                      const totalGridPages = Math.ceil(filteredGridDocs.length / GRID_DOCS_PER_PAGE) || 1;
+                      const validGridPage = Math.min(gridPage, totalGridPages);
+                      const paginatedGridDocs = filteredGridDocs.slice(
+                        (validGridPage - 1) * GRID_DOCS_PER_PAGE,
+                        validGridPage * GRID_DOCS_PER_PAGE
+                      );
 
-                              {/* Notebook Label Box */}
-                              <div className="ml-3 mt-4 bg-white/90 backdrop-blur-xs rounded-lg p-2.5 border border-white/60 shadow-xs">
-                                <p className="text-[11px] font-extrabold text-slate-800 line-clamp-3 leading-snug">
-                                  {doc.title}
-                                </p>
-                              </div>
+                      if (filteredGridDocs.length === 0) {
+                        return (
+                          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                            <FileText className="w-12 h-12 mb-3 opacity-30" />
+                            <p className="text-sm font-semibold">Chưa có tài liệu nào trong mục này</p>
+                            <p className="text-xs text-slate-400 mt-1">Bấm nút (+) ở thanh tìm kiếm để tải file hoặc tạo bản Doc mới</p>
+                          </div>
+                        );
+                      }
 
-                              {/* Notebook Bottom Info */}
-                              <div className="ml-3 flex items-center justify-between text-[9px] text-white/90 font-bold">
-                                <span>{doc.date || doc.createdAt?.split('T')[0] || '2026'}</span>
-                              </div>
-                            </div>
-
-                            {/* Notebook Title & Menu under Card */}
-                            <div className="w-full mt-2 flex items-center justify-between px-1">
-                              <span className="text-xs font-semibold text-slate-700 truncate flex-1 mr-1">
-                                {doc.title}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDocMenuId(activeDocMenuId === doc.id ? null : doc.id);
-                                }}
-                                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Doc Options Menu */}
-                            {activeDocMenuId === doc.id && (
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 overflow-y-auto pr-1 scrollbar-thin flex-1">
+                            {paginatedGridDocs.map(doc => (
                               <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-0 bottom-8 z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1 animate-in fade-in zoom-in-95 duration-150"
+                                key={doc.id}
+                                onClick={() => navigate(`/reader/${doc.id}`)}
+                                className="group relative cursor-pointer flex flex-col items-center select-none"
                               >
-                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chuyển thư mục</div>
-                                {(folders || []).map(f => (
+                                {/* Notebook Cover Illustration */}
+                                <div className="w-full aspect-[3/4] bg-gradient-to-br from-sky-400 to-blue-600 rounded-xl shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200 relative overflow-hidden flex flex-col justify-between p-3 border border-blue-300/40">
+                                  {/* Left Spiral Rings */}
+                                  <div className="absolute left-1.5 top-0 bottom-0 flex flex-col justify-around py-2 z-10">
+                                    {[...Array(9)].map((_, i) => (
+                                      <div key={i} className="w-2.5 h-1 bg-slate-800 rounded-full shadow-inner border border-slate-400/50" />
+                                    ))}
+                                  </div>
+
+                                  {/* Notebook Label Box */}
+                                  <div className="ml-3 mt-4 bg-white/90 backdrop-blur-xs rounded-lg p-2.5 border border-white/60 shadow-xs">
+                                    <p className="text-[11px] font-extrabold text-slate-800 line-clamp-3 leading-snug">
+                                      {doc.title}
+                                    </p>
+                                  </div>
+
+                                  {/* Notebook Bottom Info */}
+                                  <div className="ml-3 flex items-center justify-between text-[9px] text-white/90 font-bold">
+                                    <span>{doc.date || doc.createdAt?.split('T')[0] || '2026'}</span>
+                                  </div>
+                                </div>
+
+                                {/* Notebook Title & Menu under Card */}
+                                <div className="w-full mt-2 flex items-center justify-between px-1">
+                                  <span className="text-xs font-semibold text-slate-700 truncate flex-1 mr-1">
+                                    {doc.title}
+                                  </span>
                                   <button
-                                    key={f.id}
-                                    onClick={() => {
-                                      moveDocumentToFolder(doc.id, f.id);
-                                      setActiveDocMenuId(null);
-                                      useToastStore.getState().addToast(`Đã chuyển "${doc.title}" sang ${f.name}`, 'success');
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDocMenuId(activeDocMenuId === doc.id ? null : doc.id);
                                     }}
-                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 truncate"
+                                    className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
                                   >
-                                    {f.name}
+                                    <MoreVertical className="w-3.5 h-3.5" />
                                   </button>
-                                ))}
-                                <div className="border-t border-slate-100 my-1" />
+                                </div>
+
+                                {/* Doc Options Menu */}
+                                {activeDocMenuId === doc.id && (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-0 bottom-8 z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1 animate-in fade-in zoom-in-95 duration-150"
+                                  >
+                                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chuyển thư mục</div>
+                                    {(folders || []).map(f => (
+                                      <button
+                                        key={f.id}
+                                        onClick={() => {
+                                          moveDocumentToFolder(doc.id, f.id);
+                                          setActiveDocMenuId(null);
+                                          useToastStore.getState().addToast(`Đã chuyển "${doc.title}" sang ${f.name}`, 'success');
+                                        }}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 truncate"
+                                      >
+                                        {f.name}
+                                      </button>
+                                    ))}
+                                    <div className="border-t border-slate-100 my-1" />
+                                    <button
+                                      onClick={() => {
+                                        setActiveDocMenuId(null);
+                                        handleDeleteDocument(doc.id, doc.title);
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                      <span>Xóa tài liệu</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Workspace Grid Pagination Controls */}
+                          {totalGridPages > 1 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-3 mt-3 shrink-0 gap-2">
+                              <span className="text-[11px] text-slate-400 font-bold">
+                                Trang {validGridPage}/{totalGridPages} (Hiển thị {((validGridPage - 1) * GRID_DOCS_PER_PAGE) + 1} - {Math.min(validGridPage * GRID_DOCS_PER_PAGE, filteredGridDocs.length)} trong {filteredGridDocs.length} tài liệu)
+                              </span>
+
+                              <div className="flex items-center gap-1.5">
                                 <button
-                                  onClick={() => {
-                                    setActiveDocMenuId(null);
-                                    handleDeleteDocument(doc.id, doc.title);
-                                  }}
-                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                  onClick={() => setGridPage(p => Math.max(1, p - 1))}
+                                  disabled={validGridPage === 1}
+                                  className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                  title="Trang trước"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                  <span>Xóa tài liệu</span>
+                                  <ChevronLeft className="w-3.5 h-3.5" />
+                                  <span>Trước</span>
+                                </button>
+
+                                <div className="flex items-center gap-1">
+                                  {[...Array(totalGridPages)].map((_, i) => {
+                                    const pageNum = i + 1;
+                                    return (
+                                      <button
+                                        key={pageNum}
+                                        onClick={() => setGridPage(pageNum)}
+                                        className={`w-7 h-7 rounded-lg text-xs font-extrabold transition-colors ${
+                                          validGridPage === pageNum
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                        {pageNum}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <button
+                                  onClick={() => setGridPage(p => Math.min(totalGridPages, p + 1))}
+                                  disabled={validGridPage === totalGridPages}
+                                  className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                  title="Trang sau"
+                                >
+                                  <span>Sau</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
-                        <FileText className="w-12 h-12 mb-3 opacity-30" />
-                        <p className="text-sm font-semibold">Chưa có tài liệu nào trong mục này</p>
-                        <p className="text-xs text-slate-400 mt-1">Bấm nút (+) ở thanh tìm kiếm để tải file hoặc tạo bản Doc mới</p>
-                      </div>
-                    )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
