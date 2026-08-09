@@ -2085,39 +2085,6 @@ const ReaderPage = () => {
           {/* Settings & display controls */}
           <div className="mobile-scroll-x flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 sm:gap-3 mt-1 xl:mt-0 pb-1">
             
-            {/* Top Convenient Page Switcher Controls */}
-            {textTotalPages > 1 && (
-              <div className="flex items-center gap-1 bg-slate-100/90 border border-slate-200 rounded-xl px-2 py-1 shadow-xs font-sans">
-                <button
-                  onClick={() => {
-                    setCurrentPage(p => Math.max(1, p - 1));
-                    readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  disabled={validCurrentPage === 1}
-                  className="p-1 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                  title="Trang trước"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                <span className="text-xs font-extrabold text-slate-700 px-2 tracking-wide whitespace-nowrap">
-                  Trang {validCurrentPage} / {textTotalPages}
-                </span>
-
-                <button
-                  onClick={() => {
-                    setCurrentPage(p => Math.min(textTotalPages, p + 1));
-                    readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  disabled={validCurrentPage === textTotalPages}
-                  className="p-1 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                  title="Trang tiếp theo"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
             {/* Show/Hide Pinyin toggle */}
             <button
               onClick={() => setShowPinyin(!showPinyin)}
@@ -2529,21 +2496,54 @@ const ReaderPage = () => {
                   canRedo={currentRedoStrokes.length > 0}
                 />
 
-                <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-end gap-2 shrink-0 ${activeTheme.toolbar}`}>
-                  <button
-                    onClick={handleSaveAnnotations}
-                    className="min-h-[38px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Lưu ghi chú</span>
-                  </button>
-                  <button
-                    onClick={handleExportDocx}
-                    className="min-h-[38px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                  >
-                    <Download className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Xuất Word (.docx)</span>
-                  </button>
+                <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-between gap-2 shrink-0 ${activeTheme.toolbar}`}>
+                  {!showVisualReader && textTotalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setCurrentPage(p => Math.max(1, p - 1));
+                          readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        disabled={validCurrentPage === 1}
+                        className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        title="Trang trước"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      <span className="text-xs font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/80 shadow-sm whitespace-nowrap">
+                        Trang {validCurrentPage} / {textTotalPages}
+                      </span>
+
+                      <button
+                        onClick={() => {
+                          setCurrentPage(p => Math.min(textTotalPages, p + 1));
+                          readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        disabled={validCurrentPage === textTotalPages}
+                        className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        title="Trang tiếp theo"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={handleSaveAnnotations}
+                      className="min-h-[38px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Lưu ghi chú</span>
+                    </button>
+                    <button
+                      onClick={handleExportDocx}
+                      className="min-h-[38px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Xuất Word (.docx)</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Reader page content */}
