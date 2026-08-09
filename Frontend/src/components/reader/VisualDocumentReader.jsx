@@ -220,6 +220,13 @@ const ImageOcrReader = ({
         </div>
       </div>
       <style>{`
+        .hanora-ocr-word { 
+          display: block;
+          overflow: hidden;
+          box-sizing: border-box;
+          line-height: 1;
+          padding: 0;
+        }
         .hanora-ocr-word::selection { background: rgba(37, 99, 235, 0.24); color: transparent; }
         .hanora-ocr-word:hover { background-color: rgba(250, 204, 21, 0.32); }
         .hanora-image-note-badge {

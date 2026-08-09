@@ -64,7 +64,7 @@ export function Flashcard({
     : 'bg-slate-100 text-slate-500 border-slate-200';
 
   return (
-    <div className="flashcard-main">
+    <div id="flashcard" className="flashcard-main">
       <div className={`flashcard-inner ${isFlipped ? 'is-flipped' : ''}`} onClick={onFlip}>
         
         {/* FRONT FACE */}

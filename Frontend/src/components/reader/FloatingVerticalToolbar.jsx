@@ -61,7 +61,7 @@ export default function FloatingVerticalToolbar({
   };
 
   return (
-    <div className="fixed top-28 left-3 sm:left-6 z-[60] flex items-start gap-2 select-none animate-in fade-in slide-in-from-left-4 duration-200">
+    <div className="fixed top-36 left-3 sm:left-6 z-[60] flex items-start gap-2 select-none animate-in fade-in slide-in-from-left-4 duration-200">
       {/* Main Vertical Floating Toolbar Container */}
       <div className="bg-white/90 hover:bg-white backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-xl p-1.5 flex flex-col items-center gap-1.5 transition-all">
         {/* Toggle Collapse Button */}

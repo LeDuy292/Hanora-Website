@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { statsApi } from '../services/statsService';
+import { progressApi } from '../services/progressService';
 import { useAuthStore } from './authStore';
 
 let globalTimerInterval = null;
@@ -11,11 +12,30 @@ export const useTimerStore = create((set, get) => ({
   isHidden: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_hidden') === 'true' : false,
   isMinimized: typeof localStorage !== 'undefined' ? localStorage.getItem('hanora_timer_minimized') === 'true' : false,
 
-  setCountdownTargetSeconds: (secs) => set({ countdownTargetSeconds: secs }),
+  setCountdownTargetSeconds: (secs) => {
+    if (globalTimerInterval) {
+      clearInterval(globalTimerInterval);
+      globalTimerInterval = null;
+    }
+    set({ countdownTargetSeconds: secs, elapsedSeconds: 0, timerState: 'inactive' });
+    const mins = Math.ceil(secs / 60);
+    if (mins > 0) {
+      progressApi.setGoal(mins).then(() => {
+        useAuthStore.getState().refreshStats();
+      }).catch(console.error);
+    }
+  },
 
-  addExtraSeconds: (secs = 60) => set((state) => ({ 
-    countdownTargetSeconds: state.countdownTargetSeconds + secs 
-  })),
+  addExtraSeconds: (secs = 60) => {
+    const nextSecs = get().countdownTargetSeconds + secs;
+    set({ countdownTargetSeconds: nextSecs });
+    const mins = Math.ceil(nextSecs / 60);
+    if (mins > 0) {
+      progressApi.setGoal(mins).then(() => {
+        useAuthStore.getState().refreshStats();
+      }).catch(console.error);
+    }
+  },
 
   showWidget: () => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('hanora_timer_hidden', 'false');

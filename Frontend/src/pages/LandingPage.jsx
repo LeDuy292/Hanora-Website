@@ -229,7 +229,7 @@ export function LandingPage() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: "easeOut" }}
-            className="w-full flex flex-col items-center justify-center relative scale-[1.8]"
+            className="w-full flex flex-col items-center justify-center relative"
           >
             <div className="relative w-full max-w-[600px] aspect-[4/2.8] rounded-[3rem] overflow-hidden shadow-2xl border-8 border-white">
               <video 
