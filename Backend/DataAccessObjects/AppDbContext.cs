@@ -90,7 +90,7 @@ public partial class AppDbContext : DbContext
     {
         modelBuilder
             .HasPostgresEnum("channel_type_enum", new[] { "public", "private" })
-            .HasPostgresEnum("document_status_enum", new[] { "processing", "ready", "failed" })
+            .HasPostgresEnum("document_status_enum", new[] { "uploading", "processing", "recognizing_ocr", "analyzing_content", "ready", "failed" })
             .HasPostgresEnum("flashcard_mode_enum", new[] { "flashcard", "test" })
             .HasPostgresEnum("flip_result_enum", new[] { "know", "still_learning" })
             .HasPostgresEnum("leaderboard_period_enum", new[] { "daily", "weekly", "monthly", "all_time" })
@@ -450,6 +450,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.UserVocabulary).WithMany(p => p.Flashcards)
                 .HasForeignKey(d => d.UserVocabularyId)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("flashcards_user_vocabulary_id_fkey");
 
             entity.HasOne(d => d.Deck).WithMany(p => p.Flashcards)

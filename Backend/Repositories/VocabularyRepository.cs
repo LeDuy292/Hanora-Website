@@ -105,7 +105,8 @@ public class VocabularyRepository : IVocabularyRepository
     {
         return await _db.UserVocabularies
             .Include(uv => uv.Vocabulary)
-            .ThenInclude(v => v.ExampleSentencesNavigation)
+                .ThenInclude(v => v.ExampleSentencesNavigation)
+            .Include(uv => uv.SourceDocument)
             .Include(uv => uv.Flashcards)
             .Where(uv => uv.UserId == userId && uv.IsDeleted != true && (deckId == null || uv.Flashcards.Any(f => f.DeckId == deckId)))
             .ToListAsync();

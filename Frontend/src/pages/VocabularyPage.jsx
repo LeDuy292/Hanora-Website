@@ -168,8 +168,12 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
-  const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies } = useVocabularyStore();
+  const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies, fetchUserVocabulary } = useVocabularyStore();
   const { addXp } = useAuthStore();
+
+  useEffect(() => {
+    fetchUserVocabulary();
+  }, [fetchUserVocabulary]);
 
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace Hanora.Controllers;
 
@@ -19,6 +20,61 @@ public class VocabularyController : ControllerBase
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return long.TryParse(userIdString, out var userId) ? userId : 1;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetNotebookVocabularies()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var list = await _vocabularyService.GetUserVocabularyAsync(userId);
+            
+            return Ok(list.Select(uv => {
+                string translation = "";
+                try
+                {
+                    using (var doc = JsonDocument.Parse(uv.Vocabulary.Definitions))
+                    {
+                        var root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                        {
+                            if (root[0].TryGetProperty("meaning", out var meaningProp))
+                            {
+                                translation = meaningProp.GetString() ?? "";
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                return new {
+                    id = uv.Id,
+                    userVocabularyId = uv.Id,
+                    text = uv.Vocabulary.Word,
+                    pinyin = uv.Vocabulary.Pinyin,
+                    translation = translation,
+                    wordType = uv.Vocabulary.WordType?.ToString() ?? "Other",
+                    srsLevel = uv.MasteryLevel,
+                    dateAdded = uv.SavedAt?.ToString("yyyy-MM-dd"),
+                    documentTitle = uv.SourceDocument?.Title,
+                    documentId = uv.SourceDocumentId,
+                    hanViet = uv.Vocabulary.HanViet,
+                    collocations = uv.Vocabulary.Collocations,
+                    grammarPatterns = uv.Vocabulary.GrammarPatterns,
+                    context = uv.Vocabulary.UsageNotes,
+                    examples = uv.Vocabulary.ExampleSentencesNavigation.Select(e => new {
+                        zhText = e.ZhText,
+                        viText = e.ViText,
+                        pinyin = ""
+                    }).ToList()
+                };
+            }));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
     }
 
     [HttpGet("{word}")]
