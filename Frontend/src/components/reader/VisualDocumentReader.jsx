@@ -210,7 +210,7 @@ const ImageOcrReader = ({
                         {annotations?.stickyNotes?.[absIndex] ? '\uD83D\uDCCC' : '\uD83D\uDCA1'}
                       </span>
                     )}
-                    {showPinyin && (
+                    {showPinyin && /[\u3400-\u9fff]/.test(word.text) && (
                       <span className="hanora-image-pinyin">{cleanPinyin(word.text, pinyin(word.text, { type: 'string' }))}</span>
                     )}
                   </span>
