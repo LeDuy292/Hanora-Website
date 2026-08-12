@@ -46,15 +46,17 @@ public class OcrService : IOcrService
                 var chineseCharCount = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
                 var extractedPageCount = pages.Select(p => p.PageNumber).Distinct().Count();
 
-                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount > 10 && (expectedPageCount <= 0 || extractedPageCount >= expectedPageCount))
+                var hasReliablePdfLayout = IsPdfLayoutReliable(pages);
+                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount > 10 && hasReliablePdfLayout && (expectedPageCount <= 0 || extractedPageCount >= expectedPageCount))
                 {
                     return (text, pages, null);
                 }
 
                 _logger.LogInformation(
-                    "PDF text extraction yielded incomplete layout ({Extracted}/{Expected}) or little CJK text. Falling back to Azure Read OCR.",
+                    "PDF text extraction yielded incomplete layout ({Extracted}/{Expected}), unreliable boxes ({Reliable}), or little CJK text. Falling back to Azure Read OCR.",
                     extractedPageCount,
-                    expectedPageCount);
+                    expectedPageCount,
+                    hasReliablePdfLayout);
                 var (ocrText, ocrPages, ocrError) = await ExtractPdfWithAzureReadLayoutAsync(pdfBytes, expectedPageCount);
                 var ocrChineseCount = System.Text.RegularExpressions.Regex.Matches(ocrText ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
 
@@ -188,6 +190,42 @@ public class OcrService : IOcrService
             _logger.LogWarning(ex, "PdfPig failed to extract layout.");
         }
         return pagesDto;
+    }
+
+    private static bool IsPdfLayoutReliable(List<Services.DTOs.PageLinesDto> pages)
+    {
+        if (pages.Count == 0) return false;
+
+        var hanziWords = pages
+            .SelectMany(p => p.Lines)
+            .SelectMany(l => l.Words)
+            .Where(w => HasCjk(w.Text) && w.BoundingBox != null)
+            .ToList();
+
+        if (hanziWords.Count == 0) return false;
+
+        var suspiciousCount = hanziWords.Count(w =>
+        {
+            var box = w.BoundingBox!;
+            var cjkCount = Math.Max(1, CountCjk(w.Text));
+            var expectedMaxWidth = Math.Max(box.Height * cjkCount * 2.05, box.Height * 2.4);
+            return box.Width <= 0 || box.Height <= 0 || box.Width > expectedMaxWidth;
+        });
+
+        var tolerated = Math.Max(4, (int)Math.Ceiling(hanziWords.Count * 0.12));
+        return suspiciousCount <= tolerated;
+    }
+
+    private static bool HasCjk(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        return text.Any(ch => ch >= '\u3400' && ch <= '\u9fff');
+    }
+
+    private static int CountCjk(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+        return text.Count(ch => ch >= '\u3400' && ch <= '\u9fff');
     }
 
 
