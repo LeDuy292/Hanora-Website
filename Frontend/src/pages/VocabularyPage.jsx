@@ -674,60 +674,86 @@ export function VocabularyPage() {
             </div>
           </div>
 
-          {/* Total Row Count Indicator */}
-          <div className="flex justify-between items-center text-xs font-bold text-slate-500 px-1 font-sans">
+          {/* Total Row Count Indicator & Bulk Action Buttons */}
+          <div data-tour="vocab-actions" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs font-bold text-slate-500 px-1 font-sans">
             <span>Tổng số: <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> từ vựng</span>
-            {selectedRows.length > 0 && (
-              <div className="flex items-center gap-2">
+            
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedRows.length > 0 ? (
                 <span className="text-blue-600 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-lg">
                   Đang chọn: {selectedRows.length} từ
                 </span>
-                <button
-                  onClick={() => {
-                    const selectedWordObjects = fullVocabularyDataset
-                      .filter(w => selectedRows.includes(w.selectionKey))
-                      .map(w => ({
-                        text: w.text,
-                        pinyin: w.pinyin,
-                        translation: w.translation,
-                        hsk: w.hsk,
-                        dateAdded: w.dateAdded,
-                        difficulty: w.difficulty,
-                        srsLevel: w.srsLevel,
-                        nextReviewDate: w.nextReviewDate
-                      }));
-                    navigate('/flashcards', { state: { selectedWords: selectedWordObjects, focusNewLearning: true } });
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  <span>Ôn tập ngay</span>
-                </button>
-                <button
-                  onClick={handleOpenCreateDeckModal}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Tạo Flashcard</span>
-                </button>
-                <button
-                  onClick={handleBulkDeleteVocabulary}
-                  className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1 border border-transparent cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Xóa</span>
-                </button>
-              </div>
-            )}
+              ) : (
+                <span className="text-slate-400 font-bold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                  Chưa chọn từ vựng
+                </span>
+              )}
+              
+              <button
+                disabled={selectedRows.length === 0}
+                onClick={() => {
+                  const selectedWordObjects = fullVocabularyDataset
+                    .filter(w => selectedRows.includes(w.selectionKey))
+                    .map(w => ({
+                      text: w.text,
+                      pinyin: w.pinyin,
+                      translation: w.translation,
+                      hsk: w.hsk,
+                      dateAdded: w.dateAdded,
+                      difficulty: w.difficulty,
+                      srsLevel: w.srsLevel,
+                      nextReviewDate: w.nextReviewDate
+                    }));
+                  navigate('/flashcards', { state: { selectedWords: selectedWordObjects, focusNewLearning: true } });
+                }}
+                className={`font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-1 border border-transparent cursor-pointer ${
+                  selectedRows.length > 0
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                }`}
+                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để ôn tập" : "Ôn tập các từ vựng đã chọn"}
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span>Ôn tập ngay</span>
+              </button>
+
+              <button
+                disabled={selectedRows.length === 0}
+                onClick={handleOpenCreateDeckModal}
+                className={`font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-1 border border-transparent cursor-pointer ${
+                  selectedRows.length > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                }`}
+                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để tạo Flashcard" : "Tạo bộ thẻ Flashcard từ các từ đã chọn"}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tạo Flashcard</span>
+              </button>
+
+              <button
+                disabled={selectedRows.length === 0}
+                onClick={handleBulkDeleteVocabulary}
+                className={`font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-1 border border-transparent cursor-pointer ${
+                  selectedRows.length > 0
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                }`}
+                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để xóa" : "Xóa các từ vựng đã chọn khỏi Sổ tay"}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa</span>
+              </button>
+            </div>
           </div>
 
           {/* MAIN VOCABULARY DATATABLE */}
-          <div id="vocabulary-table" className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm font-sans">
-            <div className="overflow-x-auto">
+          <div id="vocabulary-table" className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden lg:overflow-visible shadow-sm font-sans">
+            <div className="overflow-x-auto lg:overflow-x-visible">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                    <th className="py-4.5 px-4 w-12 text-center select-none">
+                    <th className="py-4.5 px-4 w-12 text-center select-none rounded-tl-2xl">
                       <input 
                         type="checkbox"
                         checked={paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.selectionKey))}
@@ -739,7 +765,7 @@ export function VocabularyPage() {
                     <th className="py-4.5 px-4 font-black w-[20%]">Pinyin</th>
                     <th className="py-4.5 px-4 font-black w-[42%]">Nghĩa</th>
                     <th className="py-4.5 px-4 font-black w-[14%]">Ngày học</th>
-                    <th className="py-4.5 px-4 font-black text-center w-[12%]">Thao tác</th>
+                    <th className="py-4.5 px-4 font-black text-center w-[12%] rounded-tr-2xl">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

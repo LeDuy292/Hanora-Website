@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTourStore } from '../../store/tourStore';
-import { tourSteps } from './tourSteps';
 import { onboardingAudio } from '../../utils/onboardingAudio';
 
 export const TourActionController = () => {
@@ -10,13 +9,16 @@ export const TourActionController = () => {
 
   const {
     isTourActive,
+    activeSteps,
     currentStepId,
     currentStepIndex,
     completeActionStep,
     setStepByIndex
   } = useTourStore();
 
-  const currentStep = tourSteps[currentStepIndex];
+  if (!isTourActive || !activeSteps || activeSteps.length === 0) return null;
+
+  const currentStep = activeSteps[currentStepIndex];
 
   // Route Synchronization across pages
   useEffect(() => {
@@ -64,3 +66,4 @@ export const TourActionController = () => {
 
   return null;
 };
+

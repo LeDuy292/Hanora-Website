@@ -1,5 +1,4 @@
 import { useTourStore } from '../../store/tourStore';
-import { tourSteps } from './tourSteps';
 import { TourOverlay } from './TourOverlay';
 import { TourTooltip } from './TourTooltip';
 import { TourActionController } from './TourActionController';
@@ -8,6 +7,7 @@ import { TourCompletion } from './TourCompletion';
 export const TourController = () => {
   const {
     isTourActive,
+    activeSteps,
     currentStepIndex,
     status,
     endTour,
@@ -15,9 +15,9 @@ export const TourController = () => {
     acknowledgeStep
   } = useTourStore();
 
-  if (!isTourActive) return null;
+  if (!isTourActive || !activeSteps || activeSteps.length === 0) return null;
 
-  const currentStepData = tourSteps[currentStepIndex] || tourSteps[0];
+  const currentStepData = activeSteps[currentStepIndex] || activeSteps[0];
 
   return (
     <>
@@ -35,7 +35,7 @@ export const TourController = () => {
           {/* 4. Smart Tooltip Bubble */}
           <TourTooltip
             currentStepData={currentStepData}
-            totalSteps={tourSteps.length}
+            totalSteps={activeSteps.length}
             onSkip={() => endTour(false, true)}
             onPrev={prevStep}
             onAcknowledge={acknowledgeStep}
@@ -47,3 +47,4 @@ export const TourController = () => {
 };
 
 export { TourController as TourProvider };
+

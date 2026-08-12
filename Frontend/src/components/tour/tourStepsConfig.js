@@ -23,12 +23,12 @@ export const tourSteps = [
   {
     id: "step-3",
     page: "/dashboard",
-    target: '[data-tour="stat-cards"] > div:nth-child(3)',
-    fallbackTarget: '[data-tour="stat-cards"]',
-    title: "3. Theo Dõi Chuỗi Streak & SRS",
-    description: "Đây là 4 Thẻ thống kê nhanh giúp bạn theo dõi Chuỗi lửa Streak 🔥 và số từ vựng đến hạn ôn tập.",
+    target: '#streak',
+    fallbackTarget: '#streak',
+    title: "3. Theo Dõi Chuỗi Streak",
+    description: "Đây là bảng theo dõi Chuỗi lửa Streak 🔥 giúp bạn duy trì thói quen học tập hàng ngày.",
     action: "click",
-    actionHint: "👉 Nhấp vào thẻ 'Sổ tay từ vựng' hoặc vùng thống kê",
+    actionHint: "👉 Nhấp chọn bảng Streak",
   },
   {
     id: "step-4",

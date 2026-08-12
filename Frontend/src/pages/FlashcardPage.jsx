@@ -174,6 +174,17 @@ export function FlashcardPage() {
     initPageData();
   }, []);
 
+  // Listen for selectedWords passed from the Vocabulary page
+  useEffect(() => {
+    if (location.state?.selectedWords && location.state.selectedWords.length > 0) {
+      setActiveDeck({
+        id: 'temp_selected',
+        title: `⚡ Ôn tập ${location.state.selectedWords.length} từ đã chọn`
+      });
+      setStudyMode('flashcard');
+    }
+  }, [location.state]);
+
   useEffect(() => {
     const syncDeckCards = async () => {
       setSelectedDeck(null);
@@ -189,19 +200,24 @@ export function FlashcardPage() {
         setActiveDeckCards([]);
         await store.fetchUserFlashcards(); // Restore entire vocabulary list in store
       } else {
-        const isNumericDeck = activeDeck.id && !isNaN(Number(activeDeck.id));
-        if (isNumericDeck) {
-          setIsLoadingDeckCards(true);
-          try {
-            const data = await apiRequest(`/flashcard?deckId=${activeDeck.id}`, { auth: true });
-            setActiveDeckCards(data || []);
-          } catch (err) {
-            console.error("Error loading active deck cards:", err);
-          } finally {
-            setIsLoadingDeckCards(false);
-          }
+        if (activeDeck.id === 'temp_selected') {
+          const selectedWords = location.state?.selectedWords || [];
+          setActiveDeckCards(selectedWords);
         } else {
-          setActiveDeckCards(vocabList);
+          const isNumericDeck = activeDeck.id && !isNaN(Number(activeDeck.id));
+          if (isNumericDeck) {
+            setIsLoadingDeckCards(true);
+            try {
+              const data = await apiRequest(`/flashcard?deckId=${activeDeck.id}`, { auth: true });
+              setActiveDeckCards(data || []);
+            } catch (err) {
+              console.error("Error loading active deck cards:", err);
+            } finally {
+              setIsLoadingDeckCards(false);
+            }
+          } else {
+            setActiveDeckCards(vocabList);
+          }
         }
       }
     };
