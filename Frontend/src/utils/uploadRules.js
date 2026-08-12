@@ -5,6 +5,7 @@ export const ALLOWED_UPLOAD_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'image/jpeg',
   'image/png',
+  'application/octet-stream',
 ];
 
 export const UPLOAD_RULE_TEXT = 'PDF, DOCX, JPG, JPEG hoặc PNG, tối đa 5 MB';

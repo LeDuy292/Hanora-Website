@@ -33,6 +33,12 @@ public interface IFlashcardService
     Task<object> StartMatchGameAsync(long userId, long? deckId = null, int cardCount = 8);
     Task<bool> SubmitMatchPairAsync(long userId, long matchGameId, long flashcardId1, long flashcardId2);
     Task<bool> CompleteMatchGameAsync(long userId, long matchGameId);
+
+    // Learn Mode (Quizlet-style)
+    Task<LearnSessionResponse> StartLearnSessionAsync(long userId, long? deckId, bool learnAgainOnly);
+    Task<LearnQuestionDto?> GetNextLearnQuestionAsync(long userId, long sessionId, long? deckId, bool learnAgainOnly);
+    Task<SubmitLearnAnswerResponse> SubmitLearnAnswerAsync(long userId, SubmitLearnAnswerRequest request);
+    Task<LearnSessionSummaryResponse> FinishLearnSessionAsync(long userId, long sessionId);
 }
 
 public class BulkAddCardsRequest
@@ -50,4 +56,69 @@ public class CreateFlashcardSetRequest
     public string? Description { get; set; }
     public long? DocumentId { get; set; }
     public List<string> ListVocabularyIds { get; set; } = new();
+}
+
+public class StartLearnRequest
+{
+    public long? DeckId { get; set; }
+    public bool LearnAgainOnly { get; set; }
+}
+
+public class LearnSessionResponse
+{
+    public long SessionId { get; set; }
+    public int TotalQuestions { get; set; }
+}
+
+public class LearnQuestionDto
+{
+    public long FlashcardId { get; set; }
+    public string Type { get; set; } = null!;
+    public string QuestionText { get; set; } = null!;
+    public string CorrectAnswer { get; set; } = null!;
+    public List<string> Options { get; set; } = new();
+    public string Word { get; set; } = null!;
+    public string Pinyin { get; set; } = null!;
+    public string Translation { get; set; } = null!;
+    public string? HanViet { get; set; }
+    public string? WordType { get; set; }
+    public string? Explanation { get; set; }
+    public string? ExampleZh { get; set; }
+    public string? ExampleVi { get; set; }
+}
+
+public class SubmitLearnAnswerRequest
+{
+    public long SessionId { get; set; }
+    public long FlashcardId { get; set; }
+    public string UserAnswer { get; set; } = null!;
+    public int ResponseMs { get; set; }
+    public string QuestionType { get; set; } = null!;
+}
+
+public class SubmitLearnAnswerResponse
+{
+    public bool IsCorrect { get; set; }
+    public string CorrectAnswer { get; set; } = null!;
+    public int XpEarned { get; set; }
+    public int NewMasteryLevel { get; set; }
+    public string? NextReviewDate { get; set; }
+}
+
+public class LearnSessionSummaryResponse
+{
+    public int TotalCards { get; set; }
+    public int CorrectCount { get; set; }
+    public int IncorrectCount { get; set; }
+    public decimal AccuracyPercent { get; set; }
+    public int XpEarned { get; set; }
+    public List<FailedCardDto> FailedCards { get; set; } = new();
+}
+
+public class FailedCardDto
+{
+    public string Word { get; set; } = null!;
+    public string Pinyin { get; set; } = null!;
+    public string Translation { get; set; } = null!;
+    public int WrongCount { get; set; }
 }

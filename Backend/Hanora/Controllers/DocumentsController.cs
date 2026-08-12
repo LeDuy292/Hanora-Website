@@ -247,7 +247,8 @@ public class DocumentsController : ControllerBase
             ? configured
             : DefaultAllowedContentTypes.GetValueOrDefault(normalizedExtension, []);
 
-        return allowed.Any(type => string.Equals(type, contentType, StringComparison.OrdinalIgnoreCase));
+        return allowed.Any(type => string.Equals(type, contentType, StringComparison.OrdinalIgnoreCase))
+               || string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase);
     }
 
     private string BuildUploadErrorMessage(string reason)
