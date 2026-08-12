@@ -27,7 +27,8 @@ import {
   Sparkles,
   Award,
   BookMarked,
-  Volume2
+  Volume2,
+  X
 } from 'lucide-react';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useAuthStore } from '../store/authStore';
@@ -100,6 +101,18 @@ export function FlashcardPage() {
   const [reviewCards, setReviewCards] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewFlipped, setReviewFlipped] = useState(false);
+
+  // Learn Mode states
+  const [learnSessionId, setLearnSessionId] = useState(null);
+  const [learnQuestion, setLearnQuestion] = useState(null);
+  const [learnAnswered, setLearnAnswered] = useState(null);
+  const [learnInputAnswer, setLearnInputAnswer] = useState('');
+  const [learnComplete, setLearnComplete] = useState(false);
+  const [learnScore, setLearnScore] = useState(0);
+  const [learnTotalQuestions, setLearnTotalQuestions] = useState(0);
+  const [learnIncorrectCount, setLearnIncorrectCount] = useState(0);
+  const [learnFailedCards, setLearnFailedCards] = useState([]);
+  const [learnAgainOnly, setLearnAgainOnly] = useState(false);
 
   // Dashboard Stats
   const [dashboardStats, setDashboardStats] = useState({
@@ -324,6 +337,137 @@ export function FlashcardPage() {
     }
   };
 
+  const getOptionStyleAndIcon = (opt, oi) => {
+    if (!learnAnswered) {
+      return {
+        btnClass: "p-5 border border-slate-200 hover:border-blue-500 hover:bg-blue-50/30 text-left rounded-2xl font-bold text-slate-700 transition active:scale-98 flex items-center justify-between bg-white w-full group shadow-xs option-btn",
+        rightNode: <span className="text-[10px] text-slate-350 font-bold hidden sm:inline-block">Phím {oi + 1}</span>
+      };
+    }
+
+    const isCorrect = opt === learnAnswered.correctOption;
+    const isSelected = opt === learnAnswered.selectedOption;
+
+    if (isCorrect) {
+      return {
+        btnClass: "p-5 border-2 border-emerald-500 bg-emerald-50 text-emerald-800 text-left rounded-2xl font-black transition flex items-center justify-between w-full shadow-xs option-btn animate-pop",
+        rightNode: <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+      };
+    }
+
+    if (isSelected) {
+      return {
+        btnClass: "p-5 border-2 border-rose-500 bg-rose-50 text-rose-800 text-left rounded-2xl font-black transition flex items-center justify-between w-full shadow-xs option-btn animate-shake",
+        rightNode: <X className="w-5 h-5 text-rose-600 shrink-0" />
+      };
+    }
+
+    return {
+      btnClass: "p-5 border border-slate-100 bg-white text-slate-350 text-left rounded-2xl font-bold transition flex items-center justify-between w-full opacity-40 cursor-not-allowed shadow-xs option-btn",
+      rightNode: null
+    };
+  };
+
+  // Learn Mode actions
+  const startLearnMode = async (learnAgain = false) => {
+    try {
+      const res = await apiRequest(`/flashcard/learn/start`, {
+        method: 'POST',
+        auth: true,
+        body: {
+          deckId: activeDeck?.id !== 'all' ? Number(activeDeck?.id) : null,
+          learnAgainOnly: learnAgain
+        }
+      });
+      if (res && res.sessionId) {
+        setLearnSessionId(res.sessionId);
+        setLearnTotalQuestions(res.totalQuestions);
+        setLearnScore(0);
+        setLearnIncorrectCount(0);
+        setLearnComplete(false);
+        setLearnAnswered(null);
+        setLearnInputAnswer('');
+        setLearnAgainOnly(learnAgain);
+        // Fetch first question
+        await fetchNextLearnQuestion(res.sessionId, learnAgain);
+      }
+    } catch (err) {
+      console.error("Error starting learn session:", err);
+      toast.error("Không thể bắt đầu phiên học.");
+    }
+  };
+
+  const fetchNextLearnQuestion = async (sessionId, learnAgain = false) => {
+    try {
+      const deckParam = activeDeck?.id !== 'all' ? `&deckId=${activeDeck?.id}` : '';
+      const res = await apiRequest(`/flashcard/learn/next?sessionId=${sessionId}${deckParam}&learnAgainOnly=${learnAgain}`, {
+        method: 'GET',
+        auth: true
+      });
+      if (res) {
+        if (res.isComplete) {
+          await finishLearnSession(sessionId);
+        } else {
+          setLearnQuestion(res);
+          setLearnAnswered(null);
+          setLearnInputAnswer('');
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching next question:", err);
+    }
+  };
+
+  const submitLearnAnswer = async (userAns) => {
+    if (!learnQuestion || learnAnswered) return;
+    const startTime = Date.now();
+    try {
+      const res = await apiRequest(`/flashcard/learn/submit`, {
+        method: 'POST',
+        auth: true,
+        body: {
+          sessionId: learnSessionId,
+          flashcardId: learnQuestion.flashcardId,
+          userAnswer: userAns,
+          responseMs: Date.now() - startTime,
+          questionType: learnQuestion.type
+        }
+      });
+      if (res) {
+        setLearnAnswered({
+          isCorrect: res.isCorrect,
+          selectedOption: userAns,
+          correctOption: res.correctAnswer,
+          xpEarned: res.xpEarned,
+          nextReviewDate: res.nextReviewDate
+        });
+        if (res.isCorrect) {
+          setLearnScore(prev => prev + 1);
+        } else {
+          setLearnIncorrectCount(prev => prev + 1);
+        }
+      }
+    } catch (err) {
+      console.error("Error submitting answer:", err);
+    }
+  };
+
+  const finishLearnSession = async (sessionId) => {
+    try {
+      const res = await apiRequest(`/flashcard/learn/finish?sessionId=${sessionId}`, {
+        method: 'POST',
+        auth: true
+      });
+      if (res) {
+        setLearnComplete(true);
+        setLearnFailedCards(res.failedCards || []);
+        loadDashboardStats();
+      }
+    } catch (err) {
+      console.error("Error finishing session:", err);
+    }
+  };
+
   // Review Mode actions
   const startReviewMode = async () => {
     try {
@@ -481,7 +625,9 @@ export function FlashcardPage() {
   // Switch tabs
   useEffect(() => {
     if (!activeDeck) return;
-    if (studyMode === 'write') {
+    if (studyMode === 'learn') {
+      startLearnMode(false);
+    } else if (studyMode === 'write') {
       startWriteMode();
     } else if (studyMode === 'match') {
       startMatchMode();
@@ -756,6 +902,52 @@ export function FlashcardPage() {
       submitSession();
     }
   }, [isSessionComplete]);
+
+  // Learn Mode keydown handlers
+  useEffect(() => {
+    if (studyMode !== 'learn') return;
+
+    const handleLearnKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        if (e.key === 'Enter' && learnAnswered) {
+          e.preventDefault();
+          fetchNextLearnQuestion(learnSessionId, learnAgainOnly);
+        }
+        return;
+      }
+
+      if (learnComplete) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setStudyMode('flashcard');
+        return;
+      }
+
+      if (learnAnswered) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          fetchNextLearnQuestion(learnSessionId, learnAgainOnly);
+        }
+        return;
+      }
+
+      if (learnQuestion && learnQuestion.options && learnQuestion.options.length > 0) {
+        if (['1', '2', '3', '4'].includes(e.key)) {
+          e.preventDefault();
+          const idx = parseInt(e.key) - 1;
+          if (idx < learnQuestion.options.length) {
+            submitLearnAnswer(learnQuestion.options[idx]);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleLearnKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleLearnKeyDown);
+    };
+  }, [studyMode, learnQuestion, learnAnswered, learnSessionId, learnComplete, learnAgainOnly]);
 
   // RENDER 1: Deck Manager Dashboard
   if (activeDeck === null) {
@@ -1123,13 +1315,15 @@ export function FlashcardPage() {
 
   // RENDER 2: Play Modes View
   return (
-    <div className="flashcard-container page-transition">
+    <div className="flashcard-container page-transition" style={{ padding: studyMode === 'learn' ? '1rem 2rem' : '2rem' }}>
       {/* ===== CENTERED MAIN CONTENT ===== */}
         {/* Back to list and header */}
-        <div className="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-3xl shadow-sm">
+        <div className={`flex justify-between items-center bg-white border border-slate-100 shadow-sm transition-all ${
+          studyMode === 'learn' ? 'p-2.5 px-4 rounded-2xl' : 'p-4 rounded-3xl'
+        }`}>
           <button 
             onClick={() => setActiveDeck(null)}
-            className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-650 font-bold py-2 px-4 rounded-2xl transition text-xs select-none"
+            className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-650 font-bold py-2 px-4 rounded-xl transition text-xs select-none"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Danh sách bộ thẻ</span>
@@ -1141,28 +1335,30 @@ export function FlashcardPage() {
       </div>
 
       {/* Smart Review Pre-Session Banner */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1 relative z-10">
-          <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Phiên ôn tập thông minh (Smart SRS)</span>
+      {studyMode !== 'learn' && (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1 relative z-10">
+            <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Phiên ôn tập thông minh (Smart SRS)</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black">{activeDeck?.title || selectedDeck?.title || 'Bộ từ vựng'}</h3>
+            <p className="text-xs text-white/80 font-medium">Tự động sắp xếp khoảng cách lặp lại ngắt quãng (Spaced Repetition) để tối ưu khả năng ghi nhớ dài hạn.</p>
           </div>
-          <h3 className="text-base sm:text-lg font-black">{activeDeck?.title || selectedDeck?.title || 'Bộ từ vựng'}</h3>
-          <p className="text-xs text-white/80 font-medium">Tự động sắp xếp khoảng cách lặp lại ngắt quãng (Spaced Repetition) để tối ưu khả năng ghi nhớ dài hạn.</p>
-        </div>
 
-        <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 shrink-0 relative z-10">
-          <div className="text-center px-2">
-            <span className="text-[10px] font-bold text-white/70 uppercase block">Số lượng thẻ</span>
-            <span className="text-lg font-black text-white">{activeList.length} Thẻ</span>
-          </div>
-          <div className="h-8 w-px bg-white/20"></div>
-          <div className="text-center px-2">
-            <span className="text-[10px] font-bold text-white/70 uppercase block">Dự kiến phiên</span>
-            <span className="text-lg font-black text-white">~{Math.max(3, Math.ceil((activeList.length * 25) / 60))} phút</span>
+          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 shrink-0 relative z-10">
+            <div className="text-center px-2">
+              <span className="text-[10px] font-bold text-white/70 uppercase block">Số lượng thẻ</span>
+              <span className="text-lg font-black text-white">{activeList.length} Thẻ</span>
+            </div>
+            <div className="h-8 w-px bg-white/20"></div>
+            <div className="text-center px-2">
+              <span className="text-[10px] font-bold text-white/70 uppercase block">Dự kiến phiên</span>
+              <span className="text-lg font-black text-white">~{Math.max(3, Math.ceil((activeList.length * 25) / 60))} phút</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modes Navigation Tabs */}
       <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
@@ -1173,25 +1369,23 @@ export function FlashcardPage() {
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>Đọc thẻ</span>
+          <span>Flashcard</span>
         </button>
         <button 
-          onClick={() => setStudyMode('review')}
+          onClick={() => setStudyMode('learn')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'review' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
+            studyMode === 'learn' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" />
-          <span>Học từ (SRS)</span>
+          <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+          <span>Học (Learn)</span>
         </button>
         <button 
-          onClick={() => setStudyMode('write')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
-            studyMode === 'write' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
-          }`}
+          onClick={() => navigate(`/quiz?deckId=${activeDeck.id}&max=${activeList.length}`)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 transition"
         >
-          <Edit3 className="w-3.5 h-3.5" />
-          <span>Luyện viết</span>
+          <Target className="w-3.5 h-3.5 text-blue-500" />
+          <span>Kiểm tra (Test)</span>
         </button>
         <button 
           onClick={() => setStudyMode('match')}
@@ -1200,16 +1394,365 @@ export function FlashcardPage() {
           }`}
         >
           <Award className="w-3.5 h-3.5" />
-          <span>Ghép từ</span>
+          <span>Ghép từ (Match)</span>
         </button>
         <button 
-          onClick={() => navigate('/quiz')}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 transition"
+          onClick={() => setStudyMode('review')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            studyMode === 'review' ? 'bg-white text-blue-600 shadow-sm font-extrabold' : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
-          <Target className="w-3.5 h-3.5 text-blue-500" />
-          <span>Kiểm tra AI</span>
+          <Clock className="w-3.5 h-3.5" />
+          <span>Ôn tập SRS</span>
         </button>
       </div>
+
+      {/* Learn Progress Bar */}
+      {studyMode === 'learn' && !learnComplete && (
+        <div className="bg-white border border-slate-100/80 p-3 px-5 rounded-2xl shadow-xs space-y-2">
+          <div className="flex justify-between items-baseline text-xs font-bold text-slate-500">
+            <span className="text-slate-700">Học từ</span>
+            <span className="text-blue-600 font-extrabold">
+              {learnScore + learnIncorrectCount + 1} / {learnTotalQuestions} ({Math.round(((learnScore + learnIncorrectCount + 1) / learnTotalQuestions) * 100)}%)
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-600 transition-all duration-300"
+              style={{ width: `${((learnScore + learnIncorrectCount + 1) / learnTotalQuestions) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SUB-VIEW 0: Learn Mode */}
+      {studyMode === 'learn' && (
+        <div className="space-y-4 w-full max-w-[92vw] md:max-w-[92%] mx-auto pt-2 animate-fade-in font-sans">
+          <style>{`
+            @keyframes shake {
+              0%, 100% { transform: translateX(0); }
+              20%, 60% { transform: translateX(-6px); }
+              40%, 80% { transform: translateX(6px); }
+            }
+            @keyframes pop {
+              0% { transform: scale(1); }
+              50% { transform: scale(1.02); }
+              100% { transform: scale(1); }
+            }
+            .animate-shake {
+              animation: shake 0.4s ease-in-out;
+            }
+            .animate-pop {
+              animation: pop 0.3s ease-out;
+            }
+            .option-btn {
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .option-btn:hover {
+              transform: translateY(-1px);
+            }
+            .option-btn:active {
+              transform: translateY(1px) scale(0.98);
+            }
+          `}</style>
+
+          {learnComplete ? (
+            <div className="bg-white border border-slate-100 p-8 sm:p-10 rounded-3xl shadow-sm text-center space-y-6 animate-pop">
+              <div className="inline-block p-4 bg-amber-50 border border-amber-100 rounded-full text-amber-500">
+                <Award className="w-12 h-12" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black text-slate-800">Hoàn thành phiên học!</h2>
+                <p className="text-slate-500 text-sm mt-1">Chúc mừng bạn đã hoàn thành bài học từ vựng.</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-100 max-w-md mx-auto">
+                <div className="text-center border-r border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Chính xác</span>
+                  <span className="text-2xl font-black text-emerald-600 block mt-1">{learnScore}</span>
+                </div>
+                <div className="text-center border-r border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-widest">Sai</span>
+                  <span className="text-2xl font-black text-rose-600 block mt-1">{learnIncorrectCount}</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-widest">Độ chính xác</span>
+                  <span className="text-2xl font-black text-blue-600 block mt-1">
+                    {learnScore + learnIncorrectCount > 0 
+                      ? Math.round((learnScore / (learnScore + learnIncorrectCount)) * 100) 
+                      : 0}%
+                  </span>
+                </div>
+              </div>
+
+              {learnFailedCards.length > 0 && (
+                <div className="text-left space-y-3 max-w-md mx-auto">
+                  <h4 className="text-sm font-bold text-slate-700">Các từ cần học lại:</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {learnFailedCards.map((card, ci) => (
+                      <div key={ci} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-slate-800">{card.word}</span>
+                          <span className="text-slate-400">[{card.pinyin}]</span>
+                          <span className="text-slate-500">- {card.translation}</span>
+                        </div>
+                        <span className="bg-rose-50 text-rose-600 font-extrabold px-2 py-0.5 rounded-full text-[10px] shrink-0">
+                          {card.wrongCount} lần sai
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2 max-w-md mx-auto">
+                {learnFailedCards.length > 0 && (
+                  <button
+                    onClick={() => startLearnMode(true)}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
+                  >
+                    Học lại từ chưa nhớ
+                  </button>
+                )}
+                <button
+                  onClick={() => startLearnMode(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition"
+                >
+                  Học lại từ đầu
+                </button>
+                <button
+                  onClick={() => setStudyMode('flashcard')}
+                  className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-660 font-bold rounded-2xl text-xs uppercase tracking-wider transition"
+                >
+                  Quay về bộ thẻ
+                </button>
+              </div>
+            </div>
+          ) : !learnQuestion ? (
+            <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm w-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-slate-500 text-xs mt-3 font-semibold">Đang tải câu hỏi...</p>
+            </div>
+          ) : (
+            <div className={`bg-white border border-slate-100 rounded-[2rem] p-4 sm:p-6 shadow-md space-y-5 w-full transition-all duration-300 ${
+              learnAnswered 
+                ? (learnAnswered.isCorrect ? 'animate-pop border-emerald-100 bg-emerald-50/5' : 'animate-shake border-rose-100 bg-rose-50/5') 
+                : ''
+            }`}>
+              
+              {/* Header Info */}
+              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-full text-slate-500">
+                    HỌC TỪ
+                  </span>
+                  <span>{activeDeck?.title}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5 text-amber-500" /> +10 XP</span>
+                  <span>{learnScore + learnIncorrectCount + 1} / {learnTotalQuestions}</span>
+                </div>
+              </div>
+
+              {/* Question Text Prompt */}
+              <div className="text-center space-y-2 py-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full inline-block">
+                  {learnQuestion.type === 'choice_meaning' ? 'Chọn nghĩa đúng' : 
+                   learnQuestion.type === 'choice_word' ? 'Tìm từ tiếng Trung' : 
+                   learnQuestion.type === 'choice_pinyin' ? 'Chọn phiên âm đúng' :
+                   learnQuestion.type === 'audio_choice' ? 'Nghe phát âm và chọn từ đúng' :
+                   learnQuestion.type === 'fill_blank' ? 'Điền vào chỗ trống' : 'Nhập nghĩa tiếng Việt'}
+                </span>
+
+                {learnQuestion.type === 'audio_choice' ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <button
+                      onClick={() => speakChineseText(learnQuestion.word)}
+                      className="bg-blue-50 border border-blue-100 hover:bg-blue-100 p-5 rounded-full transition flex items-center justify-center group shadow-xs active:scale-95"
+                    >
+                      <Volume2 className="w-8 h-8 text-blue-600 group-hover:scale-110 transition" />
+                    </button>
+                    <span className="text-xs text-slate-450 font-bold">Bấm loa để nghe phát âm</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-800 leading-normal tracking-tight">
+                      {learnQuestion.type === 'fill_blank' && learnQuestion.questionText ? (
+                        <span>
+                          {learnQuestion.questionText.split("____").map((part, index, arr) => (
+                            <span key={index}>
+                              {part}
+                              {index < arr.length - 1 && (
+                                <span className="border-b-2 border-slate-400 px-4 mx-1 text-blue-650 font-black">
+                                  {learnAnswered ? learnAnswered.correctOption : "___"}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        learnQuestion.questionText
+                      )}
+                    </h2>
+                    {learnQuestion.type === 'choice_meaning' && showPinyin && (
+                      <p className="text-slate-455 font-bold text-sm">[{learnQuestion.pinyin}]</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Before Answering */}
+              {!learnAnswered ? (
+                learnQuestion.type === 'input_translation' || 
+                learnQuestion.type === 'input_word' || 
+                learnQuestion.type === 'input_pinyin' ? (
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submitLearnAnswer(learnInputAnswer);
+                    }} 
+                    className="space-y-4 max-w-md mx-auto w-full"
+                  >
+                    <input 
+                      type="text" 
+                      placeholder={
+                        learnQuestion.type === 'input_pinyin' ? "Nhập phiên âm pinyin (ví dụ: zi xin)..." :
+                        learnQuestion.type === 'input_word' ? "Nhập từ tiếng Trung..." :
+                        "Nhập nghĩa tiếng Việt..."
+                      }
+                      value={learnInputAnswer}
+                      onChange={(e) => setLearnInputAnswer(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                      autoFocus
+                      required
+                    />
+                    <button 
+                      type="submit"
+                      className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
+                    >
+                      Kiểm tra
+                    </button>
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                    {learnQuestion.options.map((opt, oi) => {
+                      const { btnClass, rightNode } = getOptionStyleAndIcon(opt, oi);
+                      return (
+                        <button
+                          key={oi}
+                          onClick={() => submitLearnAnswer(opt)}
+                          className={btnClass}
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 text-slate-450 flex items-center justify-center font-black text-xs shrink-0 group-hover:bg-blue-50 group-hover:text-blue-500 group-hover:border-blue-200 transition">
+                              {oi === 0 ? 'A' : oi === 1 ? 'B' : oi === 2 ? 'C' : 'D'}
+                            </span>
+                            <span className="text-sm text-slate-700 font-extrabold line-clamp-2">{opt}</span>
+                          </span>
+                          {rightNode}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* After Answering */
+                <div className="space-y-4 text-left border-t border-slate-100 pt-4 animate-in w-full">
+                  {/* Feedback Banner */}
+                  <div className={`p-4 rounded-xl border ${
+                    learnAnswered.isCorrect 
+                      ? 'bg-emerald-50 border-emerald-250 text-emerald-800' 
+                      : 'bg-rose-50 border-rose-250 text-rose-800'
+                  }`}>
+                    <div className="flex items-center gap-2 font-black text-sm uppercase tracking-wide">
+                      {learnAnswered.isCorrect ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          <span>CHÍNH XÁC (+10 XP)</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-5 h-5 text-rose-600" />
+                          <span>CHƯA CHÍNH XÁC</span>
+                        </>
+                      )}
+                    </div>
+                    {!learnAnswered.isCorrect && (
+                      <p className="text-xs mt-2 font-bold text-slate-755">
+                        Đáp án đúng: <span className="font-black text-rose-650 bg-rose-100/50 px-2 py-0.5 rounded-lg underline">{learnAnswered.correctOption}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Word Detailed Card */}
+                  <div className="bg-slate-50/50 border border-slate-150 rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex justify-between items-center border-b border-slate-200/30 pb-2">
+                      <div className="flex items-baseline gap-2">
+                        <h2 className="text-2xl font-black text-slate-800">{learnQuestion.word}</h2>
+                        {showPinyin && <span className="text-sm font-bold text-slate-400">[{learnQuestion.pinyin}]</span>}
+                      </div>
+                      <button 
+                        onClick={() => speakChineseText(learnQuestion.word)}
+                        className="bg-white border border-slate-200 p-2 rounded-full hover:bg-slate-100 transition shadow-sm active:scale-90"
+                        title="Nghe phát âm"
+                      >
+                        <Volume2 className="w-4 h-4 text-blue-600" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold text-slate-650">
+                      <div className="space-y-2">
+                        <div>
+                          <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-0.5">Nghĩa tiếng Việt</span>
+                          <p className="text-slate-800 text-sm font-black">• {learnQuestion.translation}</p>
+                        </div>
+                        {learnQuestion.hanViet && (
+                          <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-0.5">Hán-Việt</span>
+                            <p className="text-slate-700">{learnQuestion.hanViet}</p>
+                          </div>
+                        )}
+                        {learnQuestion.explanation && (
+                          <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-0.5">Chú thích</span>
+                            <p className="text-slate-600 leading-relaxed font-medium">{learnQuestion.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {learnQuestion.exampleZh ? (
+                          <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-0.5">Ví dụ minh họa</span>
+                            <div className="bg-white p-3 rounded-xl border border-slate-200/50 space-y-1">
+                              <p className="text-slate-855 font-bold text-sm">{learnQuestion.exampleZh}</p>
+                              {learnQuestion.exampleVi && <p className="text-slate-500 italic text-[11px]">{learnQuestion.exampleVi}</p>}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400 italic text-center py-4">
+                            Chưa có câu ví dụ cho từ này.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Continue Button */}
+                  <div className="flex justify-center sm:justify-end pt-1">
+                    <button 
+                      onClick={() => fetchNextLearnQuestion(learnSessionId, learnAgainOnly)}
+                      className="w-full sm:w-auto sm:px-10 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition active:scale-95 shadow-sm text-center block"
+                    >
+                      Tiếp tục → (Space / Enter)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* SUB-VIEW 1: Flashcard player */}
       {studyMode === 'flashcard' && (

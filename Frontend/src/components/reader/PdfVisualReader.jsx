@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { segmentChineseText } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
@@ -572,9 +573,10 @@ const PdfVisualReader = ({
         )}
       </div>
 
-      {/* BOTTOM PAGINATION & CONTROL TOOLBAR */}
-      <div className="shrink-0 border-t border-slate-200 bg-white/95 px-1.5 py-1.5 sm:px-3 sm:py-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-thin">
+      {/* Render the PDF controls beside the annotation actions in ReaderPage. */}
+      {typeof window !== 'undefined' && document.getElementById('pdf-reader-controls') && createPortal(
+        <div className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-thin">
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
           <button
             onClick={() => goToPage(pageNumber - 1)}
             disabled={pageNumber <= 1}
@@ -646,8 +648,10 @@ const PdfVisualReader = ({
           >
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
-        </div>
-      </div>
+          </div>
+        </div>,
+        document.getElementById('pdf-reader-controls')
+      )}
 
       <style>{`
         .textLayer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }

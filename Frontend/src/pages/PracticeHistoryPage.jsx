@@ -45,7 +45,7 @@ export function PracticeHistoryPage() {
   // ---- Detail view (reuse the review layout) ----
   if (selected) {
     return (
-      <div className="quiz-page-container py-10 px-4 max-w-4xl mx-auto">
+      <div className="quiz-page-wrapper py-6 px-4 w-full mx-auto">
         <button onClick={() => setSelected(null)} className="flex items-center gap-2 text-blue-600 font-bold mb-6 hover:underline">
           <ChevronLeft className="w-4 h-4" /> Quay lại lịch sử
         </button>
@@ -104,7 +104,7 @@ export function PracticeHistoryPage() {
 
   // ---- List view ----
   return (
-    <div className="quiz-page-container py-10 px-4 max-w-4xl mx-auto">
+    <div className="quiz-page-wrapper py-6 px-4 w-full mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
           <History className="w-8 h-8 text-blue-600" /> Lịch sử làm bài
