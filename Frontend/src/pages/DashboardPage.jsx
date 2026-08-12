@@ -104,13 +104,6 @@ export function DashboardPage() {
     }
   };
 
-  // Auto-start study countdown timer as soon as dashboard data resolves
-  useEffect(() => {
-    if (data && timerState === 'inactive') {
-      startTimer();
-    }
-  }, [data, timerState, startTimer]);
-
   // Leaderboard state
   const [leaderboardData, setLeaderboardData] = useState(null);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState('weekly');
@@ -413,88 +406,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ===== 4 TOP QUICK STAT CARDS ===== */}
-      <div id="stats" data-tour="stat-cards" className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 font-sans">
-        {/* Card 1: Chuỗi học tập */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-200">
-          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 border border-orange-100/60">
-            <Flame className="w-5 h-5 fill-orange-500/20" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Chuỗi học tập</span>
-            <span className="text-base sm:text-lg font-black text-slate-800 font-display mt-0.5 block">{streak} Ngày</span>
-          </div>
-        </div>
 
-        {/* Card 2: Học hôm nay */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-200">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/60">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Học hôm nay</span>
-            <span className="text-base sm:text-lg font-black text-slate-800 font-display mt-0.5 block">
-              {Math.round(totalMinsTodayCalculated)} / {targetMinutes} phút
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Sổ tay từ vựng (Clickable) */}
-        <div 
-          onClick={() => navigate('/vocabulary')}
-          className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-blue-300 hover:shadow-md cursor-pointer group"
-        >
-          <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-slate-200/50 group-hover:scale-105 transition-transform shadow-xs flex select-none bg-slate-50">
-            {/* Green spine */}
-            <div className="w-[18%] h-full bg-emerald-500 shrink-0 flex flex-col items-center justify-center gap-0.5">
-              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
-              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
-              <div className="w-[2px] h-[2px] rounded-full bg-white/50" />
-            </div>
-            {/* Cover body */}
-            <div className="flex-1 bg-[#c9b99a] flex flex-col items-center justify-between py-1 px-0.5 relative">
-              <div className="absolute inset-0 opacity-[0.07]"
-                style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, #000 3px, #000 4px)' }}
-              />
-              <div className="self-end relative z-10 mr-0.5">
-                <svg className="w-2.5 h-2.5 text-[#b0a080]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <div className="w-full space-y-0.5 relative z-10 px-0.5">
-                <div className="h-[1px] bg-[#b0a080] w-full" />
-                <div className="h-[1px] bg-[#b0a080]/65 w-2/3" />
-              </div>
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sổ tay từ vựng</span>
-            <span className="text-base sm:text-lg font-black text-slate-800 group-hover:text-blue-600 font-display mt-0.5 block transition-colors">
-              {(vocabList ? new Set(vocabList.map(w => (w?.text || '').trim()).filter(Boolean)).size : null) ?? data?.wordsSaved ?? data?.savedVocabCount ?? user?.stats?.totalVocabularySaved ?? 0} Từ đã lưu
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: Cần ôn tập SRS (Clickable) */}
-        <div 
-          onClick={() => navigate('/flashcards')}
-          className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-3.5 transition-all hover:border-amber-300 hover:shadow-md cursor-pointer group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100/60 group-hover:scale-105 transition-transform">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cần ôn tập SRS</span>
-            <span className="text-base sm:text-lg font-black text-slate-800 group-hover:text-amber-600 font-display mt-0.5 block transition-colors">
-              {(() => {
-                const uniqueTotalWords = vocabList ? new Set(vocabList.map(w => (w?.text || '').trim()).filter(Boolean)).size : 0;
-                const rawDueCount = data?.reviewToday ?? data?.dueSrsCount ?? 0;
-                return uniqueTotalWords > 0 ? Math.min(rawDueCount, uniqueTotalWords) : rawDueCount;
-              })()} Từ đến hạn
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* ===== MAIN DASHBOARD TWO-COLUMN LAYOUT ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans">
@@ -620,7 +532,7 @@ export function DashboardPage() {
         <div className="lg:col-span-4 space-y-6">
 
           {/* BẢNG XẾP HẠNG */}
-          <div id="leaderboard" className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col justify-between relative overflow-hidden h-full">
+          <div id="leaderboard" className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col justify-start relative overflow-hidden">
             
             {/* Header & Period Tabs */}
             <div className="space-y-3 border-b border-slate-100 pb-3">

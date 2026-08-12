@@ -110,7 +110,7 @@ export function Header({ offsetTop }) {
 
             <button
               onClick={() => {
-                useTourStore.getState().resetTour();
+                useTourStore.getState().resetTour(window.location.pathname);
               }}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="Xem hướng dẫn sử dụng website"
