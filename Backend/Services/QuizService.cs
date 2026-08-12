@@ -128,6 +128,7 @@ public class QuizService : IQuizService
                         .ToDictionary(g => g.Key, g => g.First().Vocabulary);
 
                     var mapped = new List<QuizQuestion>();
+                    var random = new Random();
                     int order = 1;
                     foreach (var aq in aiQuestions)
                     {
@@ -135,13 +136,18 @@ public class QuizService : IQuizService
                         if (aq.Word == null || !wordToVocab.TryGetValue(aq.Word, out var vocab))
                             vocab = selected[(order - 1) % selected.Count].Vocabulary;
 
+                        // Shuffle options to prevent answer always being A
+                        var shuffledOptions = aq.Options != null
+                            ? aq.Options.OrderBy(_ => random.Next()).ToList()
+                            : new List<string>();
+
                         mapped.Add(new QuizQuestion
                         {
                             SessionId = session.Id,
                             VocabularyId = vocab.Id,
                             QuestionType = aq.QuestionType,
                             QuestionText = aq.QuestionText,
-                            Options = JsonSerializer.Serialize(aq.Options),
+                            Options = JsonSerializer.Serialize(shuffledOptions),
                             CorrectAnswer = aq.CorrectAnswer,
                             Explanation = aq.Explanation,
                             QuestionOrder = order++,

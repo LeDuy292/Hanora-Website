@@ -874,4 +874,473 @@ public class FlashcardService : IFlashcardService
             return "No meaning";
         }
     }
+
+    public async Task<LearnSessionResponse> StartLearnSessionAsync(long userId, long? deckId, bool learnAgainOnly)
+    {
+        var query = _db.Flashcards
+            .Include(f => f.UserVocabulary)
+                .ThenInclude(uv => uv.Vocabulary)
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
+
+        if (deckId.HasValue)
+        {
+            query = query.Where(f => f.DeckId == deckId.Value);
+        }
+
+        if (learnAgainOnly)
+        {
+            query = query.Where(f => f.UserVocabulary.WrongCount > 0);
+        }
+
+        var cards = await query.ToListAsync();
+
+        var session = new StudySession
+        {
+            UserId = userId,
+            Mode = FlashcardMode.Flashcard,
+            StartedAt = DateTime.UtcNow,
+            TotalCards = cards.Count,
+            CardsKnow = 0,
+            CardsStillLearning = 0,
+            CorrectAnswers = 0,
+            IncorrectAnswers = 0
+        };
+
+        _db.StudySessions.Add(session);
+        await _db.SaveChangesAsync();
+
+        return new LearnSessionResponse
+        {
+            SessionId = session.Id,
+            TotalQuestions = cards.Count
+        };
+    }
+
+    public async Task<LearnQuestionDto?> GetNextLearnQuestionAsync(long userId, long sessionId, long? deckId, bool learnAgainOnly)
+    {
+        var session = await _db.StudySessions.FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId);
+        if (session == null) return null;
+
+        var query = _db.Flashcards
+            .Include(f => f.UserVocabulary)
+                .ThenInclude(uv => uv.Vocabulary)
+                    .ThenInclude(v => v.ExampleSentencesNavigation)
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true);
+
+        if (deckId.HasValue)
+        {
+            query = query.Where(f => f.DeckId == deckId.Value);
+        }
+
+        if (learnAgainOnly)
+        {
+            query = query.Where(f => f.UserVocabulary.WrongCount > 0);
+        }
+
+        var deckCards = await query.ToListAsync();
+        if (deckCards.Count == 0) return null;
+
+        var rounds = await _db.LearnRounds
+            .Where(r => r.SessionId == sessionId)
+            .ToListAsync();
+
+        var cardStats = deckCards.Select(c => {
+            var cardRounds = rounds.Where(r => r.FlashcardId == c.Id).ToList();
+            var correctCount = cardRounds.Count(r => r.Result == LearnResult.Correct);
+            var incorrectCount = cardRounds.Count(r => r.Result == LearnResult.Incorrect);
+            return new {
+                Card = c,
+                CorrectCount = correctCount,
+                IncorrectCount = incorrectCount,
+                LastRoundTime = cardRounds.Max(r => (DateTime?)r.AnsweredAt)
+            };
+        }).ToList();
+
+        var remaining = cardStats.Where(s => s.CorrectCount == 0).ToList();
+        if (remaining.Count == 0) return null;
+
+        long? lastCardId = rounds.OrderByDescending(r => r.AnsweredAt).FirstOrDefault()?.FlashcardId;
+        var candidates = remaining;
+        if (remaining.Count > 1 && lastCardId.HasValue)
+        {
+            candidates = remaining.Where(s => s.Card.Id != lastCardId.Value).ToList();
+        }
+
+        var rng = new Random();
+        var selectedCandidate = candidates
+            .OrderByDescending(s => s.IncorrectCount > 0)
+            .ThenBy(s => s.LastRoundTime.HasValue)
+            .ThenBy(s => rng.Next())
+            .First();
+
+        var selectedCard = selectedCandidate.Card;
+
+        var availableTypes = new List<string> { "choice_meaning", "choice_word", "input_translation", "input_word", "input_pinyin", "audio_choice" };
+        if (selectedCard.UserVocabulary.Vocabulary.ExampleSentencesNavigation.Any(e => !string.IsNullOrEmpty(e.ZhText)))
+        {
+            availableTypes.Add("fill_blank");
+        }
+
+        string chosenType = availableTypes[rng.Next(availableTypes.Count)];
+
+        var q = new LearnQuestionDto
+        {
+            FlashcardId = selectedCard.Id,
+            Type = chosenType,
+            Word = selectedCard.UserVocabulary.Vocabulary.Word,
+            Pinyin = selectedCard.UserVocabulary.Vocabulary.Pinyin,
+            Translation = CleanTranslation(selectedCard.UserVocabulary.Vocabulary.Definitions),
+            HanViet = selectedCard.UserVocabulary.Vocabulary.HanViet,
+            WordType = selectedCard.UserVocabulary.Vocabulary.WordType?.ToString() ?? "Other",
+            Explanation = selectedCard.UserVocabulary.Vocabulary.UsageNotes
+        };
+
+        var example = selectedCard.UserVocabulary.Vocabulary.ExampleSentencesNavigation
+            .FirstOrDefault(e => !string.IsNullOrEmpty(e.ZhText));
+        if (example != null)
+        {
+            q.ExampleZh = example.ZhText;
+            q.ExampleVi = example.ViText;
+        }
+
+        string correctMeaning = q.Translation;
+
+        if (chosenType == "choice_meaning")
+        {
+            q.QuestionText = q.Word;
+            q.CorrectAnswer = correctMeaning;
+            var distractors = await GetDistractorsAsync(userId, deckId, correctMeaning, "translation", selectedCard.Id);
+            q.Options = distractors.Concat(new[] { correctMeaning }).OrderBy(_ => rng.Next()).ToList();
+        }
+        else if (chosenType == "choice_word")
+        {
+            q.QuestionText = correctMeaning;
+            q.CorrectAnswer = q.Word;
+            var distractors = await GetDistractorsAsync(userId, deckId, q.Word, "word", selectedCard.Id);
+            q.Options = distractors.Concat(new[] { q.Word }).OrderBy(_ => rng.Next()).ToList();
+        }
+        else if (chosenType == "input_translation")
+        {
+            q.QuestionText = q.Word;
+            q.CorrectAnswer = correctMeaning;
+        }
+        else if (chosenType == "input_word")
+        {
+            q.QuestionText = correctMeaning;
+            q.CorrectAnswer = q.Word;
+        }
+        else if (chosenType == "input_pinyin")
+        {
+            q.QuestionText = q.Word;
+            q.CorrectAnswer = q.Pinyin;
+        }
+        else if (chosenType == "audio_choice")
+        {
+            q.QuestionText = "[Nghe phát âm và chọn từ đúng]";
+            q.CorrectAnswer = q.Word;
+            var distractors = await GetDistractorsAsync(userId, deckId, q.Word, "word", selectedCard.Id);
+            q.Options = distractors.Concat(new[] { q.Word }).OrderBy(_ => rng.Next()).ToList();
+        }
+        else if (chosenType == "fill_blank" && example != null)
+        {
+            string blankedZh = example.ZhText.Replace(q.Word, "____");
+            q.QuestionText = blankedZh;
+            q.CorrectAnswer = q.Word;
+            var distractors = await GetDistractorsAsync(userId, deckId, q.Word, "word", selectedCard.Id);
+            q.Options = distractors.Concat(new[] { q.Word }).OrderBy(_ => rng.Next()).ToList();
+        }
+        else
+        {
+            q.Type = "choice_meaning";
+            q.QuestionText = q.Word;
+            q.CorrectAnswer = correctMeaning;
+            var distractors = await GetDistractorsAsync(userId, deckId, correctMeaning, "translation", selectedCard.Id);
+            q.Options = distractors.Concat(new[] { correctMeaning }).OrderBy(_ => rng.Next()).ToList();
+        }
+
+        return q;
+    }
+
+    private async Task<List<string>> GetDistractorsAsync(long userId, long? deckId, string correctVal, string type, long excludeFlashcardId)
+    {
+        var query = _db.Flashcards
+            .Include(f => f.UserVocabulary)
+                .ThenInclude(uv => uv.Vocabulary)
+            .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true && f.Id != excludeFlashcardId);
+
+        if (deckId.HasValue)
+        {
+            query = query.Where(f => f.DeckId == deckId.Value);
+        }
+
+        var pool = await query.ToListAsync();
+        if (pool.Count < 3)
+        {
+            pool = await _db.Flashcards
+                .Include(f => f.UserVocabulary)
+                    .ThenInclude(uv => uv.Vocabulary)
+                .Where(f => f.UserVocabulary.UserId == userId && f.UserVocabulary.IsDeleted != true && f.Id != excludeFlashcardId)
+                .ToListAsync();
+        }
+
+        List<string> results = new();
+        if (type == "translation")
+        {
+            results = pool.Select(p => CleanTranslation(p.UserVocabulary.Vocabulary.Definitions))
+                .Where(v => !string.Equals(v, correctVal, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(3)
+                .ToList();
+        }
+        else if (type == "pinyin")
+        {
+            results = pool.Select(p => p.UserVocabulary.Vocabulary.Pinyin)
+                .Where(v => !string.Equals(v, correctVal, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(3)
+                .ToList();
+        }
+        else
+        {
+            results = pool.Select(p => p.UserVocabulary.Vocabulary.Word)
+                .Where(v => !string.Equals(v, correctVal, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(3)
+                .ToList();
+        }
+
+        var rng = new Random();
+        while (results.Count < 3)
+        {
+            results.Add(type == "translation" ? $"Nghĩa khác {rng.Next(1, 100)}" : type == "pinyin" ? $"pīnyīn_{rng.Next(1, 100)}" : $"字_{rng.Next(1, 100)}");
+        }
+
+        return results;
+    }
+
+    private bool IsAnswerCorrect(string type, string userAnswer, string correctAnswer)
+    {
+        if (string.IsNullOrWhiteSpace(userAnswer)) return false;
+
+        string cleanUser = userAnswer.Trim().ToLower();
+        string cleanCorrect = correctAnswer.Trim().ToLower();
+
+        cleanUser = System.Text.RegularExpressions.Regex.Replace(cleanUser, @"\s+", " ");
+        cleanCorrect = System.Text.RegularExpressions.Regex.Replace(cleanCorrect, @"\s+", " ");
+
+        if (type == "input_translation" || type == "choice_meaning")
+        {
+            var userParts = cleanUser.Split(new[] { ',', ';', '/' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+            var correctParts = cleanCorrect.Split(new[] { ',', ';', '/' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+
+            foreach (var cp in correctParts)
+            {
+                foreach (var up in userParts)
+                {
+                    if (up == cp || cp.Contains(up) || up.Contains(cp))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return cleanUser == cleanCorrect || cleanCorrect.Contains(cleanUser) || cleanUser.Contains(cleanCorrect);
+        }
+        else if (type == "input_pinyin")
+        {
+            return StripPinyinTones(cleanUser) == StripPinyinTones(cleanCorrect) || cleanUser == cleanCorrect;
+        }
+        else
+        {
+            return cleanUser == cleanCorrect;
+        }
+    }
+
+    private string StripPinyinTones(string pinyin)
+    {
+        string result = pinyin;
+        string[] search = { "ā", "á", "ǎ", "à", "ē", "é", "ě", "è", "ī", "í", "ǐ", "ì", "ō", "ó", "ǒ", "ò", "ū", "ú", "ǔ", "ù", "ǖ", "ǘ", "ǚ", "ǜ" };
+        string[] replace = { "a", "a", "a", "a", "e", "e", "e", "e", "i", "i", "i", "i", "o", "o", "o", "o", "u", "u", "u", "u", "u", "u", "u", "u" };
+        for (int i = 0; i < search.Length; i++)
+        {
+            result = result.Replace(search[i], replace[i]);
+        }
+        return result;
+    }
+
+    public async Task<SubmitLearnAnswerResponse> SubmitLearnAnswerAsync(long userId, SubmitLearnAnswerRequest request)
+    {
+        var flashcard = await _db.Flashcards
+            .Include(f => f.UserVocabulary)
+                .ThenInclude(uv => uv.Vocabulary)
+            .FirstOrDefaultAsync(f => f.Id == request.FlashcardId && f.UserVocabulary.UserId == userId);
+
+        if (flashcard == null)
+        {
+            throw new ArgumentException("Không tìm thấy thẻ từ vựng.");
+        }
+
+        var session = await _db.StudySessions.FirstOrDefaultAsync(s => s.Id == request.SessionId && s.UserId == userId);
+        if (session == null)
+        {
+            throw new ArgumentException("Không tìm thấy phiên học.");
+        }
+
+        string correctAnswer = "";
+        if (request.QuestionType == "choice_meaning" || request.QuestionType == "input_translation")
+        {
+            correctAnswer = CleanTranslation(flashcard.UserVocabulary.Vocabulary.Definitions);
+        }
+        else if (request.QuestionType == "input_pinyin")
+        {
+            correctAnswer = flashcard.UserVocabulary.Vocabulary.Pinyin;
+        }
+        else
+        {
+            correctAnswer = flashcard.UserVocabulary.Vocabulary.Word;
+        }
+
+        bool isCorrect = IsAnswerCorrect(request.QuestionType, request.UserAnswer, correctAnswer);
+
+        var round = new LearnRound
+        {
+            SessionId = request.SessionId,
+            FlashcardId = request.FlashcardId,
+            QuestionType = request.QuestionType switch
+            {
+                "input_translation" or "input_word" or "input_pinyin" => LearnQuestionType.TypeAnswer,
+                _ => LearnQuestionType.MultipleChoice
+            },
+            Result = isCorrect ? LearnResult.Correct : LearnResult.Incorrect,
+            CorrectAnswer = correctAnswer,
+            UserAnswer = request.UserAnswer,
+            ResponseMs = request.ResponseMs,
+            AnsweredAt = DateTime.UtcNow
+        };
+        _db.LearnRounds.Add(round);
+
+        if (isCorrect)
+        {
+            session.CorrectAnswers = (session.CorrectAnswers ?? 0) + 1;
+        }
+        else
+        {
+            session.IncorrectAnswers = (session.IncorrectAnswers ?? 0) + 1;
+        }
+        _db.StudySessions.Update(session);
+
+        var srsResult = isCorrect ? FlipResult.Know : FlipResult.StillLearning;
+        flashcard.UserVocabulary.MasteryLevel = _srsService.UpdateMasteryLevel(
+            flashcard.UserVocabulary.MasteryLevel,
+            srsResult);
+
+        flashcard.UserVocabulary.LastReviewed = DateTime.UtcNow;
+        flashcard.LastStudiedAt = DateTime.UtcNow;
+        flashcard.FlipStatus = isCorrect ? "know" : "still_learning";
+
+        if (isCorrect)
+        {
+            flashcard.UserVocabulary.CorrectCount++;
+            flashcard.LearnStatus = flashcard.UserVocabulary.MasteryLevel >= 3 ? "mastered" : "learning";
+        }
+        else
+        {
+            flashcard.UserVocabulary.WrongCount++;
+            flashcard.LearnStatus = "new";
+        }
+
+        _db.Flashcards.Update(flashcard);
+        _db.UserVocabularies.Update(flashcard.UserVocabulary);
+
+        await _db.SaveChangesAsync();
+
+        int xpEarned = 0;
+        if (isCorrect)
+        {
+            xpEarned = 10;
+            await _statsService.AwardXpAsync(userId, 10, "Luyện tập Học từ (Learn Mode) - Đúng");
+        }
+
+        var nextDate = flashcard.UserVocabulary.LastReviewed?.AddDays(flashcard.UserVocabulary.MasteryLevel > 0 ? flashcard.UserVocabulary.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd");
+
+        return new SubmitLearnAnswerResponse
+        {
+            IsCorrect = isCorrect,
+            CorrectAnswer = correctAnswer,
+            XpEarned = xpEarned,
+            NewMasteryLevel = flashcard.UserVocabulary.MasteryLevel,
+            NextReviewDate = nextDate
+        };
+    }
+
+    public async Task<LearnSessionSummaryResponse> FinishLearnSessionAsync(long userId, long sessionId)
+    {
+        var session = await _db.StudySessions
+            .Include(s => s.LearnRounds)
+                .ThenInclude(r => r.Flashcard)
+                    .ThenInclude(f => f.UserVocabulary)
+                        .ThenInclude(uv => uv.Vocabulary)
+            .FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId);
+
+        if (session == null)
+        {
+            throw new ArgumentException("Không tìm thấy phiên học.");
+        }
+
+        session.EndedAt = DateTime.UtcNow;
+
+        var distinctCards = session.LearnRounds
+            .Select(r => r.Flashcard)
+            .Where(f => f != null)
+            .GroupBy(f => f.Id)
+            .Select(g => g.First())
+            .ToList();
+        
+        session.TotalCards = distinctCards.Count;
+
+        int correctRounds = session.LearnRounds.Count(r => r.Result == LearnResult.Correct);
+        int incorrectRounds = session.LearnRounds.Count(r => r.Result == LearnResult.Incorrect);
+
+        session.CorrectAnswers = correctRounds;
+        session.IncorrectAnswers = incorrectRounds;
+
+        _db.StudySessions.Update(session);
+        await _db.SaveChangesAsync();
+
+        int bonusXp = 35;
+        await _statsService.AwardXpAsync(userId, bonusXp, "Hoàn thành phiên Học từ (Learn Mode)");
+
+        var failedGroup = session.LearnRounds
+            .Where(r => r.Result == LearnResult.Incorrect)
+            .GroupBy(r => r.FlashcardId)
+            .Select(g => {
+                var firstRound = g.First();
+                return new FailedCardDto
+                {
+                    Word = firstRound.Flashcard.UserVocabulary.Vocabulary.Word,
+                    Pinyin = firstRound.Flashcard.UserVocabulary.Vocabulary.Pinyin,
+                    Translation = CleanTranslation(firstRound.Flashcard.UserVocabulary.Vocabulary.Definitions),
+                    WrongCount = g.Count()
+                };
+            }).ToList();
+
+        decimal accuracy = 0;
+        int totalAnswers = correctRounds + incorrectRounds;
+        if (totalAnswers > 0)
+        {
+            accuracy = Math.Round(((decimal)correctRounds / totalAnswers) * 100, 2);
+        }
+
+        return new LearnSessionSummaryResponse
+        {
+            TotalCards = distinctCards.Count,
+            CorrectCount = correctRounds,
+            IncorrectCount = incorrectRounds,
+            AccuracyPercent = accuracy,
+            XpEarned = (correctRounds * 10) + bonusXp,
+            FailedCards = failedGroup
+        };
+    }
 }

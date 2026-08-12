@@ -273,6 +273,65 @@ public class FlashcardController : ControllerBase
         if (!result) return BadRequest(new { error = "Không thể hoàn thành game." });
         return Ok(new { message = "Game hoàn thành." });
     }
+
+    [HttpPost("learn/start")]
+    public async Task<IActionResult> StartLearnSession([FromBody] StartLearnRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null) return Unauthorized();
+
+        long userId = long.Parse(userIdClaim.Value);
+        var result = await _flashcardService.StartLearnSessionAsync(userId, request.DeckId, request.LearnAgainOnly);
+        return Ok(result);
+    }
+
+    [HttpGet("learn/next")]
+    public async Task<IActionResult> GetNextLearnQuestion([FromQuery] long sessionId, [FromQuery] long? deckId = null, [FromQuery] bool learnAgainOnly = false)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null) return Unauthorized();
+
+        long userId = long.Parse(userIdClaim.Value);
+        var result = await _flashcardService.GetNextLearnQuestionAsync(userId, sessionId, deckId, learnAgainOnly);
+        if (result == null) return Ok(new { isComplete = true });
+        return Ok(result);
+    }
+
+    [HttpPost("learn/submit")]
+    public async Task<IActionResult> SubmitLearnAnswer([FromBody] SubmitLearnAnswerRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null) return Unauthorized();
+
+        long userId = long.Parse(userIdClaim.Value);
+        try
+        {
+            var result = await _flashcardService.SubmitLearnAnswerAsync(userId, request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("learn/finish")]
+    public async Task<IActionResult> FinishLearnSession([FromQuery] long sessionId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null) return Unauthorized();
+
+        long userId = long.Parse(userIdClaim.Value);
+        try
+        {
+            var result = await _flashcardService.FinishLearnSessionAsync(userId, sessionId);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }
 
 public class UpdateDeckRequest
