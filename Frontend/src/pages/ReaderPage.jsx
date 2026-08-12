@@ -14,6 +14,7 @@ import { SmartReviewPromptModal } from '../components/vocabulary/SmartReviewProm
 import VisualDocumentReader from '../components/reader/VisualDocumentReader';
 import FloatingVerticalToolbar from '../components/reader/FloatingVerticalToolbar';
 import { pinyin } from 'pinyin-pro';
+import { cleanPinyin } from '../utils/chineseUtils';
 import { useVocabularyStore } from '../store/vocabularyStore';
 import { useDocumentStore } from '../store/documentStore';
 import { useAuthStore } from '../store/authStore';
@@ -319,6 +320,18 @@ const ReaderPage = () => {
       window.removeEventListener('resize', updateWidth);
     };
   }, [bubbleMenu.visible, bubbleMenu.x, bubbleMenu.y]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setBubbleMenu({ visible: false, text: '', startIndex: -1, endIndex: -1, x: 0, y: 0 });
+        setVisualSelectionRange(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const canvasRef = useRef(null);
   const visualDocReaderRef = useRef(null);
@@ -1959,9 +1972,11 @@ const ReaderPage = () => {
         window.document.body
       )}
 
-      {/* Top modern Workspace Toolbar */}
-      {readMode !== 'focus' && (
-        <div className={`${activeTheme.toolbar} px-2 sm:px-3 lg:px-4 py-2.5 sm:py-3 flex flex-col xl:flex-row gap-2 sm:gap-3 items-stretch xl:items-center justify-between shrink-0 shadow-sm transition-colors duration-250`}>
+      {/* Workspace Content Wrapper */}
+      <div className={`flex-grow flex flex-col min-h-0 ${!document ? 'max-w-7xl mx-auto w-full px-2 sm:px-4 lg:px-6' : ''}`}>
+        {/* Top modern Workspace Toolbar */}
+        {readMode !== 'focus' && (
+          <div className={`${activeTheme.toolbar} px-2 sm:px-3 lg:px-4 py-2.5 sm:py-3 flex flex-col xl:flex-row gap-2 sm:gap-3 items-slate xl:items-center justify-between shrink-0 shadow-sm transition-colors duration-250`}>
           {/* Document selection section */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <span className={`font-bold text-xs tracking-wider uppercase ml-1 shrink-0 ${activeTheme.textMuted}`}>Tài liệu đang học:</span>
@@ -2107,7 +2122,7 @@ const ReaderPage = () => {
 
         {/* Left pane: A4 Smart Reader Area */}
         <div
-          className={`flex h-full min-h-0 flex-col transition-all duration-300 ease-in-out ${!isSidebarOpen
+          className={`flex h-full min-h-0 flex-col transition-all duration-300 ease-in-out ${(!isSidebarOpen || !document)
               ? 'w-full'
               : 'w-full lg:w-[calc(100%-clamp(340px,24vw,430px)-14px)]'
             }`}
@@ -2824,7 +2839,7 @@ const ReaderPage = () => {
                                         </span>
                                         {showPinyin && (
                                           <span className="text-[0.4em] text-slate-500 font-normal leading-none mt-1.5 select-none text-center block">
-                                            {pinyin(word, { type: 'string' })}
+                                            {cleanPinyin(word, pinyin(word, { type: 'string' }))}
                                           </span>
                                         )}
                                       </span>
@@ -3113,6 +3128,7 @@ const ReaderPage = () => {
           wordCount={savedSessionCount || 10}
           docTitle={document?.title}
         />
+      </div>
       </div>
     </div>
   );

@@ -283,6 +283,23 @@ export const askAiAssistant = async (word, question, contextSentence) => {
   return await response.json();
 };
 
+export const reportTranslationError = async (word, currentTranslation, proposedTranslation, notes) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/vocabulary/report-translation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ word, currentTranslation, proposedTranslation, notes })
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to submit translation feedback');
+  }
+  return await response.json();
+};
+
 export const exportDocx = async (id, title) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/documents/${id}/export-docx`, {

@@ -445,4 +445,52 @@ public class VocabularyService : IVocabularyService
     {
         return await _aiService.AskAiAssistantAsync(word, question, contextSentence);
     }
+
+    public async Task<bool> ReportTranslationErrorAsync(long userId, string word, string currentTranslation, string proposedTranslation, string? notes = null)
+    {
+        var existingReview = await _db.TranslationReviews
+            .FirstOrDefaultAsync(r => r.SourceText == word && r.Status == "Pending" && r.ProposedTranslation == proposedTranslation);
+
+        if (existingReview != null)
+        {
+            existingReview.ReportCount += 1;
+            existingReview.UpdatedAt = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(notes))
+            {
+                existingReview.AdminNote = string.IsNullOrEmpty(existingReview.AdminNote) 
+                    ? notes 
+                    : $"{existingReview.AdminNote} | {notes}";
+            }
+        }
+        else
+        {
+            var vocab = await _db.Vocabularies.FirstOrDefaultAsync(v => v.Word == word);
+
+            var newReview = new TranslationReview
+            {
+                SourceType = "vocabulary",
+                SourceEntityId = vocab?.Id,
+                UserId = userId,
+                SourceLanguage = "ZH",
+                TargetLanguage = "VI",
+                SourceText = word,
+                CurrentTranslation = currentTranslation,
+                ProposedTranslation = proposedTranslation,
+                Pinyin = vocab?.Pinyin,
+                WordType = vocab?.WordType?.ToString() ?? "Other",
+                WarningType = "user_report",
+                ReportCount = 1,
+                Priority = 1,
+                Status = "Pending",
+                AdminNote = notes,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.TranslationReviews.Add(newReview);
+        }
+
+        await _db.SaveChangesAsync();
+        return true;
+    }
 }
