@@ -301,6 +301,32 @@ const PdfVisualReader = ({
   }, []);
 
   useEffect(() => {
+    const handleKeyDown = (event) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.isContentEditable
+      )) {
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        const bounded = Math.max(1, Math.min(pageNumber + 1, totalPages || 1));
+        onPageChange?.(bounded);
+        event.preventDefault();
+      } else if (event.key === 'ArrowLeft') {
+        const bounded = Math.max(1, Math.min(pageNumber - 1, totalPages || 1));
+        onPageChange?.(bounded);
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pageNumber, totalPages, onPageChange]);
+
+  useEffect(() => {
     if (fitMode === 'custom' || !basePageSize.width || !basePageSize.height || !scrollAreaRef.current) return undefined;
 
     const updateFitScale = () => {
@@ -504,19 +530,39 @@ const PdfVisualReader = ({
 
     const pageWidth = Number(valueOf(page, 'width', 'Width', viewport.width)) || viewport.width || 1;
     const pageHeight = Number(valueOf(page, 'height', 'Height', viewport.height)) || viewport.height || 1;
-    const scaleX = viewport.width / pageWidth;
-    const scaleY = viewport.height / pageHeight;
+    
+    const viewBox = viewport.viewBox || [0, 0, viewport.width / scale, viewport.height / scale];
+    const pdfWidth = viewBox[2] - viewBox[0];
+    const pdfHeight = viewBox[3] - viewBox[1];
 
     words.forEach((word, wordIndex) => {
       const absIndex = (pageNumber - 1) * 10000 + wordIndex;
       const span = document.createElement('span');
       span.textContent = word.text;
       span.className = 'hanora-pdf-ocr-word';
-      span.style.left = `${word.box.x * scaleX}px`;
-      span.style.top = `${word.box.y * scaleY}px`;
-      span.style.width = `${word.box.width * scaleX}px`;
-      span.style.height = `${word.box.height * scaleY}px`;
-      span.style.fontSize = `${Math.max(10, word.box.height * scaleY * 0.92)}px`;
+
+      const ocrXPercent = word.box.x / pageWidth;
+      const ocrYPercent = word.box.y / pageHeight;
+      const ocrWidthPercent = word.box.width / pageWidth;
+      const ocrHeightPercent = word.box.height / pageHeight;
+
+      const pdfX = viewBox[0] + ocrXPercent * pdfWidth;
+      const pdfY = viewBox[1] + (1 - ocrYPercent) * pdfHeight;
+
+      const pdfX2 = pdfX + ocrWidthPercent * pdfWidth;
+      const pdfY2 = pdfY - ocrHeightPercent * pdfHeight;
+
+      const [viewX, viewY] = viewport.convertToViewportPoint(pdfX, pdfY);
+      const [viewX2, viewY2] = viewport.convertToViewportPoint(pdfX2, pdfY2);
+
+      const spanWidth = Math.max(1, viewX2 - viewX);
+      const spanHeight = Math.max(1, viewY2 - viewY);
+
+      span.style.left = `${viewX}px`;
+      span.style.top = `${viewY}px`;
+      span.style.width = `${spanWidth}px`;
+      span.style.height = `${spanHeight}px`;
+      span.style.fontSize = `${Math.max(10, spanHeight * 0.92)}px`;
       decorateWordSpan(span, word.text, absIndex);
       attachWordHandlers(span, word.text, absIndex);
       textLayerDiv.appendChild(span);
