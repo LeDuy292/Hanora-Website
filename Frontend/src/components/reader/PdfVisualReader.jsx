@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
-import { segmentChineseText } from '../../utils/chineseUtils';
+import { segmentChineseText, cleanPinyin, CHINESE_DICTIONARY } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
 import { generateDocumentOcrPage } from '../../lib/api';
 
@@ -48,26 +48,60 @@ const measureTextUnits = (text = '') => {
 const segmentPdfHitText = (text = '') => {
   if (!text) return [];
 
-  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-    try {
-      const segmenter = new Intl.Segmenter('zh', { granularity: 'word' });
-      const tokens = Array.from(segmenter.segment(text))
-        .map((part) => ({
-          text: part.segment,
-          isWord: hasHanzi(part.segment),
-        }))
-        .filter((token) => token.text);
-
-      if (tokens.length > 1) return tokens;
-    } catch (error) {
-      // Fall through to the project dictionary segmenter.
-    }
-  }
-
-  return segmentChineseText(text).map((token) => ({
+  const tokens = segmentChineseText(text).map((token) => ({
     text: token.text,
     isWord: Boolean(token.isWord) || hasHanzi(token.text),
   }));
+
+  const mergedTokens = [];
+  let idx = 0;
+  while (idx < tokens.length) {
+    if (idx < tokens.length - 1 && tokens[idx].text.length === 1 && tokens[idx + 1].text.length === 1) {
+      const combo = tokens[idx].text + tokens[idx + 1].text;
+      if (CHINESE_DICTIONARY[combo]) {
+        mergedTokens.push({
+          text: combo,
+          isWord: true
+        });
+        idx += 2;
+        continue;
+      }
+    }
+    mergedTokens.push(tokens[idx]);
+    idx++;
+  }
+
+  return mergedTokens;
+};
+
+const fitTextBoxToContent = (text, box, pageWidth) => {
+  if (!box) return null;
+
+  const units = measureTextUnits(text);
+  const hasCJK = hasHanzi(text);
+  const scaleFactor = hasCJK ? 1.02 : 1.12; 
+  const expectedWidth = Math.max(box.height * units * scaleFactor, box.height * 0.8);
+  const availableWidth = pageWidth ? Math.max(1, pageWidth - box.x) : box.width;
+  const maxAllowedWidth = Math.min(availableWidth, expectedWidth * 1.15);
+
+  if (box.width > maxAllowedWidth) {
+    return {
+      ...box,
+      width: Math.max(1, maxAllowedWidth),
+    };
+  }
+
+  return box;
+};
+
+const fitTokenBoxWidth = (token, sourceBox, allocatedWidth) => {
+  if (!token?.text || !sourceBox || !hasHanzi(token.text)) {
+    return Math.max(1, allocatedWidth);
+  }
+
+  const units = measureTextUnits(token.text);
+  const expectedWidth = sourceBox.height * units * 1.02;
+  return Math.min(allocatedWidth, expectedWidth);
 };
 
 const splitTextBoxIntoHitWords = (text, box, keyPrefix) => {
@@ -81,7 +115,8 @@ const splitTextBoxIntoHitWords = (text, box, keyPrefix) => {
   return tokens.flatMap((token, tokenIndex) => {
     const units = tokenUnits[tokenIndex] || 1;
     const left = box.x + (cursorUnits / totalUnits) * box.width;
-    const width = Math.max(1, (units / totalUnits) * box.width);
+    const allocatedWidth = Math.max(1, (units / totalUnits) * box.width);
+    const width = fitTokenBoxWidth(token, box, allocatedWidth);
     cursorUnits += units;
 
     if (!token.isWord || !token.text.trim()) return [];
@@ -99,22 +134,72 @@ const splitTextBoxIntoHitWords = (text, box, keyPrefix) => {
   });
 };
 
+const countHanzi = (text = '') => Array.from(text).filter((char) => HANZI_RE.test(char)).length;
+
+const isSuspiciousWordBox = (text, box, lineBox) => {
+  if (!text || !box || !hasHanzi(text)) return false;
+
+  const hanziCount = Math.max(1, countHanzi(text));
+  const expectedMaxWidth = Math.max(box.height * hanziCount * 1.48, box.height * 1.8);
+
+  if (box.width > expectedMaxWidth) return true;
+  if (lineBox && hanziCount <= 2 && box.width > lineBox.width * 0.4) return true;
+
+  return false;
+};
+
+const shouldSplitFromLineBox = (lineText, lineBox, words) => {
+  if (!lineText || !lineBox) return false;
+  if (!Array.isArray(words) || words.length === 0) return true;
+
+  const wordBoxes = words
+    .map((word) => ({
+      text: valueOf(word, 'text', 'Text', ''),
+      box: getBox(valueOf(word, 'boundingBox', 'BoundingBox')),
+    }))
+    .filter((word) => word.text && word.box);
+
+  if (!wordBoxes.length) return true;
+
+  const sortedWords = [...wordBoxes].sort((a, b) => a.box.x - b.box.x);
+  for (let i = 0; i < sortedWords.length - 1; i++) {
+    const current = sortedWords[i];
+    const next = sortedWords[i + 1];
+    if (next.box.x < current.box.x + current.box.width - 2) {
+      return true;
+    }
+  }
+
+  const hanziWords = wordBoxes.filter((word) => hasHanzi(word.text));
+  if (!hanziWords.length) return false;
+
+  const suspiciousCount = hanziWords.filter((word) => isSuspiciousWordBox(word.text, word.box, lineBox)).length;
+  return suspiciousCount > 0;
+};
+
 const getWords = (page) => {
   const lines = valueOf(page, 'lines', 'Lines', []);
+  const pageWidth = Number(valueOf(page, 'width', 'Width', 0)) || null;
 
   return lines.flatMap((line, lineIndex) => {
     const words = valueOf(line, 'words', 'Words', []);
+    const lineText = valueOf(line, 'text', 'Text', '');
+    const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
+    const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
+
+    if (shouldSplitFromLineBox(lineText, fittedLineBox, words)) {
+      return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+    }
+
     if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
       return words.flatMap((word, wordIndex) => {
         const text = valueOf(word, 'text', 'Text', '');
-        const box = getBox(valueOf(word, 'boundingBox', 'BoundingBox'));
+        const box = fitTextBoxToContent(text, getBox(valueOf(word, 'boundingBox', 'BoundingBox')), pageWidth);
         return splitTextBoxIntoHitWords(text, box, lineIndex + '-' + wordIndex);
       });
     }
 
-    const lineText = valueOf(line, 'text', 'Text', '');
-    const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
-    return splitTextBoxIntoHitWords(lineText, lineBox, lineIndex + '-line');
+    return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
   }).filter((word) => word.text && word.box);
 };
 
@@ -333,7 +418,6 @@ const PdfVisualReader = ({
     wordSpan.dataset.pageNumber = String(pageNumber);
     wordSpan.classList.add('hanora-pdf-token');
     wordSpan.style.cursor = 'pointer';
-    wordSpan.style.borderRadius = '3px';
     wordSpan.style.transition = 'background 150ms ease, box-shadow 150ms ease, outline 150ms ease';
 
     const rangeStart = selectionRange ? Math.min(selectionRange.start, selectionRange.end) : -1;
@@ -343,9 +427,23 @@ const PdfVisualReader = ({
     if (highlightColor) {
       wordSpan.style.backgroundColor = `${highlightColor}73`;
       wordSpan.style.boxShadow = 'inset 0 -0.08em 0 rgba(15, 23, 42, 0.08)';
+      wordSpan.style.borderRadius = '3px';
     } else if (isSelecting) {
-      wordSpan.style.backgroundColor = 'rgba(37, 99, 235, 0.24)';
-      wordSpan.style.outline = '1px solid rgba(37, 99, 235, 0.28)';
+      wordSpan.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+      wordSpan.style.outline = 'none';
+      const isFirst = absIndex === rangeStart;
+      const isLast = absIndex === rangeEnd;
+      if (isFirst && isLast) {
+        wordSpan.style.borderRadius = '3px';
+      } else if (isFirst) {
+        wordSpan.style.borderRadius = '3px 0 0 3px';
+      } else if (isLast) {
+        wordSpan.style.borderRadius = '0 3px 3px 0';
+      } else {
+        wordSpan.style.borderRadius = '0';
+      }
+    } else {
+      wordSpan.style.borderRadius = '3px';
     }
 
     if (hasTextNote || hasStickyNote) {
@@ -358,7 +456,7 @@ const PdfVisualReader = ({
 
     if (showPinyin) {
       const pinyinLabel = document.createElement('span');
-      pinyinLabel.textContent = pinyin(word, { type: 'string' });
+      pinyinLabel.textContent = cleanPinyin(word, pinyin(word, { type: 'string' }));
       pinyinLabel.className = 'hanora-pinyin-label';
       wordSpan.appendChild(pinyinLabel);
     }

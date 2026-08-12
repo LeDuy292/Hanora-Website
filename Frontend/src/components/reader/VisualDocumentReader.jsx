@@ -1,6 +1,7 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { pinyin } from 'pinyin-pro';
+import { cleanPinyin } from '../../utils/chineseUtils';
 import PdfVisualReader from './PdfVisualReader';
 import { resolveDocumentAssetUrl } from '../../lib/api';
 
@@ -159,23 +160,29 @@ const ImageOcrReader = ({
                 const box = word.box;
                 const absIndex = wordIndex;
                 const highlightColor = annotations?.highlights?.[absIndex];
-                const rangeStart = selectionRange ? Math.min(selectionRange.start, selectionRange.end) : -1;
+                 const rangeStart = selectionRange ? Math.min(selectionRange.start, selectionRange.end) : -1;
                 const rangeEnd = selectionRange ? Math.max(selectionRange.start, selectionRange.end) : -1;
                 const isSelecting = absIndex >= rangeStart && absIndex <= rangeEnd;
+                const isFirst = absIndex === rangeStart;
+                const isLast = absIndex === rangeEnd;
+                const borderRadius = isSelecting
+                  ? (isFirst && isLast ? '3px' : isFirst ? '3px 0 0 3px' : isLast ? '0 3px 3px 0' : '0')
+                  : '3px';
                 const style = {
                   left: `${box.x * scaleX}px`,
                   top: `${box.y * scaleY}px`,
                   width: `${box.width * scaleX}px`,
                   height: `${box.height * scaleY}px`,
                   fontSize: `${Math.max(10, box.height * scaleY * 0.9)}px`,
+                  borderRadius,
                 };
 
                 return (
                   <span
                     key={word.key}
                     data-abs-index={absIndex}
-                    className="hanora-ocr-word absolute cursor-text whitespace-nowrap rounded-[3px] text-transparent transition"
-                    style={highlightColor ? { ...style, backgroundColor: `${highlightColor}66`, boxShadow: 'none' } : isSelecting ? { ...style, backgroundColor: 'rgba(37, 99, 235, 0.24)', outline: '1px solid rgba(37, 99, 235, 0.28)' } : style}
+                    className="hanora-ocr-word absolute cursor-text whitespace-nowrap text-transparent transition"
+                    style={highlightColor ? { ...style, backgroundColor: `${highlightColor}66`, boxShadow: 'none' } : isSelecting ? { ...style, backgroundColor: 'rgba(59, 130, 246, 0.3)', outline: 'none' } : style}
                     onClick={(event) => {
                       event.stopPropagation();
                       onWordClick?.(word.text, absIndex, event);
@@ -204,7 +211,7 @@ const ImageOcrReader = ({
                       </span>
                     )}
                     {showPinyin && (
-                      <span className="hanora-image-pinyin">{pinyin(word.text, { type: 'string' })}</span>
+                      <span className="hanora-image-pinyin">{cleanPinyin(word.text, pinyin(word.text, { type: 'string' }))}</span>
                     )}
                   </span>
                 );

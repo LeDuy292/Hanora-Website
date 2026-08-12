@@ -257,6 +257,40 @@ public class VocabularyController : ControllerBase
         var reply = await _vocabularyService.AskAiAssistantAsync(request.Word, request.Question, request.ContextSentence ?? "");
         return Ok(new { Reply = reply });
     }
+
+    [HttpPost("report-translation")]
+    public async Task<IActionResult> ReportTranslation([FromBody] ReportTranslationRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Word) || string.IsNullOrWhiteSpace(request.ProposedTranslation))
+        {
+            return BadRequest("Word and ProposedTranslation are required.");
+        }
+
+        try
+        {
+            var userId = GetCurrentUserId();
+            var success = await _vocabularyService.ReportTranslationErrorAsync(
+                userId,
+                request.Word.Trim(),
+                request.CurrentTranslation?.Trim() ?? string.Empty,
+                request.ProposedTranslation.Trim(),
+                request.Notes?.Trim());
+
+            return Ok(new { success = true, message = "Đã gửi báo cáo lỗi dịch thuật thành công." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+}
+
+public class ReportTranslationRequest
+{
+    public string Word { get; set; } = null!;
+    public string CurrentTranslation { get; set; } = null!;
+    public string ProposedTranslation { get; set; } = null!;
+    public string? Notes { get; set; }
 }
 
 public class SaveVocabularyRequest

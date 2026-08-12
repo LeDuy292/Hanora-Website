@@ -11,6 +11,7 @@ public interface IVocabularyService
     Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence);
     Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText);
     Task<string> AskAiAssistantAsync(string word, string question, string contextSentence);
+    Task<bool> ReportTranslationErrorAsync(long userId, string word, string currentTranslation, string proposedTranslation, string? notes = null);
 }
 
 public class VocabularySaveResult

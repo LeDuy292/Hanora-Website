@@ -203,8 +203,57 @@ export const CHARACTER_DATABASE = {
   "鱼": { pinyin: "yú", translation: "fish" },
   "猫": { pinyin: "māo", translation: "cat" },
   "狗": { pinyin: "gǒu", translation: "dog" },
-  "好": { pinyin: "hǎo", translation: "good; well; fine" }
+  "好": { pinyin: "hǎo", translation: "good; well; fine" },
+
+  // Additional HSK Words for segmentation
+  "梦乡": { pinyin: "mèng xiāng", translation: "dreamland; land of dreams", hsk: 5 },
+  "睡眠": { pinyin: "shuì mián", translation: "sleeping; slumber", hsk: 3 },
+  "质量": { pinyin: "zhì liàng", translation: "quality", hsk: 4 },
+  "入睡": { pinyin: "rù shuì", translation: "to fall asleep", hsk: 4 },
+  "提高": { pinyin: "tí gāo", translation: "to raise; improve; increase", hsk: 3 },
+  "注意": { pinyin: "zhù yì", translation: "to pay attention to; take notice of", hsk: 3 },
+  "取得": { pinyin: "qǔ dé", translation: "to acquire; get; obtain", hsk: 4 },
+  "良好": { pinyin: "liáng hǎo", translation: "good; favorable; fine", hsk: 4 },
+  "精力": { pinyin: "jīng lì", translation: "energy; vigor; vitality", hsk: 4 },
+  "下降": { pinyin: "xià jiàng", translation: "to decline; drop; fall", hsk: 4 },
+  "反应": { pinyin: "fǎn yìng", translation: "reaction; response; to react", hsk: 4 },
+  "减慢": { pinyin: "jiǎn màn", translation: "to slow down", hsk: 4 },
+  "情绪": { pinyin: "qíng xù", translation: "feeling; emotion; mood", hsk: 4 },
+  "低下": { pinyin: "dī xià", translation: "low; beneath", hsk: 4 },
+  "利于": { pinyin: "lì yú", translation: "to be beneficial for; facilitate", hsk: 4 },
+  "进入": { pinyin: "jìn rù", translation: "to enter; join", hsk: 4 },
+  "甜美": { pinyin: "tián měi", translation: "sweet; pleasant", hsk: 4 },
+  "适合": { pinyin: "shì hé", translation: "to suit; fit", hsk: 3 },
+  "必须": { pinyin: "bì xū", translation: "must; have to", hsk: 3 },
+  "有利于": { pinyin: "yǒu lì yú", translation: "to be beneficial to", hsk: 4 },
+  "健康": { pinyin: "jiàn kāng", translation: "health; healthy", hsk: 3 },
+  "京剧": { pinyin: "jīng jù", translation: "Beijing opera", hsk: 3 },
+  "字幕": { pinyin: "zì mù", translation: "caption; subtitle", hsk: 4 },
+  "取消": { pinyin: "qǔ xiāo", translation: "to cancel; call off", hsk: 4 },
+  "晚点": { pinyin: "wǎn diǎn", translation: "to be late; behind schedule", hsk: 4 },
+  "座率": { pinyin: "zuò lǜ", translation: "occupancy rate", hsk: 5 },
+  "降落": { pinyin: "jiàng luò", translation: "to descend; land", hsk: 4 },
+  "紧急": { pinyin: "jǐn jí", translation: "urgent; pressing", hsk: 4 },
+  "讽刺": { pinyin: "fěng cì", translation: "to satirize; mock; irony", hsk: 5 },
+  "鼓励": { pinyin: "gǔ lì", translation: "to encourage", hsk: 3 },
+  "怀疑": { pinyin: "huái yí", translation: "to doubt; suspect; doubt", hsk: 4 },
+  "反对": { pinyin: "fǎn duì", translation: "to oppose; fight against", hsk: 4 },
+  "考试": { pinyin: "kǎo shì", translation: "exam; test", hsk: 1 },
+  "及格": { pinyin: "jí gé", translation: "to pass a test", hsk: 3 },
+  "发票": { pinyin: "fā piào", translation: "invoice; receipt", hsk: 4 },
+  "中奖": { pinyin: "zhòng jiǎng", translation: "to win a prize", hsk: 4 },
+  "驾照": { pinyin: "jià zhào", translation: "driver's license", hsk: 4 },
+  "新车": { pinyin: "xīn chē", translation: "new car", hsk: 4 },
+  "取消了": { pinyin: "qǔ xiāo le", translation: "cancelled", hsk: 4 }
 };
+
+export function cleanPinyin(word, pinyinStr) {
+  if (!pinyinStr) return '';
+  if (/^[\u4e00-\u9fa5]+$/.test(word)) {
+    return pinyinStr.replace(/\s+/g, '');
+  }
+  return pinyinStr;
+}
 
 // Check if a character is Chinese (Hanzi)
 export function isChinese(char) {
