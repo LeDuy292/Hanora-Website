@@ -896,12 +896,30 @@ const ReaderPage = () => {
     const end = Math.max(startOffset, endOffset);
 
     if (showVisualReader) {
-      const tokens = Array.from(readerContainerRef.current?.querySelectorAll('[data-abs-index]') || [])
+      const elements = Array.from(readerContainerRef.current?.querySelectorAll('[data-abs-index]') || [])
         .filter(el => {
           const idx = Number(el.getAttribute('data-abs-index'));
           return idx >= start && idx <= end;
+        });
+
+      // Sort elements by visual reading flow (top-to-bottom, left-to-right)
+      elements.sort((a, b) => {
+        const rectA = a.getBoundingClientRect();
+        const rectB = b.getBoundingClientRect();
+        const diffY = rectA.top - rectB.top;
+        if (Math.abs(diffY) > 8) {
+          return diffY;
+        }
+        return rectA.left - rectB.left;
+      });
+
+      const tokens = elements
+        .map(el => {
+          const clone = el.cloneNode(true);
+          const badges = clone.querySelectorAll('.hanora-pinyin-label, .hanora-image-pinyin, .hanora-note-badge, .hanora-image-note-badge');
+          badges.forEach(b => b.remove());
+          return clone.textContent || '';
         })
-        .map(el => Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE)?.textContent || '')
         .filter(Boolean);
 
       return (tokens.join('') || fallbackText || '').trim();
@@ -1352,14 +1370,15 @@ const ReaderPage = () => {
       if (selectedIndexes.length > 0) {
         const startIdx = Math.min(...selectedIndexes);
         const endIdx = Math.max(...selectedIndexes);
+        const correctText = getTextForRange(startIdx, endIdx, selectedText);
         if (activeTool === 'highlight') {
-          createHighlightRange(startIdx, endIdx, activeColor, selectedText);
+          createHighlightRange(startIdx, endIdx, activeColor, correctText);
           selection.removeAllRanges();
         } else {
           const rect = range.getBoundingClientRect();
           setBubbleMenu({
             visible: true,
-            text: selectedText,
+            text: correctText,
             startIndex: startIdx,
             endIndex: endIdx,
             x: rect.left + rect.width / 2,

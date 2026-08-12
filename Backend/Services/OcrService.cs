@@ -194,26 +194,33 @@ public class OcrService : IOcrService
 
     private static bool IsPdfLayoutReliable(List<Services.DTOs.PageLinesDto> pages)
     {
-        if (pages.Count == 0) return false;
+        if (pages == null || pages.Count == 0) return false;
 
-        var hanziWords = pages
-            .SelectMany(p => p.Lines)
-            .SelectMany(l => l.Words)
-            .Where(w => HasCjk(w.Text) && w.BoundingBox != null)
-            .ToList();
-
-        if (hanziWords.Count == 0) return false;
-
-        var suspiciousCount = hanziWords.Count(w =>
+        foreach (var page in pages)
         {
-            var box = w.BoundingBox!;
-            var cjkCount = Math.Max(1, CountCjk(w.Text));
-            var expectedMaxWidth = Math.Max(box.Height * cjkCount * 2.05, box.Height * 2.4);
-            return box.Width <= 0 || box.Height <= 0 || box.Width > expectedMaxWidth;
-        });
+            var pageHanziWords = page.Lines
+                .SelectMany(l => l.Words)
+                .Where(w => HasCjk(w.Text) && w.BoundingBox != null)
+                .ToList();
 
-        var tolerated = Math.Max(4, (int)Math.Ceiling(hanziWords.Count * 0.12));
-        return suspiciousCount <= tolerated;
+            if (pageHanziWords.Count == 0) continue;
+
+            var suspiciousCount = pageHanziWords.Count(w =>
+            {
+                var box = w.BoundingBox!;
+                var cjkCount = Math.Max(1, CountCjk(w.Text));
+                var expectedMaxWidth = Math.Max(box.Height * cjkCount * 2.05, box.Height * 2.4);
+                return box.Width <= 0 || box.Height <= 0 || box.Width > expectedMaxWidth;
+            });
+
+            double pageSuspiciousRate = (double)suspiciousCount / pageHanziWords.Count;
+            if (pageSuspiciousRate > 0.05 || suspiciousCount > 2)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool HasCjk(string? text)

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus, RefreshCw } from 'lucide-react';
 import { segmentChineseText, cleanPinyin, CHINESE_DICTIONARY } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
 import { generateDocumentOcrPage } from '../../lib/api';
+import { toast } from '../../store/notificationStore';
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
@@ -95,12 +96,14 @@ const fitTextBoxToContent = (text, box, pageWidth) => {
 };
 
 const fitTokenBoxWidth = (token, sourceBox, allocatedWidth) => {
-  if (!token?.text || !sourceBox || !hasHanzi(token.text)) {
+  if (!token?.text || !sourceBox) {
     return Math.max(1, allocatedWidth);
   }
 
   const units = measureTextUnits(token.text);
-  const expectedWidth = sourceBox.height * units * 1.02;
+  const hasCJK = hasHanzi(token.text);
+  const scaleFactor = hasCJK ? 1.02 : 1.7;
+  const expectedWidth = sourceBox.height * units * scaleFactor;
   return Math.min(allocatedWidth, expectedWidth);
 };
 
@@ -119,7 +122,7 @@ const splitTextBoxIntoHitWords = (text, box, keyPrefix) => {
     const width = fitTokenBoxWidth(token, box, allocatedWidth);
     cursorUnits += units;
 
-    if (!token.isWord || !token.text.trim()) return [];
+    if (!token.text || !token.text.trim()) return [];
 
     return [{
       key: keyPrefix + '-' + tokenIndex + '-' + token.text,
@@ -187,19 +190,22 @@ const getWords = (page) => {
     const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
     const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
 
-    if (shouldSplitFromLineBox(lineText, fittedLineBox, words)) {
-      return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
-    }
+    let lineWords = [];
 
-    if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
-      return words.flatMap((word, wordIndex) => {
+    if (shouldSplitFromLineBox(lineText, fittedLineBox, words)) {
+      lineWords = splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+    } else if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
+      lineWords = words.flatMap((word, wordIndex) => {
         const text = valueOf(word, 'text', 'Text', '');
         const box = fitTextBoxToContent(text, getBox(valueOf(word, 'boundingBox', 'BoundingBox')), pageWidth);
         return splitTextBoxIntoHitWords(text, box, lineIndex + '-' + wordIndex);
       });
+    } else {
+      lineWords = splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
     }
 
-    return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+    // Sort words within this specific line visually by x coordinate (left-to-right)
+    return lineWords.sort((a, b) => (a.box?.x || 0) - (b.box?.x || 0));
   }).filter((word) => word.text && word.box);
 };
 
@@ -248,6 +254,31 @@ const PdfVisualReader = ({
   const [ocrPages, setOcrPages] = useState([]);
   const [isLoadingOcr, setIsLoadingOcr] = useState(Boolean(ocrJsonUrl));
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRegeneratingOcr, setIsRegeneratingOcr] = useState(false);
+
+  const forceRegenerateOcrForPage = async () => {
+    if (!documentId || pageNumber < 1 || isRegeneratingOcr) return;
+    setIsRegeneratingOcr(true);
+    toast.info("Đang nhận diện lại chữ cho trang này...");
+    try {
+      const result = await generateDocumentOcrPage(documentId, pageNumber);
+      const page = result?.page || result?.Page;
+      if (!page) {
+        throw new Error("Không lấy được dữ liệu OCR mới từ server.");
+      }
+      const identifiedPage = withPageIdentity(page, pageNumber);
+      setOcrPages((prev) => {
+        const withoutPage = prev.filter((item, index) => getPageIdentity(item, index) !== pageNumber);
+        return [...withoutPage, identifiedPage].sort((a, b) => getPageIdentity(a, 0) - getPageIdentity(b, 0));
+      });
+      toast.success("Đã nhận diện lại chữ thành công!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Nhận diện thất bại: " + error.message);
+    } finally {
+      setIsRegeneratingOcr(false);
+    }
+  };
 
   const readerRootRef = useRef(null);
   const scrollAreaRef = useRef(null);
@@ -454,7 +485,7 @@ const PdfVisualReader = ({
       wordSpan.appendChild(noteBadge);
     }
 
-    if (showPinyin) {
+    if (showPinyin && hasHanzi(word)) {
       const pinyinLabel = document.createElement('span');
       pinyinLabel.textContent = cleanPinyin(word, pinyin(word, { type: 'string' }));
       pinyinLabel.className = 'hanora-pinyin-label';
@@ -509,7 +540,7 @@ const PdfVisualReader = ({
         const wordSpan = document.createElement('span');
         wordSpan.textContent = token.text;
 
-        if (token.isWord) {
+        if (token.text && token.text.trim() !== '') {
           const absIndex = (pageNumber - 1) * 10000 + tokenIndex;
           decorateWordSpan(wordSpan, token.text, absIndex);
           attachWordHandlers(wordSpan, token.text, absIndex);
@@ -739,6 +770,21 @@ const PdfVisualReader = ({
           >
             Fit Page
           </button>
+
+          <button
+            onClick={forceRegenerateOcrForPage}
+            disabled={isRegeneratingOcr}
+            className="flex h-9 min-h-9 px-2.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:opacity-50 sm:h-10 sm:rounded-xl sm:px-3 text-xs font-bold gap-1.5"
+            title="Nhận diện lại chữ (OCR)"
+          >
+            {isRegeneratingOcr ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden lg:inline">OCR lại trang</span>
+          </button>
+
           <button
             onClick={toggleFullscreen}
             className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
