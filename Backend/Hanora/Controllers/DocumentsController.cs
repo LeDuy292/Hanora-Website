@@ -340,6 +340,30 @@ public class DocumentsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("library")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetLibraryDocuments()
+    {
+        var docs = await _db.Documents
+            .Where(d => 
+                EF.Functions.ILike(d.Title, "%hsk%") || 
+                EF.Functions.ILike(d.OriginalFilename, "%hsk%"))
+            .OrderBy(d => d.Title)
+            .Select(d => new
+            {
+                d.Id,
+                d.Title,
+                d.OriginalFilename,
+                d.FileUrl,
+                d.FileSizeBytes,
+                d.Status,
+                d.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(docs);
+    }
+
     [HttpGet("{id}/annotations")]
     public async Task<IActionResult> GetAnnotations(long id)
     {
@@ -1028,7 +1052,11 @@ public class DocumentsController : ControllerBase
             // 4. Delete DocumentPages
             _db.DocumentPages.RemoveRange(document.DocumentPages);
 
-            // 5. Delete the Document
+            // 5. Delete physical files (S3 / Local uploads)
+            await _s3StorageService.DeleteFileAsync(document.FileUrl);
+            await _s3StorageService.DeleteFileAsync(document.OcrJsonUrl);
+
+            // 6. Delete the Document
             _db.Documents.Remove(document);
 
             await _db.SaveChangesAsync();

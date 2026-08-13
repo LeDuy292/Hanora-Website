@@ -254,7 +254,28 @@ public class OcrService : IOcrService
             var key = _config["AzureComputerVision:Key"]?.Trim()
                 ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
-            var pagePass = await AnalyzeAzureReadPdfAsync(bytes, endpoint, key, pageNumber.ToString());
+            byte[] singlePageBytes;
+            try
+            {
+                using var srcMs = new MemoryStream(bytes);
+                using var srcReader = new iText.Kernel.Pdf.PdfReader(srcMs);
+                using var srcDoc = new iText.Kernel.Pdf.PdfDocument(srcReader);
+                using var destMs = new MemoryStream();
+                using (var writer = new iText.Kernel.Pdf.PdfWriter(destMs))
+                using (var destDoc = new iText.Kernel.Pdf.PdfDocument(writer))
+                {
+                    srcDoc.CopyPagesTo(pageNumber, pageNumber, destDoc);
+                }
+                singlePageBytes = destMs.ToArray();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "iText failed to extract page {PageNumber}. Falling back to sending entire PDF bytes.", pageNumber);
+                singlePageBytes = bytes;
+            }
+
+            // We query page 1 of our newly generated single-page PDF
+            var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, "1");
             if (!string.IsNullOrWhiteSpace(pagePass.errorMessage))
             {
                 return (null, pagePass.errorMessage);
@@ -286,10 +307,30 @@ public class OcrService : IOcrService
             var key = _config["AzureComputerVision:Key"]?.Trim()
                 ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
-            var firstPass = await AnalyzeAzureReadPdfAsync(bytes, endpoint, key, null);
+            (string? text, List<Services.DTOs.PageLinesDto>? pages, string? errorMessage) firstPass = (null, null, null);
+            
+            // If the PDF is smaller than 5 MB, we can try to do a full OCR pass to save requests
+            if (bytes.Length <= 5 * 1024 * 1024)
+            {
+                firstPass = await AnalyzeAzureReadPdfAsync(bytes, endpoint, key, null);
+            }
+            else
+            {
+                _logger.LogInformation("PDF is too large ({Length} bytes) for single-pass Azure Read API. Falling back to page-by-page extraction.", bytes.Length);
+                firstPass = (string.Empty, new List<Services.DTOs.PageLinesDto>(), null);
+            }
+
             if (!string.IsNullOrWhiteSpace(firstPass.errorMessage))
             {
-                return firstPass;
+                if (firstPass.errorMessage.Contains("InvalidImageSize") || firstPass.errorMessage.Contains("too large"))
+                {
+                    _logger.LogInformation("PDF returned InvalidImageSize. Falling back to page-by-page extraction.");
+                    firstPass = (string.Empty, new List<Services.DTOs.PageLinesDto>(), null);
+                }
+                else
+                {
+                    return firstPass;
+                }
             }
 
             var pages = firstPass.pages ?? new List<Services.DTOs.PageLinesDto>();
@@ -302,7 +343,30 @@ public class OcrService : IOcrService
 
                 foreach (var missingPage in missingPages)
                 {
-                    var pagePass = await AnalyzeAzureReadPdfAsync(bytes, endpoint, key, missingPage.ToString());
+                    // Sleep to avoid rate limits
+                    await Task.Delay(3000);
+
+                    byte[] singlePageBytes;
+                    try
+                    {
+                        using var srcMs = new MemoryStream(bytes);
+                        using var srcReader = new iText.Kernel.Pdf.PdfReader(srcMs);
+                        using var srcDoc = new iText.Kernel.Pdf.PdfDocument(srcReader);
+                        using var destMs = new MemoryStream();
+                        using (var writer = new iText.Kernel.Pdf.PdfWriter(destMs))
+                        using (var destDoc = new iText.Kernel.Pdf.PdfDocument(writer))
+                        {
+                            srcDoc.CopyPagesTo(missingPage, missingPage, destDoc);
+                        }
+                        singlePageBytes = destMs.ToArray();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "iText failed to extract page {PageNumber} for full OCR fallback. Falling back to sending entire PDF bytes.", missingPage);
+                        singlePageBytes = bytes;
+                    }
+
+                    var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, "1");
                     if (!string.IsNullOrWhiteSpace(pagePass.errorMessage))
                     {
                         _logger.LogWarning("Azure Read page {PageNumber} fallback failed: {Error}", missingPage, pagePass.errorMessage);

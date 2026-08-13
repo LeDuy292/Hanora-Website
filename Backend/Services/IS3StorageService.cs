@@ -8,4 +8,5 @@ public interface IS3StorageService
     Task<Stream> DownloadFileAsync(string fileUrl);
     (string PresignedUrl, string FileUrl) GeneratePreSignedUrl(string fileName, string contentType, string folderPath = "Hanora");
     Task<string> UploadBytesAsync(byte[] bytes, string fileName, string contentType, string folderPath = "Hanora");
+    Task DeleteFileAsync(string? fileUrl);
 }

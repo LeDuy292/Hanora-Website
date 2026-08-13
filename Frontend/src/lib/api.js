@@ -101,6 +101,19 @@ export const getMyDocuments = async () => {
   return await response.json();
 };
 
+export const getLibraryDocuments = async () => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/documents/library`, {
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch library documents');
+  }
+  return await response.json();
+};
+
 export const deleteDocument = async (id) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
