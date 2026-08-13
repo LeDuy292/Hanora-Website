@@ -170,4 +170,35 @@ public class S3StorageService : IS3StorageService
 
         return $"/uploads/{folderPath}/{uniqueFileName}";
     }
+
+    public async Task DeleteFileAsync(string? fileUrl)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl)) return;
+
+        try
+        {
+            if (IsLocalUploadUrl(fileUrl))
+            {
+                var relativePath = Uri.UnescapeDataString(fileUrl.TrimStart('/'))
+                    .Replace('/', Path.DirectorySeparatorChar);
+                var uploadsRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
+                var localPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath));
+
+                if (localPath.StartsWith(uploadsRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(localPath))
+                {
+                    File.Delete(localPath);
+                }
+            }
+            else if (Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri))
+            {
+                var key = uri.AbsolutePath.TrimStart('/');
+                await _s3Client.DeleteObjectAsync(_bucketName, key);
+            }
+        }
+        catch
+        {
+            // Ignore deletion errors to avoid breaking DB operations
+        }
+    }
 }

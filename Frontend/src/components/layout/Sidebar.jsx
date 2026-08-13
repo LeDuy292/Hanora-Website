@@ -8,7 +8,8 @@ import {
   Mic,
   TrendingUp,
   LayoutDashboard,
-  BookMarked
+  BookMarked,
+  Library
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
@@ -26,6 +27,7 @@ export function Sidebar() {
     { to: '/dashboard', label: 'Tiến trình', icon: TrendingUp },
     { to: '/vocabulary', label: 'Từ vựng', icon: BookMarked },
     { to: '/flashcards', label: 'Flashcard', icon: Layers },
+    { to: '/library', label: 'Thư viện HSK', icon: Library },
     { to: '/reader', label: 'Dịch thuật', icon: BookOpen },
     { to: '/pronunciation', label: 'Luyện phát âm', icon: Mic },
   ];
