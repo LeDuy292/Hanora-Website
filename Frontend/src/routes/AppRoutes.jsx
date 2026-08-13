@@ -18,6 +18,7 @@ import { ProfilePage } from '../pages/ProfilePage';
 import { QuizPage } from '../pages/QuizPage';
 import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
 import { AdminPage } from '../pages/AdminPage';
+import { LibraryPage } from '../pages/LibraryPage';
 
 
 export function AppRoutes() {
@@ -146,6 +147,17 @@ export function AppRoutes() {
           <ProtectedRoute>
             <MainLayout>
               <ProfilePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/library"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <LibraryPage />
             </MainLayout>
           </ProtectedRoute>
         }

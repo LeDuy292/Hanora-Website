@@ -29,3 +29,8 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local uploads and seeding files
+xxxx/
+Backend/Hanora/wwwroot/uploads/
+
