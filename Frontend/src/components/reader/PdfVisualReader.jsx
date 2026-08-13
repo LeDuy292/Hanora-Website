@@ -185,29 +185,77 @@ const shouldSplitFromLineBox = (lineText, lineBox, words) => {
   return suspiciousCount > 0;
 };
 
+const getWordsFromLine = (line, lineIndex, pageWidth) => {
+  const lineText = valueOf(line, 'text', 'Text', '');
+  const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
+  const rawWords = valueOf(line, 'words', 'Words', []);
+
+  if (!lineText) return [];
+
+  const tokens = segmentPdfHitText(lineText);
+  if (!tokens.length) return [];
+
+  const validWordBoxes = Array.isArray(rawWords)
+    ? rawWords
+        .map((w) => ({
+          text: valueOf(w, 'text', 'Text', ''),
+          box: fitTextBoxToContent(valueOf(w, 'text', 'Text', ''), getBox(valueOf(w, 'boundingBox', 'BoundingBox')), pageWidth)
+        }))
+        .filter((w) => w.text && w.box)
+    : [];
+
+  if (validWordBoxes.length > 0) {
+    const resultWords = [];
+    let boxIdx = 0;
+
+    for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
+      const token = tokens[tIdx];
+      const tokenText = token.text;
+
+      let accumulatedText = '';
+      const matchedBoxes = [];
+
+      while (boxIdx < validWordBoxes.length && accumulatedText.length < tokenText.length) {
+        const w = validWordBoxes[boxIdx];
+        accumulatedText += w.text;
+        matchedBoxes.push(w.box);
+        boxIdx++;
+      }
+
+      if (matchedBoxes.length > 0) {
+        const minX = Math.min(...matchedBoxes.map((b) => b.x));
+        const minY = Math.min(...matchedBoxes.map((b) => b.y));
+        const maxX = Math.max(...matchedBoxes.map((b) => b.x + b.width));
+        const maxY = Math.max(...matchedBoxes.map((b) => b.y + b.height));
+
+        resultWords.push({
+          key: `${lineIndex}-${tIdx}-${tokenText}`,
+          text: tokenText,
+          box: {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+          }
+        });
+      }
+    }
+
+    if (resultWords.length > 0) {
+      return resultWords;
+    }
+  }
+
+  const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
+  return splitTextBoxIntoHitWords(lineText, fittedLineBox, `${lineIndex}-line`);
+};
+
 const getWords = (page) => {
   const lines = valueOf(page, 'lines', 'Lines', []);
   const pageWidth = Number(valueOf(page, 'width', 'Width', 0)) || null;
 
   return lines.flatMap((line, lineIndex) => {
-    const words = valueOf(line, 'words', 'Words', []);
-    const lineText = valueOf(line, 'text', 'Text', '');
-    const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
-    const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
-
-    if (shouldSplitFromLineBox(lineText, fittedLineBox, words)) {
-      return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
-    }
-
-    if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
-      return words.flatMap((word, wordIndex) => {
-        const text = valueOf(word, 'text', 'Text', '');
-        const box = fitTextBoxToContent(text, getBox(valueOf(word, 'boundingBox', 'BoundingBox')), pageWidth);
-        return splitTextBoxIntoHitWords(text, box, lineIndex + '-' + wordIndex);
-      });
-    }
-
-    return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+    return getWordsFromLine(line, lineIndex, pageWidth);
   }).filter((word) => word.text && word.box && hasTargetText(word.text));
 };
 
