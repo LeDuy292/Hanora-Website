@@ -31,6 +31,14 @@ const getBox = (box) => {
 };
 
 const HANZI_RE = /[\u3400-\u9fff]/;
+const VIETNAMESE_RE = /[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+const CJK_OR_DIGIT_RE = /[\u3400-\u9fff0-9]/;
+
+const hasTargetText = (text = '') => {
+  if (!text) return false;
+  if (VIETNAMESE_RE.test(text)) return false;
+  return CJK_OR_DIGIT_RE.test(text);
+};
 
 const hasHanzi = (text = '') => HANZI_RE.test(text);
 
@@ -204,9 +212,8 @@ const getWords = (page) => {
       lineWords = splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
     }
 
-    // Sort words within this specific line visually by x coordinate (left-to-right)
-    return lineWords.sort((a, b) => (a.box?.x || 0) - (b.box?.x || 0));
-  }).filter((word) => word.text && word.box);
+    return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+  }).filter((word) => word.text && word.box && hasTargetText(word.text));
 };
 
 const getPageIdentity = (page, index) => {
@@ -364,30 +371,6 @@ const PdfVisualReader = ({
   useEffect(() => {
     requestedOcrPagesRef.current.clear();
   }, [documentId, fileUrl]);
-
-  useEffect(() => {
-    if (!documentId || !pdfDoc || isLoadingOcr || hasOcrPageForCurrentPage || pageNumber < 1) return;
-    if (requestedOcrPagesRef.current.has(pageNumber)) return;
-
-    requestedOcrPagesRef.current.add(pageNumber);
-    generateDocumentOcrPage(documentId, pageNumber)
-      .then((result) => {
-        const page = result?.page || result?.Page;
-        if (!page) {
-          requestedOcrPagesRef.current.delete(pageNumber);
-          return;
-        }
-        const identifiedPage = withPageIdentity(page, pageNumber);
-        setOcrPages((prev) => {
-          const withoutPage = prev.filter((item, index) => getPageIdentity(item, index) !== pageNumber);
-          return [...withoutPage, identifiedPage].sort((a, b) => getPageIdentity(a, 0) - getPageIdentity(b, 0));
-        });
-      })
-      .catch((error) => {
-        requestedOcrPagesRef.current.delete(pageNumber);
-        console.warn('Cannot generate OCR for PDF page ' + pageNumber + '.', error);
-      });
-  }, [documentId, pdfDoc, isLoadingOcr, hasOcrPageForCurrentPage, pageNumber]);
 
   useEffect(() => {
     let isMounted = true;
