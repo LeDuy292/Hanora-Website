@@ -128,8 +128,8 @@ const UploadModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 relative animate-scale-in max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 pt-20 sm:pt-24 overflow-y-auto">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-scale-in max-h-[85vh] overflow-y-auto flex flex-col my-auto">
         <button 
           onClick={onClose}
           disabled={isUploading || (processingId && !isFailed)}
