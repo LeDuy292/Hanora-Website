@@ -258,30 +258,7 @@ const getWords = (page) => {
   const pageWidth = Number(valueOf(page, 'width', 'Width', 0)) || null;
 
   return lines.flatMap((line, lineIndex) => {
-<<<<<<< HEAD
-    const words = valueOf(line, 'words', 'Words', []);
-    const lineText = valueOf(line, 'text', 'Text', '');
-    const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
-    const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
-
-    let lineWords = [];
-
-    if (shouldSplitFromLineBox(lineText, fittedLineBox, words)) {
-      lineWords = splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
-    } else if (Array.isArray(words) && words.some((word) => getBox(valueOf(word, 'boundingBox', 'BoundingBox')))) {
-      lineWords = words.flatMap((word, wordIndex) => {
-        const text = valueOf(word, 'text', 'Text', '');
-        const box = fitTextBoxToContent(text, getBox(valueOf(word, 'boundingBox', 'BoundingBox')), pageWidth);
-        return splitTextBoxIntoHitWords(text, box, lineIndex + '-' + wordIndex);
-      });
-    } else {
-      lineWords = splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
-    }
-
-    return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
-=======
     return getWordsFromLine(line, lineIndex, pageWidth);
->>>>>>> e0a8615 (fix: remove OCR page retry button, merge compound words, filter non-CJK OCR text and optimize PDF fast-path)
   }).filter((word) => word.text && word.box && hasTargetText(word.text));
 };
 
