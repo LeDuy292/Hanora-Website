@@ -45,9 +45,9 @@ public class OcrService : IOcrService
                 var text = string.Join(Environment.NewLine + Environment.NewLine, pages.SelectMany(p => p.Lines).Select(l => l.Text));
                 var chineseCharCount = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
                 var extractedPageCount = pages.Select(p => p.PageNumber).Distinct().Count();
-
+                var minRequiredCjk = Math.Max(10, expectedPageCount * 2);
                 var hasReliablePdfLayout = IsPdfLayoutReliable(pages);
-                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount >= 5 && hasReliablePdfLayout)
+                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount >= minRequiredCjk && hasReliablePdfLayout)
                 {
                     _logger.LogInformation("PDF native layout extraction succeeded with {ChineseCount} CJK characters across {PageCount} pages. Returning instant result.", chineseCharCount, extractedPageCount);
                     return (text, pages, null);
