@@ -149,6 +149,10 @@ public class OcrService : IOcrService
                     var lineWords = lineGroup.OrderBy(w => w.BoundingBox.Left).ToList();
                     if (!lineWords.Any()) continue;
 
+                    // Filter out lines that do not contain Chinese characters or numbers
+                    var fullLineText = string.Join(" ", lineWords.Select(w => w.Text));
+                    if (!HasCjkOrNumber(fullLineText)) continue;
+
                     var minX = lineWords.Min(w => w.BoundingBox.Left);
                     var maxX = lineWords.Max(w => w.BoundingBox.Right);
                     var minY = lineWords.Min(w => w.BoundingBox.Bottom);
@@ -214,6 +218,18 @@ public class OcrService : IOcrService
 
         var tolerated = Math.Max(4, (int)Math.Ceiling(hanziWords.Count * 0.12));
         return suspiciousCount <= tolerated;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex VietnameseRegex = 
+        new(@"[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠÂẦẤẨẪẬĂẰẮẲẴẶÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static bool HasCjkOrNumber(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (VietnameseRegex.IsMatch(text)) return false;
+        var hasCjk = text.Any(ch => ch >= '\u3400' && ch <= '\u9fff');
+        var hasDigits = text.Any(char.IsDigit);
+        return hasCjk || hasDigits;
     }
 
     private static bool HasCjk(string? text)
@@ -486,6 +502,7 @@ public class OcrService : IOcrService
                 foreach (var line in lines.EnumerateArray())
                 {
                     var lineText = line.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? string.Empty : string.Empty;
+                    if (!HasCjkOrNumber(lineText)) continue;
                     if (!string.IsNullOrWhiteSpace(lineText)) textBuilder.AppendLine(lineText);
 
                     var lineDto = new Services.DTOs.OcrLineDto
@@ -582,6 +599,7 @@ public class OcrService : IOcrService
                 foreach (var line in block.GetProperty("lines").EnumerateArray())
                 {
                     var lineText = line.GetProperty("text").GetString() ?? "";
+                    if (!HasCjkOrNumber(lineText)) continue;
                     textBuilder.AppendLine(lineText);
 
                     var boundingPoly = line.GetProperty("boundingPolygon").EnumerateArray().Select(x => x.GetProperty("x").GetDouble()).ToArray();

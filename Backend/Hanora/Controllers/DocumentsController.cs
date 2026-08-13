@@ -329,13 +329,17 @@ public class DocumentsController : ControllerBase
         }
 
         var documents = await _documentRepository.GetByUserIdAsync(userId);
-        var result = documents.Select(d => new
-        {
-            d.Id,
-            d.Title,
-            d.Status,
-            d.CreatedAt
-        });
+        var result = documents
+            .Where(d => 
+                !(d.Title ?? "").Contains("hsk", StringComparison.OrdinalIgnoreCase) && 
+                !(d.OriginalFilename ?? "").Contains("hsk", StringComparison.OrdinalIgnoreCase))
+            .Select(d => new
+            {
+                d.Id,
+                d.Title,
+                d.Status,
+                d.CreatedAt
+            });
 
         return Ok(result);
     }

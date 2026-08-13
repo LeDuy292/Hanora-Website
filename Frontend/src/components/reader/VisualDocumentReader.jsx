@@ -42,7 +42,7 @@ const getWords = (page) => {
       text: valueOf(line, 'text', 'Text', ''),
       box: getBox(valueOf(line, 'boundingBox', 'BoundingBox')),
     }];
-  }).filter((word) => word.text && word.box);
+  }).filter((word) => word.text && word.box && !/[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(word.text) && /[\u3400-\u9fff0-9]/.test(word.text));
 };
 
 const ImageOcrReader = ({
