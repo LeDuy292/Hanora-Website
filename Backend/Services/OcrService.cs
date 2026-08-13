@@ -47,16 +47,11 @@ public class OcrService : IOcrService
                 var extractedPageCount = pages.Select(p => p.PageNumber).Distinct().Count();
 
                 var hasReliablePdfLayout = IsPdfLayoutReliable(pages);
-                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount > 10 && hasReliablePdfLayout && (expectedPageCount <= 0 || extractedPageCount >= expectedPageCount))
+                if (!string.IsNullOrWhiteSpace(text) && chineseCharCount >= 5 && hasReliablePdfLayout)
                 {
+                    _logger.LogInformation("PDF native layout extraction succeeded with {ChineseCount} CJK characters across {PageCount} pages. Returning instant result.", chineseCharCount, extractedPageCount);
                     return (text, pages, null);
                 }
-
-                _logger.LogInformation(
-                    "PDF text extraction yielded incomplete layout ({Extracted}/{Expected}), unreliable boxes ({Reliable}), or little CJK text. Falling back to Azure Read OCR.",
-                    extractedPageCount,
-                    expectedPageCount,
-                    hasReliablePdfLayout);
                 var (ocrText, ocrPages, ocrError) = await ExtractPdfWithAzureReadLayoutAsync(pdfBytes, expectedPageCount);
                 var ocrChineseCount = System.Text.RegularExpressions.Regex.Matches(ocrText ?? "", @"\p{IsCJKUnifiedIdeographs}").Count;
 
@@ -360,7 +355,7 @@ public class OcrService : IOcrService
                 foreach (var missingPage in missingPages)
                 {
                     // Sleep to avoid rate limits
-                    await Task.Delay(3000);
+                    await Task.Delay(200);
 
                     byte[] singlePageBytes;
                     try

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { pinyin } from 'pinyin-pro';
-import { cleanPinyin } from '../../utils/chineseUtils';
+import { cleanPinyin, segmentChineseText } from '../../utils/chineseUtils';
 import PdfVisualReader from './PdfVisualReader';
 import { resolveDocumentAssetUrl } from '../../lib/api';
 
@@ -28,9 +28,63 @@ const getBox = (box) => {
 const getWords = (page) => {
   const lines = valueOf(page, 'lines', 'Lines', []);
   return lines.flatMap((line, lineIndex) => {
-    const words = valueOf(line, 'words', 'Words', []);
-    if (Array.isArray(words) && words.length > 0) {
-      return words.map((word, wordIndex) => ({
+    const rawWords = valueOf(line, 'words', 'Words', []);
+    const lineText = valueOf(line, 'text', 'Text', '');
+
+    if (!lineText) return [];
+
+    const tokens = segmentChineseText(lineText);
+    const validWordBoxes = Array.isArray(rawWords)
+      ? rawWords
+          .map((w) => ({
+            text: valueOf(w, 'text', 'Text', ''),
+            box: getBox(valueOf(w, 'boundingBox', 'BoundingBox'))
+          }))
+          .filter((w) => w.text && w.box)
+      : [];
+
+    if (validWordBoxes.length > 0 && tokens.length > 0) {
+      const resultWords = [];
+      let boxIdx = 0;
+
+      for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
+        const tokenText = tokens[tIdx].text;
+        let accumulatedText = '';
+        const matchedBoxes = [];
+
+        while (boxIdx < validWordBoxes.length && accumulatedText.length < tokenText.length) {
+          const w = validWordBoxes[boxIdx];
+          accumulatedText += w.text;
+          matchedBoxes.push(w.box);
+          boxIdx++;
+        }
+
+        if (matchedBoxes.length > 0) {
+          const minX = Math.min(...matchedBoxes.map((b) => b.x));
+          const minY = Math.min(...matchedBoxes.map((b) => b.y));
+          const maxX = Math.max(...matchedBoxes.map((b) => b.x + b.width));
+          const maxY = Math.max(...matchedBoxes.map((b) => b.y + b.height));
+
+          resultWords.push({
+            key: `${lineIndex}-${tIdx}-${tokenText}`,
+            text: tokenText,
+            box: {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY
+            }
+          });
+        }
+      }
+
+      if (resultWords.length > 0) {
+        return resultWords;
+      }
+    }
+
+    if (Array.isArray(rawWords) && rawWords.length > 0) {
+      return rawWords.map((word, wordIndex) => ({
         key: `${lineIndex}-${wordIndex}-${valueOf(word, 'text', 'Text', '')}`,
         text: valueOf(word, 'text', 'Text', ''),
         box: getBox(valueOf(word, 'boundingBox', 'BoundingBox')),
@@ -39,7 +93,7 @@ const getWords = (page) => {
 
     return [{
       key: `${lineIndex}-line`,
-      text: valueOf(line, 'text', 'Text', ''),
+      text: lineText,
       box: getBox(valueOf(line, 'boundingBox', 'BoundingBox')),
     }];
   }).filter((word) => word.text && word.box && !/[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(word.text) && /[\u3400-\u9fff0-9]/.test(word.text));

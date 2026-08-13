@@ -188,11 +188,77 @@ const shouldSplitFromLineBox = (lineText, lineBox, words) => {
   return suspiciousCount > 0;
 };
 
+const getWordsFromLine = (line, lineIndex, pageWidth) => {
+  const lineText = valueOf(line, 'text', 'Text', '');
+  const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
+  const rawWords = valueOf(line, 'words', 'Words', []);
+
+  if (!lineText) return [];
+
+  const tokens = segmentPdfHitText(lineText);
+  if (!tokens.length) return [];
+
+  const validWordBoxes = Array.isArray(rawWords)
+    ? rawWords
+        .map((w) => ({
+          text: valueOf(w, 'text', 'Text', ''),
+          box: fitTextBoxToContent(valueOf(w, 'text', 'Text', ''), getBox(valueOf(w, 'boundingBox', 'BoundingBox')), pageWidth)
+        }))
+        .filter((w) => w.text && w.box)
+    : [];
+
+  if (validWordBoxes.length > 0) {
+    const resultWords = [];
+    let boxIdx = 0;
+
+    for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
+      const token = tokens[tIdx];
+      const tokenText = token.text;
+
+      let accumulatedText = '';
+      const matchedBoxes = [];
+
+      while (boxIdx < validWordBoxes.length && accumulatedText.length < tokenText.length) {
+        const w = validWordBoxes[boxIdx];
+        accumulatedText += w.text;
+        matchedBoxes.push(w.box);
+        boxIdx++;
+      }
+
+      if (matchedBoxes.length > 0) {
+        const minX = Math.min(...matchedBoxes.map((b) => b.x));
+        const minY = Math.min(...matchedBoxes.map((b) => b.y));
+        const maxX = Math.max(...matchedBoxes.map((b) => b.x + b.width));
+        const maxY = Math.max(...matchedBoxes.map((b) => b.y + b.height));
+
+        resultWords.push({
+          key: `${lineIndex}-${tIdx}-${tokenText}`,
+          text: tokenText,
+          box: {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+          }
+        });
+      }
+    }
+
+    if (resultWords.length > 0) {
+      return resultWords;
+    }
+  }
+
+  const fittedLineBox = fitTextBoxToContent(lineText, lineBox, pageWidth);
+  return splitTextBoxIntoHitWords(lineText, fittedLineBox, `${lineIndex}-line`);
+};
+
 const getWords = (page) => {
   const lines = valueOf(page, 'lines', 'Lines', []);
   const pageWidth = Number(valueOf(page, 'width', 'Width', 0)) || null;
 
   return lines.flatMap((line, lineIndex) => {
+<<<<<<< HEAD
     const words = valueOf(line, 'words', 'Words', []);
     const lineText = valueOf(line, 'text', 'Text', '');
     const lineBox = getBox(valueOf(line, 'boundingBox', 'BoundingBox'));
@@ -213,6 +279,9 @@ const getWords = (page) => {
     }
 
     return splitTextBoxIntoHitWords(lineText, fittedLineBox, lineIndex + '-line');
+=======
+    return getWordsFromLine(line, lineIndex, pageWidth);
+>>>>>>> e0a8615 (fix: remove OCR page retry button, merge compound words, filter non-CJK OCR text and optimize PDF fast-path)
   }).filter((word) => word.text && word.box && hasTargetText(word.text));
 };
 
@@ -798,20 +867,6 @@ const PdfVisualReader = ({
             className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'page' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
           >
             Fit Page
-          </button>
-
-          <button
-            onClick={forceRegenerateOcrForPage}
-            disabled={isRegeneratingOcr}
-            className="flex h-9 min-h-9 px-2.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:opacity-50 sm:h-10 sm:rounded-xl sm:px-3 text-xs font-bold gap-1.5"
-            title="Nhận diện lại chữ (OCR)"
-          >
-            {isRegeneratingOcr ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden lg:inline">OCR lại trang</span>
           </button>
 
           <button
