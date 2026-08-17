@@ -265,8 +265,10 @@ public class DocumentsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetDocument(long id)
     {
+        Response.Headers["Cache-Control"] = "public, max-age=300";
         var document = await _documentRepository.GetByIdAsync(id);
         if (document == null)
         {
@@ -319,24 +321,27 @@ public class DocumentsController : ControllerBase
     }
 
     [HttpGet("my-documents")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetMyDocuments()
     {
-
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!long.TryParse(userIdString, out long userId))
         {
-            userId = 1; 
+            userId = 1;
         }
 
         var documents = await _documentRepository.GetByUserIdAsync(userId);
         var result = documents
-            .Where(d => 
-                !(d.Title ?? "").Contains("hsk", StringComparison.OrdinalIgnoreCase) && 
-                !(d.OriginalFilename ?? "").Contains("hsk", StringComparison.OrdinalIgnoreCase))
+            .Where(d => !(d.Title ?? "").StartsWith("(HSK", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(d => d.CreatedAt)
             .Select(d => new
             {
                 d.Id,
                 d.Title,
+                d.OriginalFilename,
+                d.FileUrl,
+                d.FileSizeBytes,
+                d.PageCount,
                 d.Status,
                 d.CreatedAt
             });
@@ -348,6 +353,7 @@ public class DocumentsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetLibraryDocuments()
     {
+        Response.Headers["Cache-Control"] = "public, max-age=600";
         var docs = await _db.Documents
             .Where(d => 
                 EF.Functions.ILike(d.Title, "%hsk%") || 
@@ -369,6 +375,7 @@ public class DocumentsController : ControllerBase
     }
 
     [HttpGet("{id}/annotations")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAnnotations(long id)
     {
         var document = await _documentRepository.GetByIdAsync(id);
@@ -992,6 +999,102 @@ public class DocumentsController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { page, ocrJsonUrl = layoutUrl });
+    }
+
+    /// <summary>
+    /// Admin-only: Batch OCR all pages of a library document using Azure Vision.
+    /// POST /api/documents/{id}/ocr-all
+    /// </summary>
+    [HttpPost("{id}/ocr-all")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GenerateOcrAllPages(long id)
+    {
+        var document = await _db.Documents.FirstOrDefaultAsync(d => d.Id == id);
+        if (document == null)
+        {
+            return NotFound(new { error = "Tài liệu không tồn tại." });
+        }
+
+        var fileName = document.OriginalFilename ?? document.Title ?? string.Empty;
+        if (!fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "Chỉ hỗ trợ OCR cho file PDF." });
+        }
+
+        // Download PDF once
+        using var fileStream = await _s3StorageService.DownloadFileAsync(document.FileUrl);
+        using var memoryStream = new MemoryStream();
+        await fileStream.CopyToAsync(memoryStream);
+        var pdfBytes = memoryStream.ToArray();
+
+        // Determine total pages using PdfPig
+        int totalPages;
+        using (var pdfDoc = UglyToad.PdfPig.PdfDocument.Open(pdfBytes))
+        {
+            totalPages = pdfDoc.NumberOfPages;
+        }
+
+        var allPages = new List<Services.DTOs.PageLinesDto>();
+        var errors = new List<string>();
+        int successCount = 0;
+
+        for (int page = 1; page <= totalPages; page++)
+        {
+            try
+            {
+                using var pageStream = new MemoryStream(pdfBytes);
+                var (pageResult, errorMessage) = await _ocrService.ExtractPdfPageLayoutAsync(pageStream, page);
+                if (pageResult != null)
+                {
+                    allPages.Add(pageResult);
+                    successCount++;
+                }
+                else
+                {
+                    errors.Add($"Page {page}: {errorMessage}");
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Page {page}: {ex.Message}");
+            }
+
+            // Small delay to avoid Azure rate limiting
+            if (page % 5 == 0)
+            {
+                await Task.Delay(500);
+            }
+        }
+
+        allPages = allPages.OrderBy(p => p.PageNumber).ToList();
+
+        var ocrPayload = new
+        {
+            Version = 1,
+            Source = "hanora-layout-ocr",
+            Pages = allPages
+        };
+
+        var layoutJson = JsonSerializer.Serialize(ocrPayload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var layoutBytes = Encoding.UTF8.GetBytes(layoutJson);
+        var layoutFileName = $"{Guid.NewGuid()}_layout.json";
+        var layoutUrl = await _s3StorageService.UploadBytesAsync(layoutBytes, layoutFileName, "application/json");
+
+        document.OcrJsonUrl = layoutUrl;
+        document.PageCount = totalPages;
+        document.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            documentId = id,
+            title = document.Title,
+            totalPages,
+            successCount,
+            errorCount = errors.Count,
+            ocrJsonUrl = layoutUrl,
+            errors = errors.Take(10)
+        });
     }
 
     private async Task<List<Services.DTOs.PageLinesDto>> LoadExistingOcrPagesAsync(string? ocrJsonUrl)

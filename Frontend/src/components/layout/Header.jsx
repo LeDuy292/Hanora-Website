@@ -41,10 +41,10 @@ export function Header({ offsetTop }) {
     <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.22)] transition-all duration-300`}>
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
-        <NavLink to="/" className="hover:opacity-90 transition-opacity group">
+        <NavLink to="/" className="group flex items-center transition-all p-1 rounded-2xl hover:bg-white/10">
           <img
             src={logoImg}
-            className="h-10 sm:h-12 md:h-16 w-auto object-contain brightness-0 invert filter transition-transform duration-500 group-hover:scale-105"
+            className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_2px_12px_rgba(255,255,255,0.9)]"
             alt="Hanora logo"
           />
         </NavLink>

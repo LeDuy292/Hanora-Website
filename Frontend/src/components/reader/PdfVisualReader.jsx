@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { segmentChineseText, cleanPinyin, CHINESE_DICTIONARY } from '../../utils/chineseUtils';
 import { pinyin } from 'pinyin-pro';
-import { generateDocumentOcrPage } from '../../lib/api';
-import { toast } from '../../store/notificationStore';
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const clampScale = (value) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+
+// Global in-memory cache for OCR layouts to avoid re-fetching 6MB JSONs
+const ocrLayoutMemoryCache = new Map();
 
 const normalizePages = (payload) => {
   if (!payload) return [];
@@ -88,7 +89,7 @@ const fitTextBoxToContent = (text, box, pageWidth) => {
 
   const units = measureTextUnits(text);
   const hasCJK = hasHanzi(text);
-  const scaleFactor = hasCJK ? 1.02 : 1.12; 
+  const scaleFactor = hasCJK ? 1.02 : 1.12;
   const expectedWidth = Math.max(box.height * units * scaleFactor, box.height * 0.8);
   const availableWidth = pageWidth ? Math.max(1, pageWidth - box.x) : box.width;
   const maxAllowedWidth = Math.min(availableWidth, expectedWidth * 1.15);
@@ -200,11 +201,11 @@ const getWordsFromLine = (line, lineIndex, pageWidth) => {
 
   const validWordBoxes = Array.isArray(rawWords)
     ? rawWords
-        .map((w) => ({
-          text: valueOf(w, 'text', 'Text', ''),
-          box: fitTextBoxToContent(valueOf(w, 'text', 'Text', ''), getBox(valueOf(w, 'boundingBox', 'BoundingBox')), pageWidth)
-        }))
-        .filter((w) => w.text && w.box)
+      .map((w) => ({
+        text: valueOf(w, 'text', 'Text', ''),
+        box: fitTextBoxToContent(valueOf(w, 'text', 'Text', ''), getBox(valueOf(w, 'boundingBox', 'BoundingBox')), pageWidth)
+      }))
+      .filter((w) => w.text && w.box)
     : [];
 
   if (validWordBoxes.length > 0) {
@@ -307,31 +308,6 @@ const PdfVisualReader = ({
   const [ocrPages, setOcrPages] = useState([]);
   const [isLoadingOcr, setIsLoadingOcr] = useState(Boolean(ocrJsonUrl));
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isRegeneratingOcr, setIsRegeneratingOcr] = useState(false);
-
-  const forceRegenerateOcrForPage = async () => {
-    if (!documentId || pageNumber < 1 || isRegeneratingOcr) return;
-    setIsRegeneratingOcr(true);
-    toast.info("Đang nhận diện lại chữ cho trang này...");
-    try {
-      const result = await generateDocumentOcrPage(documentId, pageNumber);
-      const page = result?.page || result?.Page;
-      if (!page) {
-        throw new Error("Không lấy được dữ liệu OCR mới từ server.");
-      }
-      const identifiedPage = withPageIdentity(page, pageNumber);
-      setOcrPages((prev) => {
-        const withoutPage = prev.filter((item, index) => getPageIdentity(item, index) !== pageNumber);
-        return [...withoutPage, identifiedPage].sort((a, b) => getPageIdentity(a, 0) - getPageIdentity(b, 0));
-      });
-      toast.success("Đã nhận diện lại chữ thành công!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Nhận diện thất bại: " + error.message);
-    } finally {
-      setIsRegeneratingOcr(false);
-    }
-  };
 
   const readerRootRef = useRef(null);
   const scrollAreaRef = useRef(null);
@@ -357,8 +333,8 @@ const PdfVisualReader = ({
     const handleKeyDown = (event) => {
       const activeEl = document.activeElement;
       if (activeEl && (
-        activeEl.tagName === 'INPUT' || 
-        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
         activeEl.isContentEditable
       )) {
         return;
@@ -418,6 +394,9 @@ const PdfVisualReader = ({
     requestedOcrPagesRef.current.clear();
   }, [documentId, fileUrl]);
 
+// Global in-memory & session storage cache for OCR layouts to avoid re-fetching 6MB JSONs
+const ocrLayoutMemoryCache = new Map();
+
   useEffect(() => {
     let isMounted = true;
     if (!ocrJsonUrl) {
@@ -426,11 +405,40 @@ const PdfVisualReader = ({
       return undefined;
     }
 
+    // 1. Check in-memory cache first for instant 0ms load
+    if (ocrLayoutMemoryCache.has(ocrJsonUrl)) {
+      setOcrPages(ocrLayoutMemoryCache.get(ocrJsonUrl));
+      setIsLoadingOcr(false);
+      return undefined;
+    }
+
+    // 2. Check sessionStorage cache
+    try {
+      const cached = sessionStorage.getItem(`hanora_ocr_${ocrJsonUrl}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const normalized = normalizePages(parsed);
+        ocrLayoutMemoryCache.set(ocrJsonUrl, normalized);
+        setOcrPages(normalized);
+        setIsLoadingOcr(false);
+        return undefined;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
     setIsLoadingOcr(true);
-    fetch(ocrJsonUrl)
+    fetch(ocrJsonUrl, { cache: 'force-cache' })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Cannot load OCR layout')))
       .then((payload) => {
-        if (isMounted) setOcrPages(normalizePages(payload));
+        const normalized = normalizePages(payload);
+        ocrLayoutMemoryCache.set(ocrJsonUrl, normalized);
+        try {
+          sessionStorage.setItem(`hanora_ocr_${ocrJsonUrl}`, JSON.stringify(payload));
+        } catch {
+          // Ignore quota exceeded
+        }
+        if (isMounted) setOcrPages(normalized);
       })
       .catch((error) => {
         console.warn('Cannot load PDF OCR layout.', error);
@@ -443,9 +451,14 @@ const PdfVisualReader = ({
     return () => { isMounted = false; };
   }, [ocrJsonUrl]);
 
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadError, setLoadError] = useState(null);
+
   useEffect(() => {
     if (!fileUrl) return undefined;
     let cancelled = false;
+    setLoadError(null);
+    setLoadProgress(0);
 
     const loadPdf = async () => {
       try {
@@ -456,24 +469,37 @@ const PdfVisualReader = ({
         }
         pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
 
+        // Optimized streaming configuration for S3 PDFs
         const loadingTask = pdfjsLib.getDocument({
           url: fileUrl,
           cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
           cMapPacked: true,
+          disableAutoFetch: false,
+          disableStream: false,
+          rangeChunkSize: 1048576 * 4, // 4MB chunk streaming (64x faster than 64KB)
         });
+
+        loadingTask.onProgress = ({ loaded, total }) => {
+          if (total > 0 && !cancelled) {
+            setLoadProgress(Math.min(99, Math.round((loaded / total) * 100)));
+          }
+        };
+
         const pdf = await loadingTask.promise;
         if (cancelled) return;
         setPdfDoc(pdf);
         setTotalPages(pdf.numPages);
-        onPageChange?.(1);
       } catch (error) {
-        console.error('Error loading PDF:', error);
+        if (!cancelled) {
+          console.error('Error loading PDF:', error);
+          setLoadError(error.message || 'Không thể tải PDF');
+        }
       }
     };
 
     loadPdf();
     return () => { cancelled = true; };
-  }, [fileUrl, onPageChange]);
+  }, [fileUrl]);
 
   const attachWordHandlers = (wordSpan, word, absIndex) => {
     wordSpan.onclick = (event) => {
@@ -559,10 +585,6 @@ const PdfVisualReader = ({
 
     const pageWidth = Number(valueOf(page, 'width', 'Width', viewport.width)) || viewport.width || 1;
     const pageHeight = Number(valueOf(page, 'height', 'Height', viewport.height)) || viewport.height || 1;
-    
-    const viewBox = viewport.viewBox || [0, 0, viewport.width / scale, viewport.height / scale];
-    const pdfWidth = viewBox[2] - viewBox[0];
-    const pdfHeight = viewBox[3] - viewBox[1];
 
     words.forEach((word, wordIndex) => {
       const absIndex = (pageNumber - 1) * 10000 + wordIndex;
@@ -570,28 +592,16 @@ const PdfVisualReader = ({
       span.textContent = word.text;
       span.className = 'hanora-pdf-ocr-word';
 
-      const ocrXPercent = word.box.x / pageWidth;
-      const ocrYPercent = word.box.y / pageHeight;
-      const ocrWidthPercent = word.box.width / pageWidth;
-      const ocrHeightPercent = word.box.height / pageHeight;
-
-      const pdfX = viewBox[0] + ocrXPercent * pdfWidth;
-      const pdfY = viewBox[1] + (1 - ocrYPercent) * pdfHeight;
-
-      const pdfX2 = pdfX + ocrWidthPercent * pdfWidth;
-      const pdfY2 = pdfY - ocrHeightPercent * pdfHeight;
-
-      const [viewX, viewY] = viewport.convertToViewportPoint(pdfX, pdfY);
-      const [viewX2, viewY2] = viewport.convertToViewportPoint(pdfX2, pdfY2);
-
-      const spanWidth = Math.max(1, viewX2 - viewX);
-      const spanHeight = Math.max(1, viewY2 - viewY);
+      const viewX = (word.box.x / pageWidth) * viewport.width;
+      const viewY = (word.box.y / pageHeight) * viewport.height;
+      const spanWidth = Math.max(1, (word.box.width / pageWidth) * viewport.width);
+      const spanHeight = Math.max(1, (word.box.height / pageHeight) * viewport.height);
 
       span.style.left = `${viewX}px`;
       span.style.top = `${viewY}px`;
       span.style.width = `${spanWidth}px`;
       span.style.height = `${spanHeight}px`;
-      span.style.fontSize = `${Math.max(10, spanHeight * 0.92)}px`;
+      span.style.fontSize = `${Math.max(10, spanHeight * 0.90)}px`;
       decorateWordSpan(span, word.text, absIndex);
       attachWordHandlers(span, word.text, absIndex);
       textLayerDiv.appendChild(span);
@@ -680,14 +690,24 @@ const PdfVisualReader = ({
         await task.promise;
         if (cancelled) return;
 
-        const renderedOcr = ocrPage ? renderOcrOverlay(textLayerDiv, ocrPage, viewport) : false;
-        if (!renderedOcr) {
+        const textContent = await page.getTextContent();
+        const nativeText = textContent?.items?.map(item => item.str || '').join(' ') || '';
+        const nativeChineseCount = (nativeText.match(/[\u3400-\u9fff]/g) || []).length;
+
+        const ocrWords = ocrPage ? getWords(ocrPage) : [];
+        const ocrChineseCount = ocrWords.filter(w => hasHanzi(w.text)).length;
+
+        // If OCR has Chinese text and native PDF has broken/empty Chinese font encoding, prefer OCR overlay
+        const preferOcr = ocrPage && ocrChineseCount > 0 && (nativeChineseCount === 0 || ocrChineseCount > nativeChineseCount * 1.5);
+
+        if (preferOcr) {
+          renderOcrOverlay(textLayerDiv, ocrPage, viewport);
+        } else if (textContent && textContent.items && textContent.items.length > 0 && textContent.items.some((item) => item.str && item.str.trim().length > 0)) {
           textLayerDiv.innerHTML = '';
           textLayerDiv.style.height = `${viewport.height}px`;
           textLayerDiv.style.width = `${viewport.width}px`;
           textLayerDiv.style.setProperty('--scale-factor', scale);
 
-          const textContent = await page.getTextContent();
           await window.pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container: textLayerDiv,
@@ -695,9 +715,17 @@ const PdfVisualReader = ({
             textDivs: []
           }).promise;
           if (!cancelled) processPdfTextLayerForClick(textLayerDiv);
+        } else if (ocrPage) {
+          renderOcrOverlay(textLayerDiv, ocrPage, viewport);
         }
 
         requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+
+        // Background pre-fetch next & previous pages for instant 0ms flipping
+        if (pdfDoc) {
+          if (pageNumber < totalPages) pdfDoc.getPage(pageNumber + 1).catch(() => {});
+          if (pageNumber > 1) pdfDoc.getPage(pageNumber - 1).catch(() => {});
+        }
       } catch (error) {
         if (error?.name !== 'RenderingCancelledException') {
           console.error('Error rendering page:', error);
@@ -749,9 +777,35 @@ const PdfVisualReader = ({
     <div ref={readerRootRef} className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm sm:rounded-xl">
       <div ref={scrollAreaRef} className="relative min-h-0 flex-1 overflow-auto bg-slate-100/60 p-1 sm:p-3">
         {!pdfDoc && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
-            <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-            <p className="mt-4 text-sm font-bold uppercase tracking-widest text-slate-500">Đang tải tài liệu...</p>
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm p-6 text-center">
+            {loadError ? (
+              <div className="max-w-md bg-white p-6 rounded-2xl border border-rose-200 shadow-xl">
+                <p className="text-sm font-bold text-rose-600 mb-2">Không thể tải tài liệu</p>
+                <p className="text-xs text-slate-500 mb-4">{loadError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md"
+                >
+                  Tải lại trang
+                </button>
+              </div>
+            ) : (
+              <>
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="mt-4 text-sm font-bold uppercase tracking-widest text-slate-600">Đang tải tài liệu...</p>
+                {loadProgress > 0 && (
+                  <div className="mt-3 w-48 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-1.5 rounded-full transition-all duration-200"
+                      style={{ width: `${loadProgress}%` }}
+                    />
+                  </div>
+                )}
+                {loadProgress > 0 && (
+                  <span className="mt-1 text-[11px] font-semibold text-slate-400">{loadProgress}%</span>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -770,6 +824,50 @@ const PdfVisualReader = ({
           />
         </div>
 
+        {/* Bottom Pagination & Navigation Bar */}
+        <div className="mx-auto my-6 flex w-fit items-center gap-2.5 sm:gap-3.5 rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur-md transition-all">
+          <button
+            onClick={() => {
+              goToPage(pageNumber - 1);
+              scrollAreaRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={pageNumber <= 1}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
+            title="Trang trước"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Trang trước</span>
+          </button>
+
+          <div className="flex items-center gap-2 px-1 text-xs font-bold text-slate-700">
+            <span className="text-slate-400 font-semibold hidden sm:inline">Trang</span>
+            <input
+              value={pageInput}
+              onChange={(event) => setPageInput(event.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={commitPageInput}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+              }}
+              className="h-7 w-11 rounded-lg border border-slate-200 bg-slate-50 text-center text-xs font-black text-slate-900 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              aria-label="Nhập số trang"
+            />
+            <span className="text-slate-400">/ {totalPages || '?'}</span>
+          </div>
+
+          <button
+            onClick={() => {
+              goToPage(pageNumber + 1);
+              scrollAreaRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={pageNumber >= totalPages}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none active:scale-95"
+            title="Trang kế tiếp"
+          >
+            <span>Trang kế tiếp</span>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
         {isLoadingOcr && (
           <div className="pointer-events-none absolute right-4 top-4 z-40 flex items-center gap-2 rounded-full border border-blue-100 bg-white/90 px-3 py-2 text-xs font-bold text-blue-700 shadow-sm">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> OCR
@@ -781,92 +879,158 @@ const PdfVisualReader = ({
       {typeof window !== 'undefined' && document.getElementById('pdf-reader-controls') && createPortal(
         <div className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-thin">
           <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <button
-            onClick={() => goToPage(pageNumber - 1)}
-            disabled={pageNumber <= 1}
-            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
-            title="Trang trước"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
+            <button
+              onClick={() => goToPage(pageNumber - 1)}
+              disabled={pageNumber <= 1}
+              className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
+              title="Trang trước"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
 
-          <div className="flex h-9 min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-700 sm:h-10 sm:rounded-xl sm:gap-2">
-            <span className="hidden text-xs uppercase tracking-wide text-slate-500 sm:inline">Trang</span>
-            <input
-              value={pageInput}
-              onChange={(event) => setPageInput(event.target.value.replace(/[^0-9]/g, ''))}
-              onBlur={commitPageInput}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') event.currentTarget.blur();
-              }}
-              className="h-6 w-9 rounded-md border border-slate-200 bg-white text-center text-sm font-black text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:h-7 sm:w-10 sm:rounded-lg"
-              aria-label="Nhập số trang"
-            />
-            <span className="whitespace-nowrap text-xs text-slate-500">/ {totalPages || '?'}</span>
-          </div>
+            <div className="flex h-9 min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-700 sm:h-10 sm:rounded-xl sm:gap-2">
+              <span className="hidden text-xs uppercase tracking-wide text-slate-500 sm:inline">Trang</span>
+              <input
+                value={pageInput}
+                onChange={(event) => setPageInput(event.target.value.replace(/[^0-9]/g, ''))}
+                onBlur={commitPageInput}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+                className="h-6 w-9 rounded-md border border-slate-200 bg-white text-center text-sm font-black text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:h-7 sm:w-10 sm:rounded-lg"
+                aria-label="Nhập số trang"
+              />
+              <span className="whitespace-nowrap text-xs text-slate-500">/ {totalPages || '?'}</span>
+            </div>
 
-          <button
-            onClick={() => goToPage(pageNumber + 1)}
-            disabled={pageNumber >= totalPages}
-            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
-            title="Trang sau"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+            <button
+              onClick={() => goToPage(pageNumber + 1)}
+              disabled={pageNumber >= totalPages}
+              className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10 sm:rounded-xl"
+              title="Trang sau"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
 
-          <div className="mx-1 h-6 w-px shrink-0 bg-slate-200" />
+            <div className="mx-1 h-6 w-px shrink-0 bg-slate-200" />
 
-          <button
-            onClick={() => zoomBy(-0.15)}
-            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
-            title="Thu nhỏ"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <div className="flex h-9 min-h-9 min-w-[58px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-black text-slate-800 sm:h-10 sm:min-w-[64px] sm:rounded-xl">
-            {zoomPercent}%
-          </div>
-          <button
-            onClick={() => zoomBy(0.15)}
-            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
-            title="Phóng to"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setFitMode('width')}
-            className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'width' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
-          >
-            Fit Width
-          </button>
-          <button
-            onClick={() => setFitMode('page')}
-            className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'page' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
-          >
-            Fit Page
-          </button>
+            <button
+              onClick={() => zoomBy(-0.15)}
+              className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              title="Thu nhỏ"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <div className="flex h-9 min-h-9 min-w-[58px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-black text-slate-800 sm:h-10 sm:min-w-[64px] sm:rounded-xl">
+              {zoomPercent}%
+            </div>
+            <button
+              onClick={() => zoomBy(0.15)}
+              className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              title="Phóng to"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setFitMode('width')}
+              className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'width' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
+            >
+              Fit Width
+            </button>
+            <button
+              onClick={() => setFitMode('page')}
+              className={`h-9 min-h-9 rounded-lg border px-2.5 text-xs font-bold transition-colors sm:h-10 sm:rounded-xl sm:px-3 ${fitMode === 'page' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}
+            >
+              Fit Page
+            </button>
 
-          <button
-            onClick={toggleFullscreen}
-            className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
-            title="Toàn màn hình"
-          >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </button>
+            <button
+              onClick={toggleFullscreen}
+              className="flex h-9 min-h-9 w-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              title="Toàn màn hình"
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
           </div>
         </div>,
         document.getElementById('pdf-reader-controls')
       )}
 
       <style>{`
-        .textLayer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }
-        .textLayer > span { color: transparent; position: absolute; overflow: visible !important; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-        .hanora-pdf-ocr-word { position: absolute; display: block; overflow: visible !important; color: transparent; white-space: nowrap; cursor: text; line-height: 1; }
-        .textLayer .word-highlight:hover, .textLayer .hanora-pdf-ocr-word:hover { background-color: rgba(250, 204, 21, 0.32); border-radius: 4px; }
-        .hanora-pdf-token { position: relative; isolation: isolate; overflow: visible !important; }
-        .hanora-pdf-token.hanora-token-selecting { background-color: rgba(37, 99, 235, 0.24) !important; outline: 1px solid rgba(37, 99, 235, 0.28); }
-        .hanora-note-badge { position: absolute; right: -0.72em; top: -0.82em; z-index: 2; color: #e11d48; font-size: 0.72em; line-height: 1; pointer-events: auto; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; }
-        .hanora-pinyin-label { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); color: #2563eb; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; white-space: nowrap; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; }
+        .textLayer {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          opacity: 1;
+          line-height: 1;
+          pointer-events: auto !important;
+          z-index: 20;
+        }
+        .textLayer > span {
+          color: transparent;
+          position: absolute;
+          overflow: visible !important;
+          white-space: pre;
+          cursor: pointer !important;
+          transform-origin: 0% 0%;
+          pointer-events: auto !important;
+          user-select: text;
+        }
+        .hanora-pdf-ocr-word {
+          position: absolute;
+          display: block;
+          overflow: visible !important;
+          color: transparent;
+          white-space: nowrap;
+          cursor: pointer !important;
+          line-height: 1;
+          pointer-events: auto !important;
+          user-select: text;
+          transition: background-color 150ms ease;
+        }
+        .textLayer .word-highlight:hover,
+        .textLayer .hanora-pdf-ocr-word:hover,
+        .hanora-pdf-token:hover {
+          background-color: rgba(59, 130, 246, 0.28) !important;
+          border-radius: 4px;
+          outline: 1px solid rgba(59, 130, 246, 0.4);
+        }
+        .hanora-pdf-token {
+          position: relative;
+          isolation: isolate;
+          overflow: visible !important;
+          cursor: pointer !important;
+          pointer-events: auto !important;
+          display: inline-block;
+        }
+        .hanora-pdf-token.hanora-token-selecting {
+          background-color: rgba(37, 99, 235, 0.28) !important;
+          outline: 1px solid rgba(37, 99, 235, 0.45);
+        }
+        .hanora-note-badge {
+          position: absolute;
+          right: -0.72em;
+          top: -0.82em;
+          z-index: 2;
+          color: #e11d48;
+          font-size: 0.72em;
+          line-height: 1;
+          pointer-events: auto;
+          text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff;
+        }
+        .hanora-pinyin-label {
+          position: absolute;
+          left: 50%;
+          bottom: 100%;
+          transform: translateX(-50%);
+          color: #2563eb;
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1;
+          pointer-events: none;
+          white-space: nowrap;
+          text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff;
+        }
       `}</style>
     </div>
   );

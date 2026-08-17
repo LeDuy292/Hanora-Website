@@ -34,11 +34,11 @@ import {
 
 const HIGHLIGHT_COLORS = [
   { id: 'yellow', name: 'Vàng (Từ mới)', value: '#fef08a' },
-    { id: 'green', name: 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
+  { id: 'green', name: 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
   { id: 'blue', name: 'Xanh dương (Quan trọng)', value: '#bfdbfe' },
-    { id: 'purple', name: 'Tím (Ngữ pháp)', value: '#e9d5ff' },
+  { id: 'purple', name: 'Tím (Ngữ pháp)', value: '#e9d5ff' },
   { id: 'pink', name: 'Hồng (Thành ngữ)', value: '#fbcfe8' },
-    { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
+  { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
 ];
 
 const DRAWING_COLORS = [
@@ -68,8 +68,8 @@ const PEN_STYLES = [
 const NOTE_CATEGORIES = [
   { id: 'text', name: 'Ghi chú văn bản', icon: '📝', prefix: '[Text] ' },
   { id: 'vocab', name: 'Ghi chú từ vựng', icon: '📖', prefix: '[Vocabulary] ' },
-    { id: 'grammar', name: 'Ghi chú ngữ pháp', icon: '💡', prefix: '[Grammar] ' },
-    { id: 'personal', name: 'Nhận xét cá nhân', icon: '👤', prefix: '[Personal] ' }
+  { id: 'grammar', name: 'Ghi chú ngữ pháp', icon: '💡', prefix: '[Grammar] ' },
+  { id: 'personal', name: 'Nhận xét cá nhân', icon: '👤', prefix: '[Personal] ' }
 ];
 
 const EMPTY_ANNOTATIONS = {
@@ -112,10 +112,10 @@ const parseNoteContent = (noteStr) => {
     return { text: noteStr.slice('[Vocabulary] '.length), category: 'vocab', icon: '📖', label: 'Ghi chú từ vựng' };
   }
   if (noteStr.startsWith('[Grammar] ')) {
-        return { text: noteStr.slice('[Grammar] '.length), category: 'grammar', icon: '💡', label: 'Ghi chú ngữ pháp' };
+    return { text: noteStr.slice('[Grammar] '.length), category: 'grammar', icon: '💡', label: 'Ghi chú ngữ pháp' };
   }
   if (noteStr.startsWith('[Personal] ')) {
-        return { text: noteStr.slice('[Personal] '.length), category: 'personal', icon: '👤', label: 'Nhận xét cá nhân' };
+    return { text: noteStr.slice('[Personal] '.length), category: 'personal', icon: '👤', label: 'Nhận xét cá nhân' };
   }
   if (noteStr.startsWith('[Text] ')) {
     return { text: noteStr.slice('[Text] '.length), category: 'text', icon: '📝', label: 'Ghi chú văn bản' };
@@ -392,12 +392,18 @@ const ReaderPage = () => {
       return;
     }
     let intervalId = null;
+    let initialPageSet = false;
+
     const fetchDoc = async () => {
       try {
         const doc = await getDocument(id);
         setDocument(doc);
-        setCurrentPage(1);
         setDocumentError('');
+
+        if (!initialPageSet) {
+          initialPageSet = true;
+          setCurrentPage(1);
+        }
 
         const status = String(doc.status || '').toLowerCase();
         if (status === 'failed' || doc.status === 5 || doc.status === 2) {
@@ -407,8 +413,11 @@ const ReaderPage = () => {
           return;
         }
 
-        if (doc.extractedText && (status === 'ready' || doc.status === 4 || doc.status === 'ready')) {
+        if (status === 'ready' || doc.status === 4 || doc.status === 'ready' || doc.status === 1) {
           if (intervalId) clearInterval(intervalId);
+        }
+
+        if (doc.extractedText && (status === 'ready' || doc.status === 4 || doc.status === 'ready' || doc.status === 1)) {
           try {
             const parsed = JSON.parse(doc.extractedText);
             const normalized = parsed.map(s =>
@@ -430,12 +439,13 @@ const ReaderPage = () => {
           }
         }
       } catch (error) {
-        console.error(error);
+        console.error("fetchDoc error:", error);
+        if (intervalId) clearInterval(intervalId);
       }
     };
 
     fetchDoc();
-    intervalId = setInterval(fetchDoc, 2000);
+    intervalId = setInterval(fetchDoc, 3000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
@@ -497,7 +507,7 @@ const ReaderPage = () => {
 
     // 2. Locate target word inside document segments & switch to target page
     if (segments && segments.length > 0) {
-      const matchIndex = segments.findIndex(seg => 
+      const matchIndex = segments.findIndex(seg =>
         typeof seg === 'string' && seg.includes(cleanWord)
       );
 
@@ -1495,7 +1505,7 @@ const ReaderPage = () => {
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-                text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
+        text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
       }]);
     } catch (err) {
       console.error(err);
@@ -1839,8 +1849,8 @@ const ReaderPage = () => {
               <Copy className="h-3.5 w-3.5" />
               <span>Sao chép</span>
             </button>
-            <div 
-              className="absolute top-full border-[6px] border-transparent border-t-gray-950" 
+            <div
+              className="absolute top-full border-[6px] border-transparent border-t-gray-950"
               style={{
                 left: '50%',
                 transform: `translate(calc(-50% + ${bubbleWidth > 0 ? clampedArrowOffset : 0}px), 0)`
@@ -1898,8 +1908,8 @@ const ReaderPage = () => {
                       type="button"
                       onClick={() => setEditingNote(prev => ({ ...prev, category: cat.id }))}
                       className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${editingNote.category === cat.id
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                          : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                        : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'
                         }`}
                     >
                       <span>{cat.icon}</span>
@@ -1996,99 +2006,555 @@ const ReaderPage = () => {
         {/* Top modern Workspace Toolbar */}
         {readMode !== 'focus' && (
           <div className={`${activeTheme.toolbar} px-2 sm:px-3 lg:px-4 py-2.5 sm:py-3 flex flex-col xl:flex-row gap-2 sm:gap-3 items-slate xl:items-center justify-between shrink-0 shadow-sm transition-colors duration-250`}>
-          {/* Document selection section */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <span className={`font-bold text-xs tracking-wider uppercase ml-1 shrink-0 ${activeTheme.textMuted}`}>Tài liệu đang học:</span>
+            {/* Document selection section */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <span className={`font-bold text-xs tracking-wider uppercase ml-1 shrink-0 ${activeTheme.textMuted}`}>Tài liệu đang học:</span>
 
-            {/* Custom Dropdown Selector */}
-            <div id="upload-document" className="relative" ref={docDropdownRef}>
-              <button
-                onClick={() => setIsDocDropdownOpen(!isDocDropdownOpen)}
-                className={`flex items-center justify-between w-full sm:w-64 bg-slate-50/50 border hover:bg-slate-100/50 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none transition-colors ${activeTheme.card} ${activeTheme.text}`}
-              >
-                <span className="truncate mr-2 font-semibold">
-                  {id ? documentsList.find(d => d.id == id)?.title || 'Đang tải...' : 'Chưa chọn tài liệu'}
-                </span>
-                <ChevronRight className="w-4 h-4 opacity-50 rotate-90 shrink-0" />
-              </button>
+              {/* Custom Dropdown Selector */}
+              <div id="upload-document" className="relative" ref={docDropdownRef}>
+                <button
+                  onClick={() => setIsDocDropdownOpen(!isDocDropdownOpen)}
+                  className={`flex items-center justify-between w-full sm:w-64 bg-slate-50/50 border hover:bg-slate-100/50 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none transition-colors ${activeTheme.card} ${activeTheme.text}`}
+                >
+                  <span className="truncate mr-2 font-semibold">
+                    {document?.title || (id ? documentsList.find(d => d.id == id)?.title || 'Đang tải...' : 'Chưa chọn tài liệu')}
+                  </span>
+                  <ChevronRight className="w-4 h-4 opacity-50 rotate-90 shrink-0" />
+                </button>
 
-              {isDocDropdownOpen && (
-                <div className={`absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl border shadow-xl p-3 z-50 flex flex-col gap-3 animate-in fade-in slide-in-from-top-3 duration-200 ${activeTheme.card} ${activeTheme.bg}`}>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-                    <input
-                      type="text"
-                      placeholder="Tìm tài liệu nhanh..."
-                      className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${activeTheme.input}`}
-                      value={docSearchQuery}
-                      onChange={(e) => setDocSearchQuery(e.target.value)}
-                    />
-                  </div>
+                {isDocDropdownOpen && (
+                  <div className={`absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl border shadow-xl p-3 z-50 flex flex-col gap-3 animate-in fade-in slide-in-from-top-3 duration-200 ${activeTheme.card} ${activeTheme.bg}`}>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                      <input
+                        type="text"
+                        placeholder="Tìm tài liệu nhanh..."
+                        className={`w-full border rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${activeTheme.input}`}
+                        value={docSearchQuery}
+                        onChange={(e) => setDocSearchQuery(e.target.value)}
+                      />
+                    </div>
 
-                  <div className="max-h-48 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block px-2 mb-1">Tài liệu gần đây</span>
-                    {filteredDropdownDocs.length > 0 ? (
-                      filteredDropdownDocs.map(doc => (
-                        <button
-                          key={doc.id}
-                          onClick={() => {
-                            setIsDocDropdownOpen(false);
-                            navigate(`/reader/${doc.id}`);
-                          }}
-                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${id == doc.id
+                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block px-2 mb-1">Tài liệu gần đây</span>
+                      {filteredDropdownDocs.length > 0 ? (
+                        filteredDropdownDocs.map(doc => (
+                          <button
+                            key={doc.id}
+                            onClick={() => {
+                              setIsDocDropdownOpen(false);
+                              navigate(`/reader/${doc.id}`);
+                            }}
+                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${id == doc.id
                               ? 'bg-blue-600 text-white'
                               : 'hover:bg-slate-150/40 hover:text-blue-600'
-                            }`}
-                        >
-                          <span className="truncate flex-grow">{doc.title}</span>
-                          {id == doc.id && <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded ml-2 shrink-0">Đọc</span>}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-xs text-gray-400 italic block px-2 py-4 text-center">Không tìm thấy tài liệu</span>
+                              }`}
+                          >
+                            <span className="truncate flex-grow">{doc.title}</span>
+                            {id == doc.id && <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded ml-2 shrink-0">Đọc</span>}
+                          </button>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400 italic block px-2 py-4 text-center">Không tìm thấy tài liệu</span>
 
+                      )}
+                    </div>
+
+                    <div className="border-t border-gray-150/30 pt-2 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => {
+                          setIsDocDropdownOpen(false);
+                          setIsSelectModalOpen(true);
+                        }}
+                        className="flex-grow py-2 text-center text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                      >
+                        Xem tất cả
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDocDropdownOpen(false);
+                          setIsUploadModalOpen(true);
+                        }}
+                        className="flex-grow py-2 text-center text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-dashed border-emerald-300"
+                      >
+                        + Tải file mới
+                      </button>
+
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {!showVisualReader && textTotalPages > 1 && (
+                      <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
+                        <div className="flex items-center gap-6">
+                          <button
+                            onClick={() => {
+                              setCurrentPage(p => Math.max(1, p - 1));
+                              readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            disabled={validCurrentPage === 1}
+                            className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            title="Trang trước"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                          </button>
+
+                          <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
+                            Trang {validCurrentPage} / {textTotalPages}
+                          </span>
+
+                          <button
+                            onClick={() => {
+                              setCurrentPage(p => Math.min(textTotalPages, p + 1));
+                              readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            disabled={validCurrentPage === textTotalPages}
+                            className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            title="Trang tiếp theo"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
+                )}
+              </div>
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="flex items-center justify-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border border-blue-100 w-full sm:w-auto"
+              >
+                <Upload className="w-4 h-4" />
+                Tải lên tài liệu
+              </button>
+            </div>
 
-                  <div className="border-t border-gray-150/30 pt-2 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => {
-                        setIsDocDropdownOpen(false);
-                        setIsSelectModalOpen(true);
-                      }}
-                      className="flex-grow py-2 text-center text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                    >
-                      Xem tất cả
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDocDropdownOpen(false);
-                        setIsUploadModalOpen(true);
-                      }}
-                      className="flex-grow py-2 text-center text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-dashed border-emerald-300"
-                    >
-                      + Tải file mới
-                    </button>
+            {/* Settings & display controls */}
+            <div className="mobile-scroll-x flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 sm:gap-3 mt-1 xl:mt-0 pb-1">
 
+              {/* Show/Hide Pinyin toggle */}
+              <button
+                onClick={() => setShowPinyin(!showPinyin)}
+                className={`flex-grow sm:flex-grow-0 justify-center flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${showPinyin
+                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                  : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50'
+                  }`}
+              >
+                <span>Pinyin</span>
+                <span className={`w-2 h-2 rounded-full ${showPinyin ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Workspace Workspace Layout Grid */}
+        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-visible p-0 sm:gap-2 sm:p-2 lg:h-[calc(100vh-132px)] lg:flex-row lg:overflow-hidden">
+
+          {/* Left pane: A4 Smart Reader Area */}
+          <div
+            className={`flex h-full min-h-0 flex-col transition-all duration-300 ease-in-out ${(!isSidebarOpen || !document)
+              ? 'w-full'
+              : 'w-full lg:w-[calc(100%-clamp(340px,24vw,430px)-14px)]'
+              }`}
+          >
+            <div id="reader-content" className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-white transition-colors duration-250 sm:rounded-3xl ${activeTheme.sheet}`}>
+              {!document && (
+                <div className="flex-1 flex flex-col bg-slate-50/50 p-4 sm:p-6 overflow-y-auto min-h-0">
+                  {/* 1. Red Outlined Search Bar (2/3 width, tight top spacing) */}
+                  <div className="w-full max-w-2xl mx-auto mt-0 mb-6 relative shrink-0">
+                    <div className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-2xl p-2 shadow-sm">
+                      <div className="relative flex-1 flex items-center">
+                        <span className="text-xs font-bold text-slate-700 pl-3 pr-2 shrink-0 hidden sm:inline">Tìm kiếm Tài Liệu</span>
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                          <input
+                            type="text"
+                            placeholder="Nhập tên tài liệu..."
+                            className="w-full bg-slate-50 border border-slate-200/80 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            value={docSearchQuery}
+                            onChange={(e) => setDocSearchQuery(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Filter button */}
+                      <button
+                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 border border-slate-200/60"
+                        title="Lọc tài liệu"
+                      >
+                        <Filter className="w-4 h-4" />
+                      </button>
+
+                      {/* Plus (+) Button in Circle */}
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                          className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all"
+                          title="Thêm tài liệu"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+
+                        {isPlusMenuOpen && (
+                          <div className="absolute right-0 top-11 z-50 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-150">
+                            <button
+                              onClick={() => {
+                                setIsPlusMenuOpen(false);
+                                setIsUploadModalOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                            >
+                              <Upload className="w-4 h-4 text-blue-500" />
+                              <span>Tải tài liệu lên (PDF, Ảnh...)</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setIsPlusMenuOpen(false);
+                                setIsCreateDocModalOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                            >
+                              <FileText className="w-4 h-4 text-emerald-500" />
+                              <span>Tạo bản Doc mới</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Pagination Controls */}
-                  {!showVisualReader && textTotalPages > 1 && (
-                    <div className="mt-4 shrink-0 flex flex-col items-center justify-center border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-6">
+                  {/* 2. Main Content Grid: Folder Sidebar + Notebook Grid */}
+                  <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
+                    {/* Left Folder Sidebar */}
+                    <div className="w-full md:w-64 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm shrink-0 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                          <Folder className="w-4 h-4 text-blue-500" />
+                          Thư mục lưu trữ
+                        </span>
+                        <button
+                          onClick={() => {
+                            const name = prompt("Nhập tên thư mục mới:");
+                            if (name && name.trim()) {
+                              addFolder(name.trim());
+                              useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
+                            }
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition-colors"
+                          title="Tạo thư mục mới"
+                        >
+                          <FolderPlus className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-1 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+                        {/* All Documents */}
+                        <button
+                          onClick={() => setActiveFolderId(null)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors ${activeFolderId === null
+                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                            : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                          <span className="truncate">Tất cả tài liệu</span>
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                            {allDocsList.length}
+                          </span>
+                        </button>
+
+                        {/* User Folders */}
+                        {(folders || []).map(f => {
+                          const folderDocsCount = allDocsList.filter(d => String(d.folderId) === String(f.id)).length;
+                          return (
+                            <div key={f.id} className="relative group">
+                              <div
+                                role="button"
+                                onClick={() => setActiveFolderId(f.id)}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${activeFolderId === f.id
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                                  }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                  <Folder className="w-4 h-4 text-slate-400 shrink-0 group-hover:text-blue-500" />
+                                  <span className="truncate">{f.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                                    {folderDocsCount}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveFolderMenuId(activeFolderMenuId === f.id ? null : f.id);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <MoreVertical className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {activeFolderMenuId === f.id && (
+                                <div className="absolute right-2 top-9 z-50 w-36 bg-white rounded-xl border border-slate-200 shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
+                                  <button
+                                    onClick={() => {
+                                      setActiveFolderMenuId(null);
+                                      const newName = prompt("Đổi tên thư mục:", f.name);
+                                      if (newName && newName.trim()) renameFolder(f.id, newName.trim());
+                                    }}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Đổi tên</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setActiveFolderMenuId(null);
+                                      if (confirm(`Xóa thư mục "${f.name}"?`)) deleteFolder(f.id);
+                                    }}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                    <span>Xóa</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const name = prompt("Nhập tên thư mục mới:");
+                          if (name && name.trim()) {
+                            addFolder(name.trim());
+                            useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
+                          }
+                        }}
+                        className="mt-3 w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Thêm thư mục</span>
+                      </button>
+                    </div>
+
+                    {/* Right Notebook Grid */}
+                    <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col min-h-0">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-sm font-bold text-slate-800">
+                          {activeFolderId ? folders.find(f => f.id === activeFolderId)?.name || 'Thư mục' : 'Tất cả tài liệu'}
+                        </span>
+                        <span className="text-xs text-slate-400 font-semibold">
+                          {filteredGridDocs.length} Tài liệu
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const GRID_DOCS_PER_PAGE = 12;
+                        const totalGridPages = Math.ceil(filteredGridDocs.length / GRID_DOCS_PER_PAGE) || 1;
+                        const validGridPage = Math.min(gridPage, totalGridPages);
+                        const paginatedGridDocs = filteredGridDocs.slice(
+                          (validGridPage - 1) * GRID_DOCS_PER_PAGE,
+                          validGridPage * GRID_DOCS_PER_PAGE
+                        );
+
+                        if (filteredGridDocs.length === 0) {
+                          return (
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                              <FileText className="w-12 h-12 mb-3 opacity-30" />
+                              <p className="text-sm font-semibold">Chưa có tài liệu nào trong mục này</p>
+                              <p className="text-xs text-slate-400 mt-1">Bấm nút (+) ở thanh tìm kiếm để tải file hoặc tạo bản Doc mới</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 pr-1 flex-1">
+                              {paginatedGridDocs.map(doc => (
+                                <div
+                                  key={doc.id}
+                                  onClick={() => navigate(`/reader/${doc.id}`)}
+                                  className={`group relative cursor-pointer flex flex-col items-center select-none ${activeDocMenuId === doc.id ? 'z-[100] isolation-isolate' : ''}`}
+                                >
+                                  {/* Flat Illustration Notebook Cover */}
+                                  <div className="w-full aspect-[3/4] group-hover:-translate-y-1.5 transition-all duration-300 relative">
+                                    <div className="absolute inset-x-2 -bottom-1 h-4 bg-slate-400/20 blur-md rounded-full" />
+                                    <div className="absolute inset-0 rounded-r-xl rounded-l-sm overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 flex">
+                                      <div className="w-[13%] h-full bg-emerald-500 shrink-0 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-white/50" />
+                                        <div className="w-1 h-1 rounded-full bg-white/50" />
+                                        <div className="w-1 h-1 rounded-full bg-white/50" />
+                                      </div>
+                                      <div className="flex-1 bg-[#c9b99a] flex flex-col items-center justify-between py-3 px-2.5 relative">
+                                        <div className="absolute inset-0 opacity-[0.07]"
+                                          style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 11px)' }}
+                                        />
+                                        <div className="self-end relative z-10">
+                                          <svg className="w-5 h-5 text-[#b0a080]" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1 flex items-center justify-center w-full">
+                                          <p className="relative z-10 text-[9.5px] font-semibold text-[#6a5a44] line-clamp-4 leading-relaxed text-center">
+                                            {doc.title}
+                                          </p>
+                                        </div>
+                                        <div className="w-full space-y-1 relative z-10">
+                                          <div className="h-px bg-[#b0a080] w-full" />
+                                          <div className="h-px bg-[#b0a080]/60 w-2/3" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Title & Menu under Card */}
+                                  <div className="w-full mt-2 flex items-center justify-between px-1">
+                                    <span className="text-xs font-semibold text-slate-700 truncate flex-1 mr-1">
+                                      {doc.title}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDocMenuId(activeDocMenuId === doc.id ? null : doc.id);
+                                      }}
+                                      className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
+                                    >
+                                      <MoreVertical className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  {/* Doc Options Menu */}
+                                  {activeDocMenuId === doc.id && (
+                                    <div
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute right-0 bottom-8 z-[200] w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1 animate-in fade-in zoom-in-95 duration-150"
+                                    >
+                                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chuyển thư mục</div>
+                                      {(folders || []).map(f => (
+                                        <button
+                                          key={f.id}
+                                          onClick={() => {
+                                            moveDocumentToFolder(doc.id, f.id);
+                                            setActiveDocMenuId(null);
+                                            useToastStore.getState().addToast(`Đã chuyển "${doc.title}" sang ${f.name}`, 'success');
+                                          }}
+                                          className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 truncate"
+                                        >
+                                          {f.name}
+                                        </button>
+                                      ))}
+                                      <div className="border-t border-slate-100 my-1" />
+                                      <button
+                                        onClick={() => {
+                                          setActiveDocMenuId(null);
+                                          handleDeleteDocument(doc.id, doc.title);
+                                        }}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                        <span>Xóa tài liệu</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Workspace Grid Pagination Controls */}
+                            {totalGridPages > 1 && (
+                              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-3 mt-3 shrink-0 gap-2">
+                                <span className="text-[11px] text-slate-400 font-bold">
+                                  Trang {validGridPage}/{totalGridPages} (Hiển thị {((validGridPage - 1) * GRID_DOCS_PER_PAGE) + 1} - {Math.min(validGridPage * GRID_DOCS_PER_PAGE, filteredGridDocs.length)} trong {filteredGridDocs.length} tài liệu)
+                                </span>
+
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => setGridPage(p => Math.max(1, p - 1))}
+                                    disabled={validGridPage === 1}
+                                    className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                    title="Trang trước"
+                                  >
+                                    <ChevronLeft className="w-3.5 h-3.5" />
+                                    <span>Trước</span>
+                                  </button>
+
+                                  <div className="flex items-center gap-1">
+                                    {[...Array(totalGridPages)].map((_, i) => {
+                                      const pageNum = i + 1;
+                                      return (
+                                        <button
+                                          key={pageNum}
+                                          onClick={() => setGridPage(pageNum)}
+                                          className={`w-7 h-7 rounded-lg text-xs font-extrabold transition-colors ${validGridPage === pageNum
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                          {pageNum}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <button
+                                    onClick={() => setGridPage(p => Math.min(totalGridPages, p + 1))}
+                                    disabled={validGridPage === totalGridPages}
+                                    className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                                    title="Trang sau"
+                                  >
+                                    <span>Sau</span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {document && (
+                <>
+                  {/* Floating Vertical Canvas Drawing Tools */}
+                  <FloatingVerticalToolbar
+                    activeTool={activeTool}
+                    setActiveTool={setActiveTool}
+                    activeColor={activeColor}
+                    setActiveColor={setActiveColor}
+                    penColor={penColor}
+                    setPenColor={setPenColor}
+                    penWidth={penWidth}
+                    setPenWidth={setPenWidth}
+                    penStyle={penStyle}
+                    setPenStyle={setPenStyle}
+                    onUndo={handleUndoStroke}
+                    onRedo={handleRedoStroke}
+                    canUndo={currentPageStrokes.length > 0}
+                    canRedo={currentRedoStrokes.length > 0}
+                  />
+
+                  <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-between gap-2 shrink-0 ${activeTheme.toolbar}`}>
+                    {!showVisualReader && textTotalPages > 1 && (
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
                             setCurrentPage(p => Math.max(1, p - 1));
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                           disabled={validCurrentPage === 1}
-                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                           title="Trang trước"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                          <ChevronLeft className="w-4 h-4" />
                         </button>
 
-                        <span className="text-sm font-bold text-gray-700 bg-gray-50 px-6 py-2.5 rounded-full border border-gray-200 shadow-sm">
+                        <span className="text-xs font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/80 shadow-sm whitespace-nowrap">
                           Trang {validCurrentPage} / {textTotalPages}
                         </span>
 
@@ -2098,1056 +2564,628 @@ const ReaderPage = () => {
                             readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                           disabled={validCurrentPage === textTotalPages}
-                          className="p-3 rounded-full bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                           title="Trang tiếp theo"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                          <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border border-blue-100 w-full sm:w-auto"
-            >
-              <Upload className="w-4 h-4" />
-              Tải lên tài liệu
-            </button>
-          </div>
-
-          {/* Settings & display controls */}
-          <div className="mobile-scroll-x flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 sm:gap-3 mt-1 xl:mt-0 pb-1">
-            
-            {/* Show/Hide Pinyin toggle */}
-            <button
-              onClick={() => setShowPinyin(!showPinyin)}
-              className={`flex-grow sm:flex-grow-0 justify-center flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${showPinyin
-                  ? 'bg-blue-50 text-blue-600 border-blue-200'
-                  : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50'
-                }`}
-            >
-              <span>Pinyin</span>
-              <span className={`w-2 h-2 rounded-full ${showPinyin ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Workspace Workspace Layout Grid */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-visible p-0 sm:gap-2 sm:p-2 lg:h-[calc(100vh-132px)] lg:flex-row lg:overflow-hidden">
-
-        {/* Left pane: A4 Smart Reader Area */}
-        <div
-          className={`flex h-full min-h-0 flex-col transition-all duration-300 ease-in-out ${(!isSidebarOpen || !document)
-              ? 'w-full'
-              : 'w-full lg:w-[calc(100%-clamp(340px,24vw,430px)-14px)]'
-            }`}
-        >
-          <div id="reader-content" className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-white transition-colors duration-250 sm:rounded-3xl ${activeTheme.sheet}`}>
-            {!document && (
-              <div className="flex-1 flex flex-col bg-slate-50/50 p-4 sm:p-6 overflow-y-auto min-h-0">
-                {/* 1. Red Outlined Search Bar (2/3 width, tight top spacing) */}
-                <div className="w-full max-w-2xl mx-auto mt-0 mb-6 relative shrink-0">
-                  <div className="flex items-center gap-2 bg-white border border-slate-200/90 rounded-2xl p-2 shadow-sm">
-                    <div className="relative flex-1 flex items-center">
-                      <span className="text-xs font-bold text-slate-700 pl-3 pr-2 shrink-0 hidden sm:inline">Tìm kiếm Tài Liệu</span>
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                        <input
-                          type="text"
-                          placeholder="Nhập tên tài liệu..."
-                          className="w-full bg-slate-50 border border-slate-200/80 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                          value={docSearchQuery}
-                          onChange={(e) => setDocSearchQuery(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Filter button */}
-                    <button
-                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 border border-slate-200/60"
-                      title="Lọc tài liệu"
-                    >
-                      <Filter className="w-4 h-4" />
-                    </button>
-
-                    {/* Plus (+) Button in Circle */}
-                    <div className="relative shrink-0">
+                    )}
+                    {showVisualReader && (
+                      <div id="pdf-reader-controls" className="min-w-0 flex-1" />
+                    )}
+                    <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-                        className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all"
-                        title="Thêm tài liệu"
+                        onClick={handleSaveAnnotations}
+                        className="min-h-[38px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
                       >
-                        <Plus className="w-5 h-5" />
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Lưu ghi chú</span>
                       </button>
-
-                      {isPlusMenuOpen && (
-                        <div className="absolute right-0 top-11 z-50 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-150">
-                          <button
-                            onClick={() => {
-                              setIsPlusMenuOpen(false);
-                              setIsUploadModalOpen(true);
-                            }}
-                            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
-                          >
-                            <Upload className="w-4 h-4 text-blue-500" />
-                            <span>Tải tài liệu lên (PDF, Ảnh...)</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setIsPlusMenuOpen(false);
-                              setIsCreateDocModalOpen(true);
-                            }}
-                            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
-                          >
-                            <FileText className="w-4 h-4 text-emerald-500" />
-                            <span>Tạo bản Doc mới</span>
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={handleExportDocx}
+                        className="min-h-[38px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Xuất Word (.docx)</span>
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                {/* 2. Main Content Grid: Folder Sidebar + Notebook Grid */}
-                <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
-                  {/* Left Folder Sidebar */}
-                  <div className="w-full md:w-64 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm shrink-0 flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                        <Folder className="w-4 h-4 text-blue-500" />
-                        Thư mục lưu trữ
-                      </span>
-                      <button
-                        onClick={() => {
-                          const name = prompt("Nhập tên thư mục mới:");
-                          if (name && name.trim()) {
-                            addFolder(name.trim());
-                            useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
-                          }
-                        }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition-colors"
-                        title="Tạo thư mục mới"
-                      >
-                        <FolderPlus className="w-4 h-4" />
-                      </button>
-                    </div>
+                  {/* Reader page content */}
+                  <div className={`flex-grow flex flex-col mx-auto w-full overflow-hidden ${showVisualReader ? 'max-w-none p-0' : 'max-w-5xl pt-3 sm:pt-4 pb-3 px-3 sm:px-6 xl:px-10'} ${activeTheme.sheet}`}>
+                    {!showVisualReader && (
+                      <h1 className="text-lg sm:text-xl font-black mb-3 text-center leading-snug shrink-0 break-all border-b pb-3 border-slate-100/55">{document.title}</h1>
+                    )}
 
-                    <div className="space-y-1 flex-1 overflow-y-auto pr-1 scrollbar-thin">
-                      {/* All Documents */}
-                      <button
-                        onClick={() => setActiveFolderId(null)}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                          activeFolderId === null
-                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                            : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="truncate">Tất cả tài liệu</span>
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
-                          {allDocsList.length}
-                        </span>
-                      </button>
+                    <div
+                      ref={readerContainerRef}
+                      className={`min-h-0 flex-1 overflow-y-auto scrollbar-thin ${showVisualReader ? 'p-0' : `break-words pr-1 sm:pr-3 select-text ${fontStyles[fontMode]}`}`}
+                      style={showVisualReader ? undefined : { fontSize: `clamp(18px, ${fontSize}px, 32px)`, lineHeight: '1.9', wordSpacing: '0', letterSpacing: '0.01em' }}
+                      onMouseUp={handleTextSelection}
+                    >
+                      <div className="relative min-h-full">
+                        {/* Drawing canvas layer */}
+                        {!showVisualReader && (
+                          <canvas
+                            ref={canvasRef}
+                            className={`absolute inset-0 z-10 w-full h-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+                            style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerLeave={handlePointerUp}
+                          />
+                        )}
 
-                      {/* User Folders */}
-                      {(folders || []).map(f => {
-                        const folderDocsCount = allDocsList.filter(d => String(d.folderId) === String(f.id)).length;
-                        return (
-                          <div key={f.id} className="relative group">
-                            <div
-                              role="button"
-                              onClick={() => setActiveFolderId(f.id)}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                                activeFolderId === f.id
-                                  ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                  : 'text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0 pr-2">
-                                <Folder className="w-4 h-4 text-slate-400 shrink-0 group-hover:text-blue-500" />
-                                <span className="truncate">{f.name}</span>
+                        {/* CJK segment mapping render — grouped by paragraph / line */}
+                        <div className={`relative z-0 ${showVisualReader ? 'pb-0 pr-0' : 'pb-12 pr-2'}`}>
+                          {documentError ? (
+                            <div className="mx-auto mt-10 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-red-100 bg-red-50/80 px-6 py-10 text-center">
+                              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-red-500 shadow-sm">
+                                <FileText className="h-7 w-7" />
                               </div>
-                              <div className="flex items-center gap-1">
-                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
-                                  {folderDocsCount}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveFolderMenuId(activeFolderMenuId === f.id ? null : f.id);
-                                  }}
-                                  className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                              <h2 className="text-lg font-black text-slate-900">Không thể hiển thị tài liệu</h2>
+                              <p className="mt-3 text-sm font-semibold leading-6 text-red-700">{documentError}</p>
+                              <button
+                                type="button"
+                                onClick={() => setIsUploadModalOpen(true)}
+                                className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                              >Tải tài liệu khác</button>
                             </div>
-
-                            {activeFolderMenuId === f.id && (
-                              <div className="absolute right-2 top-9 z-50 w-36 bg-white rounded-xl border border-slate-200 shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
-                                <button
-                                  onClick={() => {
-                                    setActiveFolderMenuId(null);
-                                    const newName = prompt("Đổi tên thư mục:", f.name);
-                                    if (newName && newName.trim()) renameFolder(f.id, newName.trim());
-                                  }}
-                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                                  <span>Đổi tên</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setActiveFolderMenuId(null);
-                                    if (confirm(`Xóa thư mục "${f.name}"?`)) deleteFolder(f.id);
-                                  }}
-                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                  <span>Xóa</span>
-                                </button>
+                          ) : String(document?.status || '').toLowerCase() !== 'ready' && document?.status !== 4 && segments.length === 0 ? (
+                            <div className="mx-auto mt-10 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg font-sans">
+                              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm animate-pulse">
+                                <Activity className="h-7 w-7" />
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                              <h2 className="text-xl font-extrabold text-slate-800">Đang xử lý tài liệu "{document?.title}"</h2>
+                              <p className="mt-1 text-xs font-medium text-slate-400">Hệ thống đang tự động bóc tách chữ Hán và phân tích bố cục</p>
 
-                    <button
-                      onClick={() => {
-                        const name = prompt("Nhập tên thư mục mới:");
-                        if (name && name.trim()) {
-                          addFolder(name.trim());
-                          useToastStore.getState().addToast(`Đã tạo thư mục "${name.trim()}"`, 'success');
-                        }
-                      }}
-                      className="mt-3 w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Thêm thư mục</span>
-                    </button>
-                  </div>
+                              <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 mt-6 text-left space-y-3">
+                                {[
+                                  { step: 0, title: 'Đang tải tài liệu', desc: 'Khởi tạo tệp và tải lên máy chủ' },
+                                  { step: 1, title: 'Đang nhận diện chữ Hán', desc: 'OCR bóc tách chữ Hán trong tài liệu' },
+                                  { step: 2, title: 'Đang phân tích nội dung', desc: 'Phân tách từ vựng (Segmentation) & bố cục' },
+                                  { step: 3, title: 'Hoàn tất', desc: 'Mở giao diện đọc ngay lập tức' }
+                                ].map((item) => {
+                                  const getStepIndex = (st) => {
+                                    const s = String(st || '').toLowerCase();
+                                    if (s === 'ready' || s === '4') return 3;
+                                    if (s === 'analyzingcontent' || s === '3') return 2;
+                                    if (s === 'recognizingocr' || s === 'ocr' || s === '2') return 1;
+                                    if (s === 'processing' || s === '1') return 1;
+                                    return 0;
+                                  };
+                                  const currentStepIdx = getStepIndex(document?.status);
+                                  const isDone = item.step < currentStepIdx;
+                                  const isCurrent = item.step === currentStepIdx;
 
-                  {/* Right Notebook Grid */}
-                  <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col min-h-0">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm font-bold text-slate-800">
-                        {activeFolderId ? folders.find(f => f.id === activeFolderId)?.name || 'Thư mục' : 'Tất cả tài liệu'}
-                      </span>
-                      <span className="text-xs text-slate-400 font-semibold">
-                        {filteredGridDocs.length} Tài liệu
-                      </span>
-                    </div>
-
-                    {(() => {
-                      const GRID_DOCS_PER_PAGE = 12;
-                      const totalGridPages = Math.ceil(filteredGridDocs.length / GRID_DOCS_PER_PAGE) || 1;
-                      const validGridPage = Math.min(gridPage, totalGridPages);
-                      const paginatedGridDocs = filteredGridDocs.slice(
-                        (validGridPage - 1) * GRID_DOCS_PER_PAGE,
-                        validGridPage * GRID_DOCS_PER_PAGE
-                      );
-
-                      if (filteredGridDocs.length === 0) {
-                        return (
-                          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
-                            <FileText className="w-12 h-12 mb-3 opacity-30" />
-                            <p className="text-sm font-semibold">Chưa có tài liệu nào trong mục này</p>
-                            <p className="text-xs text-slate-400 mt-1">Bấm nút (+) ở thanh tìm kiếm để tải file hoặc tạo bản Doc mới</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 pr-1 flex-1">
-                            {paginatedGridDocs.map(doc => (
-                              <div
-                                key={doc.id}
-                                onClick={() => navigate(`/reader/${doc.id}`)}
-                              className={`group relative cursor-pointer flex flex-col items-center select-none ${activeDocMenuId === doc.id ? 'z-[100] isolation-isolate' : ''}`}
-                              >
-                                {/* Flat Illustration Notebook Cover */}
-                                <div className="w-full aspect-[3/4] group-hover:-translate-y-1.5 transition-all duration-300 relative">
-                                  <div className="absolute inset-x-2 -bottom-1 h-4 bg-slate-400/20 blur-md rounded-full" />
-                                  <div className="absolute inset-0 rounded-r-xl rounded-l-sm overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 flex">
-                                    <div className="w-[13%] h-full bg-emerald-500 shrink-0 flex flex-col items-center justify-center gap-1.5">
-                                      <div className="w-1 h-1 rounded-full bg-white/50" />
-                                      <div className="w-1 h-1 rounded-full bg-white/50" />
-                                      <div className="w-1 h-1 rounded-full bg-white/50" />
-                                    </div>
-                                    <div className="flex-1 bg-[#c9b99a] flex flex-col items-center justify-between py-3 px-2.5 relative">
-                                      <div className="absolute inset-0 opacity-[0.07]"
-                                        style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 10px, #000 10px, #000 11px)' }}
-                                      />
-                                      <div className="self-end relative z-10">
-                                        <svg className="w-5 h-5 text-[#b0a080]" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                        </svg>
+                                  return (
+                                    <div key={item.step} className="flex items-center gap-3">
+                                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${isDone
+                                        ? 'bg-emerald-500 text-white'
+                                        : isCurrent
+                                          ? 'bg-blue-600 text-white animate-pulse'
+                                          : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                        {isDone ? '✓' : item.step + 1}
                                       </div>
-                                      <div className="flex-1 flex items-center justify-center w-full">
-                                        <p className="relative z-10 text-[9.5px] font-semibold text-[#6a5a44] line-clamp-4 leading-relaxed text-center">
-                                          {doc.title}
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-xs font-extrabold ${isCurrent ? 'text-blue-600' : isDone ? 'text-slate-800' : 'text-slate-400'}`}>
+                                          {item.title}
                                         </p>
-                                      </div>
-                                      <div className="w-full space-y-1 relative z-10">
-                                        <div className="h-px bg-[#b0a080] w-full" />
-                                        <div className="h-px bg-[#b0a080]/60 w-2/3" />
+                                        <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
-
-                                {/* Title & Menu under Card */}
-                                <div className="w-full mt-2 flex items-center justify-between px-1">
-                                  <span className="text-xs font-semibold text-slate-700 truncate flex-1 mr-1">
-                                    {doc.title}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveDocMenuId(activeDocMenuId === doc.id ? null : doc.id);
-                                    }}
-                                    className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
-                                  >
-                                    <MoreVertical className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-
-                                {/* Doc Options Menu */}
-                                {activeDocMenuId === doc.id && (
-                                  <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="absolute right-0 bottom-8 z-[200] w-44 bg-white rounded-xl border border-slate-200 shadow-xl p-1 animate-in fade-in zoom-in-95 duration-150"
-                                  >
-                                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chuyển thư mục</div>
-                                    {(folders || []).map(f => (
-                                      <button
-                                        key={f.id}
-                                        onClick={() => {
-                                          moveDocumentToFolder(doc.id, f.id);
-                                          setActiveDocMenuId(null);
-                                          useToastStore.getState().addToast(`Đã chuyển "${doc.title}" sang ${f.name}`, 'success');
-                                        }}
-                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 truncate"
-                                      >
-                                        {f.name}
-                                      </button>
-                                    ))}
-                                    <div className="border-t border-slate-100 my-1" />
-                                    <button
-                                      onClick={() => {
-                                        setActiveDocMenuId(null);
-                                        handleDeleteDocument(doc.id, doc.title);
-                                      }}
-                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                      <span>Xóa tài liệu</span>
-                                    </button>
-                                  </div>
-                                )}
+                                  );
+                                })}
                               </div>
-                            ))}
-                          </div>
 
-                          {/* Workspace Grid Pagination Controls */}
-                          {totalGridPages > 1 && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-3 mt-3 shrink-0 gap-2">
-                              <span className="text-[11px] text-slate-400 font-bold">
-                                Trang {validGridPage}/{totalGridPages} (Hiển thị {((validGridPage - 1) * GRID_DOCS_PER_PAGE) + 1} - {Math.min(validGridPage * GRID_DOCS_PER_PAGE, filteredGridDocs.length)} trong {filteredGridDocs.length} tài liệu)
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toast.info('Tài liệu đang được xử lý ở nền. Bạn sẽ nhận được thông báo ngay khi hoàn tất!');
+                                  navigate('/reader');
+                                }}
+                                className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 text-xs transition border border-slate-200 gap-2"
+                              >
+                                <span>🔔 Rời trang & nhận thông báo khi hoàn tất</span>
+                              </button>
+                            </div>
+                          ) : showVisualReader ? (
+                            <div className="h-full min-h-[calc(100svh-255px)] lg:min-h-0">
+                              <VisualDocumentReader
+                                documentId={document.id || document.Id || id}
+                                fileUrl={document.fileUrl || document.FileUrl}
+                                fileType={visualDocumentType}
+                                ocrJsonUrl={visualOcrJsonUrl}
+                                showPinyin={showPinyin}
+                                activeTool={activeTool}
+                                activeColor={activeColor}
+                                annotations={annotations}
+                                selectionRange={visualSelectionRange}
+                                currentPage={currentPage}
+                                onPageChange={setCurrentPage}
+                                drawingCanvasRef={canvasRef}
+                                onDrawingPointerDown={handlePointerDown}
+                                onDrawingPointerMove={handlePointerMove}
+                                onDrawingPointerUp={handlePointerUp}
+                                onWordClick={handleWordClick}
+                                onWordPointerDown={handleWordPointerDown}
+                                onWordPointerEnter={handleWordPointerEnter}
+                                onWordPointerUp={handleWordPointerUp}
+                                onWordPointerCancel={clearLongPressTimer}
+                                onWordPointerLeave={clearLongPressTimer}
+                                onHighlightContextMenu={openHighlightMenu}
+                                onWordMouseEnter={handleWordMouseEnter}
+                                onWordMouseLeave={handleWordMouseLeave}
+                              />
+                            </div>
+                          ) : (() => {
+                            // Pre-group segments into paragraphs / lines while tracking absIndex
+                            const absBase = (validCurrentPage - 1) * WORDS_PER_PAGE;
+                            const paragraphs = [];
+                            let curPara = [];
+                            let curLine = [];
 
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => setGridPage(p => Math.max(1, p - 1))}
-                                  disabled={validGridPage === 1}
-                                  className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                                  title="Trang trước"
-                                >
-                                  <ChevronLeft className="w-3.5 h-3.5" />
-                                  <span>Trước</span>
-                                </button>
+                            const flushLine = () => {
+                              if (curLine.length > 0) { curPara.push(curLine); curLine = []; }
+                            };
+                            const flushPara = () => {
+                              flushLine();
+                              if (curPara.length > 0) { paragraphs.push(curPara); curPara = []; }
+                            };
 
-                                <div className="flex items-center gap-1">
-                                  {[...Array(totalGridPages)].map((_, i) => {
-                                    const pageNum = i + 1;
-                                    return (
-                                      <button
-                                        key={pageNum}
-                                        onClick={() => setGridPage(pageNum)}
-                                        className={`w-7 h-7 rounded-lg text-xs font-extrabold transition-colors ${
-                                          validGridPage === pageNum
-                                            ? 'bg-blue-600 text-white shadow-xs'
-                                            : 'text-slate-600 hover:bg-slate-100'
-                                        }`}
-                                      >
-                                        {pageNum}
-                                      </button>
-                                    );
-                                  })}
+                            currentSegments.forEach((word, relIndex) => {
+                              const absIndex = absBase + relIndex;
+                              const w = typeof word === 'string'
+                                ? word.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+                                : word;
+
+                              if (w === '\n\n') { flushPara(); }
+                              else if (w === '\n') { flushLine(); }
+                              else { curLine.push({ word: w, absIndex }); }
+                            });
+                            flushPara();
+
+                            return paragraphs.map((lines, pi) => {
+                              let isHeading = false;
+                              let isCenter = false;
+                              let isIndent = false;
+
+                              // Robustly consume markers regardless of how segmenter splits them
+                              while (lines.length > 0) {
+                                let strippedAny = false;
+                                ['#HEADING#', '#CENTER#', '#INDENT#'].forEach(marker => {
+                                  let lineText = lines[0].map(w => w.word).join('');
+                                  let markerIndex = lineText.indexOf(marker);
+                                  if (markerIndex !== -1) {
+                                    if (marker === '#HEADING#') isHeading = true;
+                                    if (marker === '#CENTER#') isCenter = true;
+                                    if (marker === '#INDENT#') isIndent = true;
+
+                                    strippedAny = true;
+                                    let currentStrIndex = 0;
+                                    let charsToRemove = marker.length;
+                                    let charsRemoved = 0;
+
+                                    for (let i = 0; i < lines[0].length; i++) {
+                                      let w = lines[0][i].word;
+                                      let newW = '';
+                                      for (let j = 0; j < w.length; j++) {
+                                        if (currentStrIndex >= markerIndex && charsRemoved < charsToRemove) {
+                                          charsRemoved++; // skip char
+                                        } else {
+                                          newW += w[j];
+                                        }
+                                        currentStrIndex++;
+                                      }
+                                      lines[0][i].word = newW;
+                                    }
+                                  }
+                                });
+
+                                if (!strippedAny && lines[0].map(w => w.word).join('').trim() !== '') {
+                                  break;
+                                }
+
+                                if (lines[0].map(w => w.word).join('').trim() === '') {
+                                  lines.shift();
+                                }
+                              }
+
+                              // Remove empty lines that might have been left
+                              if (lines.length > 0 && lines[0].length === 0) lines.shift();
+                              if (lines.length === 0) return null;
+
+                              const paraClass = isHeading
+                                ? "mb-6 text-[1.4em] font-bold text-slate-900 border-b border-slate-200/50 pb-2"
+                                : "mb-2.5 text-slate-800 leading-relaxed";
+
+                              return (
+                                <div key={pi} className={paraClass}>
+                                  {lines.map((lineWords, li) => (
+                                    <div key={li} className={`flex flex-wrap leading-tight mb-0.5 ${isHeading ? 'mb-1.5' : ''} ${isCenter ? 'justify-center' : ''} ${(isIndent && li === 0 && !isHeading && !isCenter) ? 'pl-10' : ''}`}>
+                                      {lineWords.map(({ word, absIndex }) => {
+                                        const highlightColor = annotations.highlights[absIndex];
+                                        const hasTextNote = annotations.textNotes[absIndex];
+                                        const hasStickyNote = annotations.stickyNotes[absIndex];
+                                        const isWordSelected = selectedWord === word;
+                                        const noteInfo = hasTextNote ? parseNoteContent(hasTextNote) : null;
+                                        const stickyInfo = hasStickyNote ? parseNoteContent(hasStickyNote) : null;
+
+                                        return (
+                                          <span
+                                            key={absIndex}
+                                            data-abs-index={absIndex}
+                                            onClick={(e) => handleWordClick(word, absIndex, e)}
+                                            onPointerDown={(e) => handleWordPointerDown(absIndex, e)}
+                                            onPointerUp={clearLongPressTimer}
+                                            onPointerCancel={clearLongPressTimer}
+                                            onPointerLeave={clearLongPressTimer}
+                                            onContextMenu={(e) => {
+                                              if (annotations.highlights[absIndex]) {
+                                                e.preventDefault();
+                                                openHighlightMenu(absIndex, e);
+                                              }
+                                            }}
+                                            onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
+                                            onMouseLeave={handleWordMouseLeave}
+                                            style={highlightColor ? { backgroundColor: highlightColor } : undefined}
+                                            className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-sm transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
+                                              } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
+                                          >
+                                            <span className="leading-none flex items-center">
+                                              {word}
+                                              {hasTextNote && (
+                                                <span
+                                                  className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none"
+                                                  title={noteInfo.text}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    startEditingNote(absIndex, 'text', hasTextNote);
+                                                  }}
+                                                >
+                                                  {noteInfo.icon}
+                                                </span>
+                                              )}
+                                              {hasStickyNote && (
+                                                <span
+                                                  className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none animate-bounce"
+                                                  title={stickyInfo.text}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    startEditingNote(absIndex, 'sticky', hasStickyNote);
+                                                  }}
+                                                >
+                                                  📌
+                                                </span>
+                                              )}
+                                            </span>
+                                            {showPinyin && (
+                                              <span className="text-[0.4em] text-slate-500 font-normal leading-none mt-1.5 select-none text-center block">
+                                                {cleanPinyin(word, pinyin(word, { type: 'string' }))}
+                                              </span>
+                                            )}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  ))}
                                 </div>
+                              );
+                            });
+                          })()}
+                        </div>
 
-                                <button
-                                  onClick={() => setGridPage(p => Math.min(totalGridPages, p + 1))}
-                                  disabled={validGridPage === totalGridPages}
-                                  className="px-2.5 py-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                                  title="Trang sau"
-                                >
-                                  <span>Sau</span>
-                                  <ChevronRight className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {document && (
-              <>
-                {/* Floating Vertical Canvas Drawing Tools */}
-                <FloatingVerticalToolbar
-                  activeTool={activeTool}
-                  setActiveTool={setActiveTool}
-                  activeColor={activeColor}
-                  setActiveColor={setActiveColor}
-                  penColor={penColor}
-                  setPenColor={setPenColor}
-                  penWidth={penWidth}
-                  setPenWidth={setPenWidth}
-                  penStyle={penStyle}
-                  setPenStyle={setPenStyle}
-                  onUndo={handleUndoStroke}
-                  onRedo={handleRedoStroke}
-                  canUndo={currentPageStrokes.length > 0}
-                  canRedo={currentRedoStrokes.length > 0}
-                />
-
-                <div className={`px-1.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-between gap-2 shrink-0 ${activeTheme.toolbar}`}>
-                  {!showVisualReader && textTotalPages > 1 && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setCurrentPage(p => Math.max(1, p - 1));
-                          readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        disabled={validCurrentPage === 1}
-                        className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        title="Trang trước"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-
-                      <span className="text-xs font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/80 shadow-sm whitespace-nowrap">
-                        Trang {validCurrentPage} / {textTotalPages}
-                      </span>
-
-                      <button
-                        onClick={() => {
-                          setCurrentPage(p => Math.min(textTotalPages, p + 1));
-                          readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        disabled={validCurrentPage === textTotalPages}
-                        className="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        title="Trang tiếp theo"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                  {showVisualReader && (
-                    <div id="pdf-reader-controls" className="min-w-0 flex-1" />
-                  )}
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={handleSaveAnnotations}
-                      className="min-h-[38px] flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>Lưu ghi chú</span>
-                    </button>
-                    <button
-                      onClick={handleExportDocx}
-                      className="min-h-[38px] flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                    >
-                      <Download className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Xuất Word (.docx)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Reader page content */}
-                <div className={`flex-grow flex flex-col mx-auto w-full overflow-hidden ${showVisualReader ? 'max-w-none p-0' : 'max-w-5xl pt-3 sm:pt-4 pb-3 px-3 sm:px-6 xl:px-10'} ${activeTheme.sheet}`}>
-                  {!showVisualReader && (
-                    <h1 className="text-lg sm:text-xl font-black mb-3 text-center leading-snug shrink-0 break-all border-b pb-3 border-slate-100/55">{document.title}</h1>
-                  )}
-
-                  <div
-                    ref={readerContainerRef}
-                    className={`min-h-0 flex-1 overflow-y-auto scrollbar-thin ${showVisualReader ? 'p-0' : `break-words pr-1 sm:pr-3 select-text ${fontStyles[fontMode]}`}`}
-                    style={showVisualReader ? undefined : { fontSize: `clamp(18px, ${fontSize}px, 32px)`, lineHeight: '1.9', wordSpacing: '0', letterSpacing: '0.01em' }}
-                    onMouseUp={handleTextSelection}
-                  >
-                    <div className="relative min-h-full">
-                      {/* Drawing canvas layer */}
-                      {!showVisualReader && (
-                        <canvas
-                          ref={canvasRef}
-                          className={`absolute inset-0 z-10 w-full h-full ${(activeTool === 'pencil' || activeTool === 'eraser') ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
-                          style={{ touchAction: (activeTool === 'pencil' || activeTool === 'eraser') ? 'none' : 'auto' }}
-                          onPointerDown={handlePointerDown}
-                          onPointerMove={handlePointerMove}
-                          onPointerUp={handlePointerUp}
-                          onPointerLeave={handlePointerUp}
-                        />
-                      )}
-
-                      {/* CJK segment mapping render — grouped by paragraph / line */}
-                      <div className={`relative z-0 ${showVisualReader ? 'pb-0 pr-0' : 'pb-12 pr-2'}`}>
-                        {documentError ? (
-                          <div className="mx-auto mt-10 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-red-100 bg-red-50/80 px-6 py-10 text-center">
-                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-red-500 shadow-sm">
-                              <FileText className="h-7 w-7" />
-                            </div>
-                            <h2 className="text-lg font-black text-slate-900">Không thể hiển thị tài liệu</h2>
-                            <p className="mt-3 text-sm font-semibold leading-6 text-red-700">{documentError}</p>
+                        {/* Bottom Pagination Bar for Text Mode */}
+                        {!showVisualReader && textTotalPages > 1 && (
+                          <div className="my-8 flex items-center justify-center gap-3">
                             <button
-                              type="button"
-                              onClick={() => setIsUploadModalOpen(true)}
-                              className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-                            >Tải tài liệu khác</button>
-                          </div>
-                        ) : String(document?.status || '').toLowerCase() !== 'ready' && document?.status !== 4 && segments.length === 0 ? (
-                          <div className="mx-auto mt-10 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg font-sans">
-                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm animate-pulse">
-                              <Activity className="h-7 w-7" />
-                            </div>
-                            <h2 className="text-xl font-extrabold text-slate-800">Đang xử lý tài liệu "{document?.title}"</h2>
-                            <p className="mt-1 text-xs font-medium text-slate-400">Hệ thống đang tự động bóc tách chữ Hán và phân tích bố cục</p>
-
-                            <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 mt-6 text-left space-y-3">
-                              {[
-                                { step: 0, title: 'Đang tải tài liệu', desc: 'Khởi tạo tệp và tải lên máy chủ' },
-                                { step: 1, title: 'Đang nhận diện chữ Hán', desc: 'OCR bóc tách chữ Hán trong tài liệu' },
-                                { step: 2, title: 'Đang phân tích nội dung', desc: 'Phân tách từ vựng (Segmentation) & bố cục' },
-                                { step: 3, title: 'Hoàn tất', desc: 'Mở giao diện đọc ngay lập tức' }
-                              ].map((item) => {
-                                const getStepIndex = (st) => {
-                                  const s = String(st || '').toLowerCase();
-                                  if (s === 'ready' || s === '4') return 3;
-                                  if (s === 'analyzingcontent' || s === '3') return 2;
-                                  if (s === 'recognizingocr' || s === 'ocr' || s === '2') return 1;
-                                  if (s === 'processing' || s === '1') return 1;
-                                  return 0;
-                                };
-                                const currentStepIdx = getStepIndex(document?.status);
-                                const isDone = item.step < currentStepIdx;
-                                const isCurrent = item.step === currentStepIdx;
-
-                                return (
-                                  <div key={item.step} className="flex items-center gap-3">
-                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
-                                      isDone 
-                                        ? 'bg-emerald-500 text-white' 
-                                        : isCurrent 
-                                        ? 'bg-blue-600 text-white animate-pulse' 
-                                        : 'bg-slate-200 text-slate-400'
-                                    }`}>
-                                      {isDone ? '✓' : item.step + 1}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-xs font-extrabold ${isCurrent ? 'text-blue-600' : isDone ? 'text-slate-800' : 'text-slate-400'}`}>
-                                        {item.title}
-                                      </p>
-                                      <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            <button
-                              type="button"
                               onClick={() => {
-                                toast.info('Tài liệu đang được xử lý ở nền. Bạn sẽ nhận được thông báo ngay khi hoàn tất!');
-                                navigate('/reader');
+                                setCurrentPage(p => Math.max(1, p - 1));
+                                readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
-                              className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 text-xs transition border border-slate-200 gap-2"
+                              disabled={validCurrentPage === 1}
+                              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95 shadow-sm"
                             >
-                              <span>🔔 Rời trang & nhận thông báo khi hoàn tất</span>
+                              <ChevronLeft className="h-4 w-4" />
+                              <span>Trang trước</span>
+                            </button>
+
+                            <span className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-sm">
+                              Trang {validCurrentPage} / {textTotalPages}
+                            </span>
+
+                            <button
+                              onClick={() => {
+                                setCurrentPage(p => Math.min(textTotalPages, p + 1));
+                                readerContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              disabled={validCurrentPage === textTotalPages}
+                              className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
+                            >
+                              <span>Trang kế tiếp</span>
+                              <ChevronRight className="h-4 w-4" />
                             </button>
                           </div>
-                        ) : showVisualReader ? (
-                          <div className="h-full min-h-[calc(100svh-255px)] lg:min-h-0">
-                            <VisualDocumentReader
-                              documentId={document.id || document.Id || id}
-                              fileUrl={document.fileUrl || document.FileUrl}
-                              fileType={visualDocumentType}
-                              ocrJsonUrl={visualOcrJsonUrl}
-                              showPinyin={showPinyin}
-                              activeTool={activeTool}
-                              activeColor={activeColor}
-                              annotations={annotations}
-                              selectionRange={visualSelectionRange}
-                              currentPage={currentPage}
-                              onPageChange={setCurrentPage}
-                              drawingCanvasRef={canvasRef}
-                              onDrawingPointerDown={handlePointerDown}
-                              onDrawingPointerMove={handlePointerMove}
-                              onDrawingPointerUp={handlePointerUp}
-                              onWordClick={handleWordClick}
-                              onWordPointerDown={handleWordPointerDown}
-                              onWordPointerEnter={handleWordPointerEnter}
-                              onWordPointerUp={handleWordPointerUp}
-                              onWordPointerCancel={clearLongPressTimer}
-                              onWordPointerLeave={clearLongPressTimer}
-                              onHighlightContextMenu={openHighlightMenu}
-                              onWordMouseEnter={handleWordMouseEnter}
-                              onWordMouseLeave={handleWordMouseLeave}
-                            />
-                          </div>
-                        ) : (() => {
-                          // Pre-group segments into paragraphs / lines while tracking absIndex
-                          const absBase = (validCurrentPage - 1) * WORDS_PER_PAGE;
-                          const paragraphs = [];
-                          let curPara = [];
-                          let curLine = [];
-
-                          const flushLine = () => {
-                            if (curLine.length > 0) { curPara.push(curLine); curLine = []; }
-                          };
-                          const flushPara = () => {
-                            flushLine();
-                            if (curPara.length > 0) { paragraphs.push(curPara); curPara = []; }
-                          };
-
-                          currentSegments.forEach((word, relIndex) => {
-                            const absIndex = absBase + relIndex;
-                            const w = typeof word === 'string'
-                              ? word.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-                              : word;
-
-                            if (w === '\n\n') { flushPara(); }
-                            else if (w === '\n') { flushLine(); }
-                            else { curLine.push({ word: w, absIndex }); }
-                          });
-                          flushPara();
-
-                          return paragraphs.map((lines, pi) => {
-                            let isHeading = false;
-                            let isCenter = false;
-                            let isIndent = false;
-
-                            // Robustly consume markers regardless of how segmenter splits them
-                            while (lines.length > 0) {
-                              let strippedAny = false;
-                              ['#HEADING#', '#CENTER#', '#INDENT#'].forEach(marker => {
-                                let lineText = lines[0].map(w => w.word).join('');
-                                let markerIndex = lineText.indexOf(marker);
-                                if (markerIndex !== -1) {
-                                  if (marker === '#HEADING#') isHeading = true;
-                                  if (marker === '#CENTER#') isCenter = true;
-                                  if (marker === '#INDENT#') isIndent = true;
-                                  
-                                  strippedAny = true;
-                                  let currentStrIndex = 0;
-                                  let charsToRemove = marker.length;
-                                  let charsRemoved = 0;
-                                  
-                                  for (let i = 0; i < lines[0].length; i++) {
-                                    let w = lines[0][i].word;
-                                    let newW = '';
-                                    for (let j = 0; j < w.length; j++) {
-                                      if (currentStrIndex >= markerIndex && charsRemoved < charsToRemove) {
-                                        charsRemoved++; // skip char
-                                      } else {
-                                        newW += w[j];
-                                      }
-                                      currentStrIndex++;
-                                    }
-                                    lines[0][i].word = newW;
-                                  }
-                                }
-                              });
-                              
-                              if (!strippedAny && lines[0].map(w => w.word).join('').trim() !== '') {
-                                break;
-                              }
-                              
-                              if (lines[0].map(w => w.word).join('').trim() === '') {
-                                lines.shift();
-                              }
-                            }
-                            
-                            // Remove empty lines that might have been left
-                            if (lines.length > 0 && lines[0].length === 0) lines.shift();
-                            if (lines.length === 0) return null;
-
-                            const paraClass = isHeading 
-                               ? "mb-6 text-[1.4em] font-bold text-slate-900 border-b border-slate-200/50 pb-2" 
-                               : "mb-2.5 text-slate-800 leading-relaxed";
-
-                            return (
-                            <div key={pi} className={paraClass}>
-                              {lines.map((lineWords, li) => (
-                                <div key={li} className={`flex flex-wrap leading-tight mb-0.5 ${isHeading ? 'mb-1.5' : ''} ${isCenter ? 'justify-center' : ''} ${(isIndent && li === 0 && !isHeading && !isCenter) ? 'pl-10' : ''}`}>
-                                  {lineWords.map(({ word, absIndex }) => {
-                                    const highlightColor = annotations.highlights[absIndex];
-                                    const hasTextNote = annotations.textNotes[absIndex];
-                                    const hasStickyNote = annotations.stickyNotes[absIndex];
-                                    const isWordSelected = selectedWord === word;
-                                    const noteInfo = hasTextNote ? parseNoteContent(hasTextNote) : null;
-                                    const stickyInfo = hasStickyNote ? parseNoteContent(hasStickyNote) : null;
-
-                                    return (
-                                      <span
-                                        key={absIndex}
-                                        data-abs-index={absIndex}
-                                        onClick={(e) => handleWordClick(word, absIndex, e)}
-                                        onPointerDown={(e) => handleWordPointerDown(absIndex, e)}
-                                        onPointerUp={clearLongPressTimer}
-                                        onPointerCancel={clearLongPressTimer}
-                                        onPointerLeave={clearLongPressTimer}
-                                        onContextMenu={(e) => {
-                                          if (annotations.highlights[absIndex]) {
-                                            e.preventDefault();
-                                            openHighlightMenu(absIndex, e);
-                                          }
-                                        }}
-                                        onMouseEnter={(e) => handleWordMouseEnter(absIndex, e)}
-                                        onMouseLeave={handleWordMouseLeave}
-                                        style={highlightColor ? { backgroundColor: highlightColor } : undefined}
-                                        className={`inline-flex flex-col items-center justify-end cursor-pointer rounded-sm transition-all duration-150 relative align-bottom ${isWordSelected && !highlightColor ? 'bg-blue-100/80 text-blue-900 ring-1 ring-blue-300' : ''
-                                          } ${!highlightColor && !isWordSelected ? 'hover:bg-blue-50/50 hover:text-blue-700' : ''}`}
-                                      >
-                                        <span className="leading-none flex items-center">
-                                          {word}
-                                          {hasTextNote && (
-                                            <span
-                                              className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none"
-                                              title={noteInfo.text}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                startEditingNote(absIndex, 'text', hasTextNote);
-                                              }}
-                                            >
-                                              {noteInfo.icon}
-                                            </span>
-                                          )}
-                                          {hasStickyNote && (
-                                            <span
-                                              className="ml-0.5 text-[0.55em] cursor-pointer hover:scale-125 transition-transform select-none animate-bounce"
-                                              title={stickyInfo.text}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                startEditingNote(absIndex, 'sticky', hasStickyNote);
-                                              }}
-                                            >
-                                              📌
-                                            </span>
-                                          )}
-                                        </span>
-                                        {showPinyin && (
-                                          <span className="text-[0.4em] text-slate-500 font-normal leading-none mt-1.5 select-none text-center block">
-                                            {cleanPinyin(word, pinyin(word, { type: 'string' }))}
-                                          </span>
-                                        )}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                                ))}
-                              </div>
-                            );
-                          });
-                        })()}
+                        )}
                       </div>
-
                     </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Backdrop for tablet/mobile sidebar drawer overlay */}
-        {isSidebarOpen && (
-          <div
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/30 backdrop-blur-[1px] z-[60] lg:hidden"
-          />
-        )}
+          {/* Backdrop for tablet/mobile sidebar drawer overlay */}
+          {isSidebarOpen && (
+            <div
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-slate-900/30 backdrop-blur-[1px] z-[60] lg:hidden"
+            />
+          )}
 
-        {/* Right pane: Collapsible Responsive Sidebar */}
-        {document && (
-          <div
-            className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-[70] ${isSidebarOpen
+          {/* Right pane: Collapsible Responsive Sidebar */}
+          {document && (
+            <div
+              className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-[70] ${isSidebarOpen
                 ? 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-0 sm:inset-x-auto sm:right-4 sm:w-[420px] lg:fixed lg:right-2 lg:top-[var(--reader-sidebar-top)] lg:bottom-[var(--reader-sidebar-bottom)] lg:h-auto lg:min-h-0 lg:max-h-none lg:w-[clamp(340px,24vw,430px)] lg:min-w-0 lg:max-w-none lg:rounded-3xl'
                 : 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-[calc(100%+6rem)] sm:inset-x-auto sm:right-4 sm:w-[420px] lg:hidden lg:translate-y-0'
-              }`}
-            style={{ '--reader-sidebar-top': `${readerSidebarTop}px`, '--reader-sidebar-bottom': `${readerSidebarBottom}px` }}
-          >
-            {/* Sidebar Tab Header */}
-            <div className="flex border-b border-slate-150 bg-slate-50/50 shrink-0">
-              <button
-                onClick={() => setSidebarTab('dict')}
-                className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'dict'
+                }`}
+              style={{ '--reader-sidebar-top': `${readerSidebarTop}px`, '--reader-sidebar-bottom': `${readerSidebarBottom}px` }}
+            >
+              {/* Sidebar Tab Header */}
+              <div className="flex border-b border-slate-150 bg-slate-50/50 shrink-0">
+                <button
+                  onClick={() => setSidebarTab('dict')}
+                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'dict'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                  }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Từ điển</span>
-              </button>
-              <button
-                onClick={() => setSidebarTab('chat')}
-                className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'chat'
+                    }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Từ điển</span>
+                </button>
+                <button
+                  onClick={() => setSidebarTab('chat')}
+                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'chat'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                  }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Trợ lý AI</span>
-              </button>
-              <button
-                onClick={() => setSidebarTab('stats')}
-                className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'stats'
+                    }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Trợ lý AI</span>
+                </button>
+                <button
+                  onClick={() => setSidebarTab('stats')}
+                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'stats'
                     ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                  }`}
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Tiến trình</span>
-              </button>
-            </div>
+                    }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Tiến trình</span>
+                </button>
+              </div>
 
-            {/* Sidebar Tab Content panels */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-thin sm:p-5">
+              {/* Sidebar Tab Content panels */}
+              <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-thin sm:p-5">
 
-              {/* Tab 1: Dictionary lookup detail view */}
-              {sidebarTab === 'dict' && (
-                <div className="h-full">
-                  {!selectedWord ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center py-12 px-6">
-                      <div className="w-14 h-14 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-5">
-                        <Search className="w-6 h-6" />
+                {/* Tab 1: Dictionary lookup detail view */}
+                {sidebarTab === 'dict' && (
+                  <div className="h-full">
+                    {!selectedWord ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center py-12 px-6">
+                        <div className="w-14 h-14 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-5">
+                          <Search className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Tra cứu thông minh</h3>
+                        <p className="text-slate-500 text-xs leading-relaxed max-w-[260px] mx-auto">
+                          Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
+                        </p>
                       </div>
-                      <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Tra cứu thông minh</h3>
-                      <p className="text-slate-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                                                Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <button
-                        onClick={closeWordCard}
-                        className="absolute -top-1 right-0 p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-655 rounded-full transition-colors z-10"
-                        title="Đóng bảng tra từ"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                      <WordCard
-                        word={selectedWord}
-                        data={vocabData}
-                        isLoading={isLoadingVocab}
-                        onWordClick={(w) => {
-                          setSelectedWord(w);
-                          setVocabData(null);
-                          setIsLoadingVocab(true);
-                          getVocabulary(w).then(d => setVocabData(d)).finally(() => setIsLoadingVocab(false));
-                        }}
-                        documentId={id}
-                        documentTitle={document?.title}
-                        documentText={segments.join('')}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tab 2: General Document AI Chat assistant */}
-              {sidebarTab === 'chat' && (
-                <div className="h-full flex flex-col min-h-[300px]">
-                  {/* Chat messages */}
-                  <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin min-h-[220px] flex flex-col mb-4">
-                    {docChatMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${msg.sender === 'user'
-                            ? 'bg-blue-600 text-white self-end ml-auto rounded-tr-none'
-                            : 'bg-slate-50 text-slate-800 border border-slate-100 mr-auto rounded-tl-none font-medium'
-                          }`}
-                      >
-                        <FormattedMarkdownText content={msg.text} isUser={msg.sender === 'user'} />
-                      </div>
-                    ))}
-                    {isSendingDocChat && (
-                      <div className="bg-slate-55 text-slate-855 mr-auto rounded-tl-none rounded-2xl p-3 text-xs leading-relaxed font-medium flex items-center gap-1.5 max-w-[85%]">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        <span className="text-[10px] text-gray-400 font-bold ml-1">AI đang soạn câu trả lời...</span>
+                    ) : (
+                      <div className="relative">
+                        <button
+                          onClick={closeWordCard}
+                          className="absolute -top-1 right-0 p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-655 rounded-full transition-colors z-10"
+                          title="Đóng bảng tra từ"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <WordCard
+                          word={selectedWord}
+                          data={vocabData}
+                          isLoading={isLoadingVocab}
+                          onWordClick={(w) => {
+                            setSelectedWord(w);
+                            setVocabData(null);
+                            setIsLoadingVocab(true);
+                            getVocabulary(w).then(d => setVocabData(d)).finally(() => setIsLoadingVocab(false));
+                          }}
+                          documentId={id}
+                          documentTitle={document?.title}
+                          documentText={segments.join('')}
+                        />
                       </div>
                     )}
-                    <div ref={docChatBottomRef} />
                   </div>
+                )}
 
-                  {/* Suggestions triggers */}
-                  {docChatMessages.length === 1 && (
-                    <div className="flex flex-col gap-1.5 mb-4">
-                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Hỏi nhanh AI</span>
-                      <button
-                        onClick={(e) => handleSendDocChat(e, "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
-                        className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
-                      >
-                        📖 Tóm tắt nội dung chính tài liệu?
-                      </button>
-                      <button
-                        onClick={(e) => handleSendDocChat(e, "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
-                        className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
-                      >
-                        💡 Chủ đề & Từ vựng quan trọng?
-                      </button>
+                {/* Tab 2: General Document AI Chat assistant */}
+                {sidebarTab === 'chat' && (
+                  <div className="h-full flex flex-col min-h-[300px]">
+                    {/* Chat messages */}
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin min-h-[220px] flex flex-col mb-4">
+                      {docChatMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${msg.sender === 'user'
+                            ? 'bg-blue-600 text-white self-end ml-auto rounded-tr-none'
+                            : 'bg-slate-50 text-slate-800 border border-slate-100 mr-auto rounded-tl-none font-medium'
+                            }`}
+                        >
+                          <FormattedMarkdownText content={msg.text} isUser={msg.sender === 'user'} />
+                        </div>
+                      ))}
+                      {isSendingDocChat && (
+                        <div className="bg-slate-55 text-slate-855 mr-auto rounded-tl-none rounded-2xl p-3 text-xs leading-relaxed font-medium flex items-center gap-1.5 max-w-[85%]">
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          <span className="text-[10px] text-gray-400 font-bold ml-1">AI đang soạn câu trả lời...</span>
+                        </div>
+                      )}
+                      <div ref={docChatBottomRef} />
                     </div>
-                  )}
 
-                  {/* Form input controls */}
-                  <form onSubmit={(e) => handleSendDocChat(e)} className="flex gap-2 shrink-0 border-t border-slate-100 pt-3">
-                    <input
-                      type="text"
-                      value={docChatInput}
-                      onChange={(e) => setDocChatInput(e.target.value)}
-                      disabled={isSendingDocChat}
-                      placeholder="Hỏi AI về chủ đề hoặc tóm tắt..."
-                      className="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSendingDocChat || !docChatInput.trim()}
-                      className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded-xl transition-colors shrink-0"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </form>
-                </div>
-              )}
+                    {/* Suggestions triggers */}
+                    {docChatMessages.length === 1 && (
+                      <div className="flex flex-col gap-1.5 mb-4">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Hỏi nhanh AI</span>
+                        <button
+                          onClick={(e) => handleSendDocChat(e, "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
+                          className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
+                        >
+                          📖 Tóm tắt nội dung chính tài liệu?
+                        </button>
+                        <button
+                          onClick={(e) => handleSendDocChat(e, "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
+                          className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
+                        >
+                          💡 Chủ đề & Từ vựng quan trọng?
+                        </button>
+                      </div>
+                    )}
 
-              {/* Tab 3: Study progress statistics dashboard */}
-              {sidebarTab === 'stats' && (
-                <div className="space-y-6">
-                  {/* Reading stats card */}
-                  <div className="bg-blue-50/20 border border-blue-100 rounded-2xl p-4 space-y-4">
-                    <h4 className="text-xs font-black uppercase text-blue-800 tracking-wider flex items-center gap-1.5 border-b border-blue-100 pb-2">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Thông số bài học</span>
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-450 font-bold uppercase block">Thời gian học</span>
-                        <span className="text-lg font-black text-slate-850 flex items-center gap-1.5">
-                          {Math.floor(readingSeconds / 60)}m {readingSeconds % 60}s
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-455 font-bold uppercase block">Tổng ký tự</span>
-                        <span className="text-lg font-black text-slate-850">{totalDocChars} từ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã tra từ điển</span>
-                        <span className="text-lg font-black text-slate-850">{lookupCount} từ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã bôi màu</span>
-                        <span className="text-lg font-black text-slate-850">{Object.keys(annotations.highlights).length} nét</span>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-455 font-bold uppercase block">Số ghi chú</span>
-                        <span className="text-lg font-black text-slate-850">
-                          {Object.keys(annotations.textNotes).length + Object.keys(annotations.stickyNotes).length} ghi chú
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã lưu sổ tay</span>
-                        <span className="text-lg font-black text-emerald-600 font-extrabold flex items-center gap-1">
-                          {savedWordsInDoc} từ
-                        </span>
-                      </div>
-                    </div>
+                    {/* Form input controls */}
+                    <form onSubmit={(e) => handleSendDocChat(e)} className="flex gap-2 shrink-0 border-t border-slate-100 pt-3">
+                      <input
+                        type="text"
+                        value={docChatInput}
+                        onChange={(e) => setDocChatInput(e.target.value)}
+                        disabled={isSendingDocChat}
+                        placeholder="Hỏi AI về chủ đề hoặc tóm tắt..."
+                        className="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSendingDocChat || !docChatInput.trim()}
+                        className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded-xl transition-colors shrink-0"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
                   </div>
+                )}
 
-                  {/* Student Gamification card */}
-                  {user && (
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 space-y-4">
-                      <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5 border-b border-slate-200/80 pb-2">
-                        <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Học viên Hanora</span>
+                {/* Tab 3: Study progress statistics dashboard */}
+                {sidebarTab === 'stats' && (
+                  <div className="space-y-6">
+                    {/* Reading stats card */}
+                    <div className="bg-blue-50/20 border border-blue-100 rounded-2xl p-4 space-y-4">
+                      <h4 className="text-xs font-black uppercase text-blue-800 tracking-wider flex items-center gap-1.5 border-b border-blue-100 pb-2">
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Thông số bài học</span>
                       </h4>
-
-                      {/* Streak & XP Display */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <Flame className="w-5 h-5 text-orange-500 fill-orange-500/10" />
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold block leading-none">Chuỗi học tập</span>
-                            <span className="text-sm font-black text-slate-805">{user.streak || 0} ngày</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <GraduationCap className="w-5 h-5 text-blue-500" />
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold block leading-none">Trình độ XP</span>
-                            <span className="text-sm font-black text-slate-805">{user.level || 'HSK 1'}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Daily minutes progress */}
-                      <div className="space-y-2 border-t border-slate-200/50 pt-3">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-500 font-semibold">Mục tiêu hằng ngày:</span>
-                          <span className="font-extrabold text-slate-855">
-                            {user.todayMinutes || 0} / {user.targetDailyMinutes || 20} phút
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-450 font-bold uppercase block">Thời gian học</span>
+                          <span className="text-lg font-black text-slate-850 flex items-center gap-1.5">
+                            {Math.floor(readingSeconds / 60)}m {readingSeconds % 60}s
                           </span>
                         </div>
-                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                          <div
-                            className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${Math.min(100, ((user.todayMinutes || 0) / (user.targetDailyMinutes || 20)) * 100)}%`
-                            }}
-                          />
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Tổng ký tự</span>
+                          <span className="text-lg font-black text-slate-850">{totalDocChars} từ</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã tra từ điển</span>
+                          <span className="text-lg font-black text-slate-850">{lookupCount} từ</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã bôi màu</span>
+                          <span className="text-lg font-black text-slate-850">{Object.keys(annotations.highlights).length} nét</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Số ghi chú</span>
+                          <span className="text-lg font-black text-slate-850">
+                            {Object.keys(annotations.textNotes).length + Object.keys(annotations.stickyNotes).length} ghi chú
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã lưu sổ tay</span>
+                          <span className="text-lg font-black text-emerald-600 font-extrabold flex items-center gap-1">
+                            {savedWordsInDoc} từ
+                          </span>
                         </div>
                       </div>
-
-                      <div className="text-[10px] text-slate-400 font-semibold italic text-center pt-2 leading-relaxed">
-                                                Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
-                      </div>
                     </div>
-                  )}
-                </div>
-              )}
 
+                    {/* Student Gamification card */}
+                    {user && (
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 space-y-4">
+                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5 border-b border-slate-200/80 pb-2">
+                          <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Học viên Hanora</span>
+                        </h4>
+
+                        {/* Streak & XP Display */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Flame className="w-5 h-5 text-orange-500 fill-orange-500/10" />
+                            <div>
+                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Chuỗi học tập</span>
+                              <span className="text-sm font-black text-slate-805">{user.streak || 0} ngày</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <GraduationCap className="w-5 h-5 text-blue-500" />
+                            <div>
+                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Trình độ XP</span>
+                              <span className="text-sm font-black text-slate-805">{user.level || 'HSK 1'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Daily minutes progress */}
+                        <div className="space-y-2 border-t border-slate-200/50 pt-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-500 font-semibold">Mục tiêu hằng ngày:</span>
+                            <span className="font-extrabold text-slate-855">
+                              {user.todayMinutes || 0} / {user.targetDailyMinutes || 20} phút
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.min(100, ((user.todayMinutes || 0) / (user.targetDailyMinutes || 20)) * 100)}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 font-semibold italic text-center pt-2 leading-relaxed">
+                          Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <SmartReviewPromptModal
-          isOpen={showSmartReviewModal}
-          onClose={() => setShowSmartReviewModal(false)}
-          wordCount={savedSessionCount || 10}
-          docTitle={document?.title}
-        />
-      </div>
+          <SmartReviewPromptModal
+            isOpen={showSmartReviewModal}
+            onClose={() => setShowSmartReviewModal(false)}
+            wordCount={savedSessionCount || 10}
+            docTitle={document?.title}
+          />
+        </div>
       </div>
     </div>
   );
