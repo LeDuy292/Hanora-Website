@@ -65,10 +65,6 @@ export function AdminLayout({ children }) {
         </nav>
 
         <div className="mt-4 border-t border-[#c1c6d6]/70 pt-4">
-          <button className="mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#005cb9] text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
-            <Sparkles className="h-4 w-4" />
-            Tổng hợp dữ liệu
-          </button>
           <a className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-bold text-[#414753] transition hover:bg-[#e6e8f2]" href="#settings">
             <Settings className="h-4 w-4" />
             Cài đặt

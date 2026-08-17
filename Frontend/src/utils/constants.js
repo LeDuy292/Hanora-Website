@@ -5,6 +5,18 @@ export const HSK_LEVELS = {
   4: { label: "HSK 4", color: "bg-red-50 text-red-500 border-red-100" }
 };
 
+export const ALLOWED_HSK_EMAILS = [
+  'phuongkttds180186@fpt.edu.vn',
+  'duongthithaonhi0808@gmail.com',
+  'boquanhoa301204@gmail.com',
+  'namsonlk2k4@gmail.com'
+];
+
+export function isAllowedHskUser(user) {
+  if (!user || !user.email) return false;
+  return ALLOWED_HSK_EMAILS.includes(String(user.email).trim().toLowerCase());
+}
+
 export const THEMES = {
   dark: { label: "Imperial Dark", class: "reader-theme-dark" },
   light: { label: "Classic Light", class: "reader-theme-light" },
