@@ -8,8 +8,9 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const clampScale = (value) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
-// Global in-memory cache for OCR layouts to avoid re-fetching 6MB JSONs
+// Global in-memory cache for OCR layouts and PDF documents to avoid re-fetching
 const ocrLayoutMemoryCache = new Map();
+const pdfDocMemoryCache = new Map();
 
 const normalizePages = (payload) => {
   if (!payload) return [];
@@ -394,9 +395,6 @@ const PdfVisualReader = ({
     requestedOcrPagesRef.current.clear();
   }, [documentId, fileUrl]);
 
-// Global in-memory & session storage cache for OCR layouts to avoid re-fetching 6MB JSONs
-const ocrLayoutMemoryCache = new Map();
-
   useEffect(() => {
     let isMounted = true;
     if (!ocrJsonUrl) {
@@ -458,6 +456,16 @@ const ocrLayoutMemoryCache = new Map();
     if (!fileUrl) return undefined;
     let cancelled = false;
     setLoadError(null);
+
+    // Instant load from memory cache if already opened in this session
+    if (pdfDocMemoryCache.has(fileUrl)) {
+      const cachedPdf = pdfDocMemoryCache.get(fileUrl);
+      setPdfDoc(cachedPdf);
+      setTotalPages(cachedPdf.numPages);
+      setLoadProgress(100);
+      return undefined;
+    }
+
     setLoadProgress(0);
 
     const loadPdf = async () => {
@@ -487,6 +495,7 @@ const ocrLayoutMemoryCache = new Map();
 
         const pdf = await loadingTask.promise;
         if (cancelled) return;
+        pdfDocMemoryCache.set(fileUrl, pdf);
         setPdfDoc(pdf);
         setTotalPages(pdf.numPages);
       } catch (error) {

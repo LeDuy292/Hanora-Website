@@ -204,11 +204,13 @@ function AccessDeniedModal({ isOpen, onClose, userEmail }) {
   );
 }
 
+let cachedHskLibraryDocs = null;
+
 export function LibraryPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [documents, setDocuments] = useState(() => cachedHskLibraryDocs || []);
+  const [loading, setLoading] = useState(() => !cachedHskLibraryDocs);
   const [error, setError] = useState(null);
   const [activeLevel, setActiveLevel] = useState(() => {
     const lvl = searchParams.get('level');
@@ -220,9 +222,11 @@ export function LibraryPage() {
   const user = useAuthStore((s) => s.user);
   const isAllowed = isAllowedHskUser(user);
 
-  const fetchDocs = useCallback(async () => {
+  const fetchDocs = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && !cachedHskLibraryDocs) {
+        setLoading(true);
+      }
       setError(null);
       const data = await getLibraryDocuments();
       const hskDocs = (data || []).filter(doc => 
@@ -232,16 +236,19 @@ export function LibraryPage() {
         !doc.originalFilename?.includes('_doc_') && 
         !doc.fileUrl?.includes('/seed/')
       );
+      cachedHskLibraryDocs = hskDocs;
       setDocuments(hskDocs);
     } catch (err) {
-      setError('Không thể tải danh sách sách. Vui lòng thử lại.');
+      if (!cachedHskLibraryDocs) {
+        setError('Không thể tải danh sách sách. Vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchDocs();
+    fetchDocs(Boolean(cachedHskLibraryDocs));
   }, [fetchDocs]);
 
   const filteredDocs = documents.filter(doc => {
