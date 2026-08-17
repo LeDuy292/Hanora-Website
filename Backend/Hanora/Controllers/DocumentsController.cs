@@ -44,6 +44,7 @@ public class DocumentsController : ControllerBase
 
     private readonly DataAccessObjects.AppDbContext _db;
     private readonly IStatsService _statsService;
+    private readonly IBackgroundTaskQueue _taskQueue;
 
     public DocumentsController(
         IDocumentProcessingService documentProcessingService,
@@ -52,7 +53,8 @@ public class DocumentsController : ControllerBase
         IConfiguration configuration,
         IOcrService ocrService,
         DataAccessObjects.AppDbContext db,
-        IStatsService statsService)
+        IStatsService statsService,
+        IBackgroundTaskQueue taskQueue)
     {
         _documentProcessingService = documentProcessingService;
         _documentRepository = documentRepository;
@@ -61,6 +63,7 @@ public class DocumentsController : ControllerBase
         _ocrService = ocrService;
         _db = db;
         _statsService = statsService;
+        _taskQueue = taskQueue;
     }
 
     public class PresignedUrlRequestDto
@@ -381,6 +384,101 @@ public class DocumentsController : ControllerBase
             .ToListAsync();
 
         return Ok(docs);
+    }
+
+    [HttpPost("{id}/reprocess")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReprocessDocument(long id)
+    {
+        var doc = await _documentRepository.GetByIdAsync(id);
+        if (doc == null) return NotFound();
+
+        doc.Status = DocumentStatus.Processing;
+        doc.ExtractedText = null;
+        doc.OcrJsonUrl = null;
+        doc.PageCount = null;
+        doc.UpdatedAt = DateTime.UtcNow;
+        await _documentRepository.UpdateAsync(doc);
+
+        var fileUrl = doc.FileUrl;
+        var fileName = doc.OriginalFilename;
+
+        await _taskQueue.QueueBackgroundWorkItemAsync(async (serviceProvider, token) =>
+        {
+            var logger = serviceProvider.GetRequiredService<ILogger<DocumentsController>>();
+            logger.LogInformation("Reprocessing document {DocId}: {Title}", id, doc.Title);
+
+            var docRepo = serviceProvider.GetRequiredService<IDocumentRepository>();
+            var s3Service = serviceProvider.GetRequiredService<IS3StorageService>();
+            var ocrService = serviceProvider.GetRequiredService<IOcrService>();
+            var layoutService = serviceProvider.GetRequiredService<ILayoutAnalysisService>();
+            var segmenter = serviceProvider.GetRequiredService<IChineseSegmenterService>();
+
+            var document = await docRepo.GetByIdAsync(id);
+            if (document == null) return;
+
+            try
+            {
+                document.Status = DocumentStatus.RecognizingOcr;
+                document.UpdatedAt = DateTime.UtcNow;
+                await docRepo.UpdateAsync(document);
+
+                using var fileStream = await s3Service.DownloadFileAsync(fileUrl);
+                var (extractedText, pages, errorMessage) = await ocrService.ExtractLayoutAsync(fileStream, fileName, "application/pdf");
+
+                if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    document.Status = DocumentStatus.Failed;
+                    document.ExtractedText = errorMessage;
+                }
+                else
+                {
+                    document.Status = DocumentStatus.AnalyzingContent;
+                    document.UpdatedAt = DateTime.UtcNow;
+                    await docRepo.UpdateAsync(document);
+
+                    if (pages != null && pages.Any())
+                    {
+                        var blocks = layoutService.AnalyzeLayout(pages);
+                        var formattedText = string.Join("\n\n", blocks.SelectMany(p => p.Blocks).Select(b =>
+                            (b.Type.StartsWith("heading") ? "#HEADING#\n" : "") +
+                            (b.Alignment == "center" ? "#CENTER#\n" : "") +
+                            (b.Alignment == "indent" ? "#INDENT#\n" : "") +
+                            string.Join("\n", b.Lines.Select(l => l.Text))
+                        ));
+
+                        var segments = segmenter.SegmentPreservingStructure(formattedText);
+                        document.ExtractedText = System.Text.Json.JsonSerializer.Serialize(segments);
+                        document.PageCount = pages.Count;
+
+                        var ocrPayload = new { Version = 1, Source = "hanora-layout-ocr", Pages = pages, Blocks = blocks };
+                        var layoutJson = System.Text.Json.JsonSerializer.Serialize(ocrPayload, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                        var layoutBytes = Encoding.UTF8.GetBytes(layoutJson);
+                        var layoutFileName = $"{Guid.NewGuid()}_layout.json";
+                        var layoutUrl = await s3Service.UploadBytesAsync(layoutBytes, layoutFileName, "application/json");
+                        document.OcrJsonUrl = layoutUrl;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(extractedText))
+                    {
+                        var segments = segmenter.SegmentPreservingStructure(extractedText);
+                        document.ExtractedText = System.Text.Json.JsonSerializer.Serialize(segments);
+                    }
+
+                    document.Status = DocumentStatus.Ready;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to reprocess document {DocId}", id);
+                document.Status = DocumentStatus.Failed;
+                document.ExtractedText = "Lỗi khi xử lý lại tài liệu: " + ex.Message;
+            }
+
+            document.UpdatedAt = DateTime.UtcNow;
+            await docRepo.UpdateAsync(document);
+        });
+
+        return Ok(new { message = $"Document {id} queued for reprocessing.", title = doc.Title });
     }
 
     [HttpGet("{id}/annotations")]
