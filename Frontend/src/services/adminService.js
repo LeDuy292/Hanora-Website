@@ -15,6 +15,12 @@ export const adminApi = {
     auth: true,
   }),
 
+  batchApproveTranslations: (ids) => apiRequest('/admin/translation-approvals/batch-approve', {
+    method: 'POST',
+    body: { ids },
+    auth: true,
+  }),
+
   users: (params = {}) => apiRequest(`/admin/users${toQuery(params)}`, { auth: true }),
 
   updateUser: (id, payload) => apiRequest(`/admin/users/${id}`, {
