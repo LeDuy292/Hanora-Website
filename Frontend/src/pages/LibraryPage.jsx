@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BookOpen, Search,
   Loader2, AlertCircle, BookMarked, GraduationCap,
-  CheckCircle2, Hourglass, XCircle
+  CheckCircle2, Hourglass, XCircle, Lock, ShieldAlert, X
 } from 'lucide-react';
 import { getLibraryDocuments } from '../lib/api';
+import { useAuthStore } from '../store/authStore';
+import { isAllowedHskUser } from '../utils/constants';
 
 // HSK level definitions
 const HSK_LEVELS = [
@@ -65,16 +67,25 @@ function StatusBadge({ status }) {
   return null;
 }
 
-function BookCard({ doc, levelInfo, bookType, onClick }) {
+function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedClick }) {
   const gradient = levelInfo?.gradient || 'from-slate-400 to-slate-600';
   const isReady = doc.status === 'Ready';
   const isProcessing = ['Processing', 'RecognizingOcr', 'AnalyzingContent'].includes(doc.status);
 
+  const handleClick = () => {
+    if (!isReady) return;
+    if (isAllowed) {
+      onOpen();
+    } else {
+      onRestrictedClick();
+    }
+  };
+
   return (
     <div
-      onClick={isReady ? onClick : undefined}
+      onClick={isReady ? handleClick : undefined}
       className={`group relative bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm transition-all duration-300 flex flex-col
-        ${isReady ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer hover:border-blue-200' : 'opacity-75 cursor-default'}
+        ${isReady ? (isAllowed ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer hover:border-blue-200' : 'cursor-pointer hover:border-amber-300 hover:shadow-md') : 'opacity-75 cursor-default'}
       `}
     >
       {/* Book Cover */}
@@ -90,6 +101,14 @@ function BookCard({ doc, levelInfo, bookType, onClick }) {
         <span className="text-4xl drop-shadow-lg z-10 transition-transform duration-300 group-hover:scale-110">
           {bookType.icon}
         </span>
+
+        {/* Lock Overlay Badge if not allowed */}
+        {!isAllowed && (
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200/90 backdrop-blur-sm border border-amber-300 px-2 py-0.5 rounded-full shadow-sm">
+            <Lock className="w-2.5 h-2.5" /> Giới hạn
+          </span>
+        )}
+
         {levelInfo && levelInfo.key !== 'all' && (
           <span className="absolute top-3 right-3 text-[10px] font-black text-white bg-white/20 backdrop-blur-sm border border-white/30 px-2 py-0.5 rounded-full uppercase tracking-widest">
             {levelInfo.label}
@@ -120,10 +139,66 @@ function BookCard({ doc, levelInfo, bookType, onClick }) {
           )}
         </div>
         {isReady && (
-          <div className="mt-1 w-full py-1.5 rounded-xl bg-blue-50 text-blue-600 text-[11px] font-bold text-center group-hover:bg-blue-600 group-hover:text-white transition-all duration-200">
-            Mở đọc →
-          </div>
+          isAllowed ? (
+            <div className="mt-1 w-full py-1.5 rounded-xl bg-blue-50 text-blue-600 text-[11px] font-bold text-center group-hover:bg-blue-600 group-hover:text-white transition-all duration-200">
+              Mở đọc →
+            </div>
+          ) : (
+            <div className="mt-1 w-full py-1.5 rounded-xl bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center gap-1.5 group-hover:bg-amber-100 group-hover:text-amber-800 transition-all duration-200">
+              <Lock className="w-3 h-3 text-slate-400 group-hover:text-amber-700" />
+              Khóa quyền đọc
+            </div>
+          )
         )}
+      </div>
+    </div>
+  );
+}
+
+function AccessDeniedModal({ isOpen, onClose, userEmail }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 overflow-hidden">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex flex-col items-center text-center">
+          <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-4 border border-amber-200 text-amber-600">
+            <Lock className="w-7 h-7" />
+          </div>
+
+          <h3 className="text-lg font-black text-slate-900 mb-1.5">
+            Tính năng đọc sách đang bị khóa
+          </h3>
+
+          <p className="text-xs text-slate-500 leading-relaxed mb-4">
+            Hiện tại tính năng mở và đọc sách trong <strong>Thư viện HSK</strong> đang trong giai đoạn thử nghiệm có giới hạn và chỉ khả dụng cho các tài khoản được ủy quyền.
+          </p>
+
+          <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-left mb-5">
+            <div className="text-[11px] text-slate-400 font-semibold mb-1">Tài khoản hiện tại của bạn:</div>
+            <div className="text-xs font-bold text-slate-800 break-all flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+              {userEmail || 'Chưa đăng nhập'}
+            </div>
+            <div className="text-[10px] text-amber-700 font-medium mt-1">
+              (Chưa nằm trong danh sách mở khóa)
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md"
+          >
+            Đã hiểu
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -140,6 +215,10 @@ export function LibraryPage() {
     return HSK_LEVELS.find(l => l.key === lvl) ? lvl : 'all';
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+
+  const user = useAuthStore((s) => s.user);
+  const isAllowed = isAllowedHskUser(user);
 
   const fetchDocs = useCallback(async () => {
     try {
@@ -177,6 +256,12 @@ export function LibraryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans">
+      <AccessDeniedModal
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        userEmail={user?.email}
+      />
+
       {/* Page Header */}
       <div className="bg-white border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -275,7 +360,9 @@ export function LibraryPage() {
                     doc={doc}
                     levelInfo={levelInfo}
                     bookType={bookType}
-                    onClick={() => navigate(`/reader/${doc.id}`)}
+                    isAllowed={isAllowed}
+                    onOpen={() => navigate(`/reader/${doc.id}`)}
+                    onRestrictedClick={() => setIsAccessModalOpen(true)}
                   />
                 );
               })}

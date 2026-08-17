@@ -25,10 +25,11 @@ namespace Hanora
             }
 
             // Database
-            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                ?? Environment.GetEnvironmentVariable("DATABASE_URL");
             if (string.IsNullOrEmpty(connectionString))
             {
-                connectionString = "Host=reseau.proxy.rlwy.net;Port=32993;Database=railway;Username=postgres;Password=yMEnWyNEDKcPQRgdrnzlXclATiyOjZjo";
+                throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured. Please check appsettings.Development.json or environment variables.");
             }
             var connStrBuilder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
             {
@@ -314,6 +315,7 @@ namespace Hanora
             app.UseAuthorization();
             app.MapControllers();
             app.MapHub<Hanora.Hubs.CommunityHub>("/communityhub");
+
             app.Run();
         }
     }

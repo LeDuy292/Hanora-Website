@@ -23,13 +23,14 @@ import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
 } from '../utils/documentTextUtils';
+import { isAllowedHskUser } from '../utils/constants';
 import {
   MousePointer, Highlighter, Pencil, Eraser,
   FileText, Pin, Save, Download, X, Upload, ChevronLeft, ChevronRight,
   Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare,
   Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send,
   Copy, Trash2, Undo2, Redo2, Folder, FolderPlus, Plus, Filter,
-  MoreVertical, Edit2, PlusCircle
+  MoreVertical, Edit2, PlusCircle, Lock
 } from 'lucide-react';
 
 const HIGHLIGHT_COLORS = [
@@ -264,6 +265,14 @@ const ReaderPage = () => {
   // store methods for quick bubble menu
   const { vocabList, addWord, updateServerStatus } = useVocabularyStore();
   const { user, trackStudyTime, refreshStats } = useAuthStore();
+
+  const isHskDoc = useMemo(() => {
+    if (!document) return false;
+    const combined = ((document.title || '') + ' ' + (document.originalFilename || '')).toLowerCase();
+    return combined.includes('hsk') || combined.includes('hsk1') || combined.includes('hsk2') || combined.includes('hsk3') || combined.includes('hsk4') || combined.includes('hsk5') || combined.includes('hsk6');
+  }, [document]);
+
+  const isRestrictedHskDoc = isHskDoc && !isAllowedHskUser(user);
 
   // Annotations state
   const [annotations, setAnnotations] = useState(EMPTY_ANNOTATIONS);
@@ -2519,7 +2528,26 @@ const ReaderPage = () => {
                 </div>
               )}
 
-              {document && (
+              {document && isRestrictedHskDoc && (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 min-h-[400px]">
+                  <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mb-4 text-amber-600 border border-amber-200 shadow-sm">
+                    <Lock className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Quyền truy cập sách HSK bị khóa</h2>
+                  <p className="text-xs text-slate-500 max-w-md mb-6 leading-relaxed">
+                    Sách HSK này hiện tại chỉ mở cho các tài khoản được ủy quyền. Tài khoản của bạn ({user?.email || 'Chưa đăng nhập'}) chưa có quyền mở sách này.
+                  </p>
+                  <button
+                    onClick={() => navigate('/library')}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Quay lại Thư viện HSK
+                  </button>
+                </div>
+              )}
+
+              {document && !isRestrictedHskDoc && (
                 <>
                   {/* Floating Vertical Canvas Drawing Tools */}
                   <FloatingVerticalToolbar

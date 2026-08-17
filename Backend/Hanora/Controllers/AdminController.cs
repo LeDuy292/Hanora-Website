@@ -90,21 +90,33 @@ namespace Hanora.Controllers
                 .Take(6))
                 .ToListAsync();
 
-            var activeDates = await _db.UserStats
+            var trendStartDateOnly = DateOnly.FromDateTime(trendStart);
+
+            // Group distinct active users per day from LearningProgress
+            var activeProgressDays = await _db.LearningProgresses
                 .AsNoTracking()
-                .Where(s => s.LastActiveDate != null)
-                .Select(s => s.LastActiveDate!.Value)
+                .Where(p => p.ActivityDate >= trendStartDateOnly)
+                .GroupBy(p => p.ActivityDate)
+                .Select(g => new { Date = g.Key, Count = g.Select(p => p.UserId).Distinct().Count() })
                 .ToListAsync();
+
+            var activeDateMap = activeProgressDays.ToDictionary(x => x.Date, x => x.Count);
+
+            var activeUserTrend = Enumerable.Range(0, 30)
+                .Select(offset =>
+                {
+                    var date = trendStart.Date.AddDays(offset);
+                    var dateOnly = DateOnly.FromDateTime(date);
+                    var count = activeDateMap.TryGetValue(dateOnly, out var c) ? c : 0;
+                    return new AdminChartPointDto(date.ToString("dd/MM"), date, count, count);
+                })
+                .ToList();
 
             var newUserDates = await _db.Users
                 .AsNoTracking()
                 .Where(u => u.CreatedAt >= trendStart)
                 .Select(u => u.CreatedAt!.Value)
                 .ToListAsync();
-
-            var activeUserTrend = BuildDailySeries(
-                trendStart,
-                activeDates.Select(d => d.ToDateTime(TimeOnly.MinValue)));
 
             var newUserTrend = BuildDailySeries(trendStart, newUserDates);
 
@@ -115,32 +127,14 @@ namespace Hanora.Controllers
         public async Task<ActionResult<AdminRevenueDto>> GetRevenue()
         {
             var today = DateTime.UtcNow.Date;
-            var weekStart = today.AddDays(-6);
             var dailyStart = today.AddDays(-13);
             var yearStart = DateTime.SpecifyKind(new DateTime(today.Year, 1, 1), DateTimeKind.Utc);
-            const decimal learnerActivationValue = 49000m;
-            const decimal documentProcessingValue = 12000m;
-
-            var users = await _db.Users
-                .AsNoTracking()
-                .Where(u => u.CreatedAt >= dailyStart)
-                .Select(u => u.CreatedAt!.Value)
-                .ToListAsync();
-
-            var documents = await _db.Documents
-                .AsNoTracking()
-                .Where(d => d.CreatedAt >= dailyStart)
-                .Select(d => new { CreatedAt = d.CreatedAt!.Value, d.Title, Owner = d.User.DisplayName ?? d.User.Username })
-                .ToListAsync();
 
             var dailyRevenue = Enumerable.Range(0, 14)
                 .Select(offset =>
                 {
                     var date = dailyStart.AddDays(offset);
-                    var userCount = users.Count(d => d.Date == date);
-                    var docCount = documents.Count(d => d.CreatedAt.Date == date);
-                    var value = userCount * learnerActivationValue + docCount * documentProcessingValue;
-                    return new AdminChartPointDto(date.ToString("dd/MM"), date, value, userCount + docCount);
+                    return new AdminChartPointDto(date.ToString("dd/MM"), date, 0m, 0);
                 })
                 .ToList();
 
@@ -148,44 +142,22 @@ namespace Hanora.Controllers
                 .Select(offset =>
                 {
                     var month = yearStart.AddMonths(offset);
-                    var next = month.AddMonths(1);
-                    var userCount = _db.Users.Count(u => u.CreatedAt >= month && u.CreatedAt < next);
-                    var docCount = _db.Documents.Count(d => d.CreatedAt >= month && d.CreatedAt < next);
-                    var value = userCount * learnerActivationValue + docCount * documentProcessingValue;
-                    return new AdminChartPointDto(month.ToString("MMM"), month, value, userCount + docCount);
+                    return new AdminChartPointDto(month.ToString("MMM"), month, 0m, 0);
                 })
                 .ToList();
 
-            var todayRevenue = dailyRevenue.Where(p => p.Date.Date == today).Sum(p => p.Value);
-            var weekRevenue = dailyRevenue.Where(p => p.Date >= weekStart).Sum(p => p.Value);
-            var monthRevenue = monthlyRevenue.FirstOrDefault(p => p.Date.Month == today.Month)?.Value ?? 0;
-            var totalOrders = await _db.Users.CountAsync() + await _db.Documents.CountAsync();
-            var averageOrderValue = totalOrders > 0 ? monthRevenue / Math.Max(1, monthlyRevenue.FirstOrDefault(p => p.Date.Month == today.Month)?.Count ?? 1) : 0;
-
             var activeUsers = await _db.Users.CountAsync(u => u.IsActive != false);
             var admins = await _db.Users.CountAsync(u => u.Role == "Admin");
-            var documentOwners = await _db.Documents.Select(d => d.UserId).Distinct().CountAsync();
             var planSegments = new List<AdminSegmentDto>
             {
-                new("Basic", Math.Max(activeUsers - documentOwners, 0), "#abc7ff"),
-                new("Pro", documentOwners, "#005cb9"),
-                new("Admin", admins, "#2d3038")
+                new("Gói Miễn phí (Free)", Math.Max(activeUsers - admins, 0), "#005cb9"),
+                new("Tài khoản Quản trị", admins, "#2d3038")
             };
 
-            var recentTransactions = documents
-                .OrderByDescending(d => d.CreatedAt)
-                .Take(8)
-                .Select((d, index) => new AdminRevenueTransactionDto(
-                    $"DOC-{d.CreatedAt:MMdd}-{index + 1}",
-                    d.Owner,
-                    d.Title,
-                    documentProcessingValue,
-                    "Completed",
-                    d.CreatedAt))
-                .ToList();
+            var recentTransactions = new List<AdminRevenueTransactionDto>();
 
             return Ok(new AdminRevenueDto(
-                new AdminRevenueSummaryDto(todayRevenue, weekRevenue, monthRevenue, totalOrders, averageOrderValue),
+                new AdminRevenueSummaryDto(0m, 0m, 0m, 0, 0m),
                 dailyRevenue,
                 monthlyRevenue,
                 planSegments,
@@ -322,7 +294,7 @@ namespace Hanora.Controllers
                     r.SourceText,
                     r.CurrentTranslation ?? "",
                     r.ProposedTranslation ?? r.CurrentTranslation ?? "",
-                    r.AdminNote ?? r.AiExplanation ?? "Can admin xac minh ban dich truoc khi dua vao kho hoc lieu.",
+                    r.AdminNote ?? r.AiExplanation ?? "Cần admin xác minh bản dịch trước khi đưa vào kho học liệu.",
                     r.User != null ? r.User.DisplayName ?? r.User.Username : "system",
                     r.CreatedAt,
                     r.Status,
@@ -361,7 +333,7 @@ namespace Hanora.Controllers
 
             var nextStatus = NormalizeReviewStatus(request.Status);
             if (nextStatus == null)
-                return BadRequest(new { error = "Review status khong hop le." });
+                return BadRequest(new { error = "Review status không hợp lệ." });
 
             var previousStatus = review.Status;
             var proposed = string.IsNullOrWhiteSpace(request.Translation)
@@ -404,9 +376,44 @@ namespace Hanora.Controllers
             await _db.SaveChangesAsync();
             return Ok(new { success = true });
         }
-        [HttpGet("users")]
-        public async Task<ActionResult<List<AdminUserRowDto>>> GetUsers([FromQuery] string? q, [FromQuery] string? role, [FromQuery] string? status)
+
+        [HttpPost("translation-approvals/batch-approve")]
+        public async Task<IActionResult> BatchApproveTranslations([FromBody] AdminBatchApproveRequest request)
         {
+            var ids = request.Ids ?? new List<long>();
+            var reviews = await _db.TranslationReviews
+                .Where(r => ids.Contains(r.Id) && r.Status == "Pending")
+                .ToListAsync();
+
+            var currentUserId = GetCurrentUserId();
+            var now = DateTime.UtcNow;
+
+            foreach (var review in reviews)
+            {
+                review.Status = "Approved";
+                review.ReviewedBy = currentUserId;
+                review.ReviewedAt = now;
+                review.UpdatedAt = now;
+
+                var proposed = review.ProposedTranslation ?? review.CurrentTranslation;
+                await SyncApprovedTranslation(review, proposed);
+            }
+
+            await _db.SaveChangesAsync();
+            return Ok(new { success = true, approvedCount = reviews.Count });
+        }
+
+        [HttpGet("users")]
+        public async Task<ActionResult<AdminUserPageDto>> GetUsers(
+            [FromQuery] string? q,
+            [FromQuery] string? role,
+            [FromQuery] string? status,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 5, 100);
+
             var query = _db.Users.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -426,9 +433,15 @@ namespace Hanora.Controllers
             else if (status == "Locked")
                 query = query.Where(u => u.IsActive == false);
 
+            var total = await query.CountAsync();
+            var activeTotal = await _db.Users.CountAsync(u => u.IsActive != false);
+            var lockedTotal = await _db.Users.CountAsync(u => u.IsActive == false);
+            var adminTotal = await _db.Users.CountAsync(u => u.Role == "Admin");
+
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
-                .Take(100)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new AdminUserRowDto(
                     u.Id,
                     u.Username,
@@ -445,7 +458,9 @@ namespace Hanora.Controllers
                 ))
                 .ToListAsync();
 
-            return Ok(users);
+            var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+
+            return Ok(new AdminUserPageDto(users, total, page, pageSize, totalPages, activeTotal, lockedTotal, adminTotal));
         }
 
         [HttpPatch("users/{id:long}")]
@@ -457,13 +472,13 @@ namespace Hanora.Controllers
 
             var currentAdminId = GetCurrentUserId();
             if (currentAdminId == id && request.IsActive == false)
-                return BadRequest(new { error = "Admin khong the tu khoa tai khoan dang dang nhap." });
+                return BadRequest(new { error = "Admin không thể tự khóa tài khoản đang đăng nhập." });
 
             if (!string.IsNullOrWhiteSpace(request.Role))
             {
                 var role = request.Role.Trim();
                 if (role is not ("Admin" or "User"))
-                    return BadRequest(new { error = "Role chi co the la Admin hoac User." });
+                    return BadRequest(new { error = "Role chỉ có thể là Admin hoặc User." });
                 user.Role = role;
             }
 
@@ -561,10 +576,10 @@ namespace Hanora.Controllers
         public async Task<ActionResult<AdminVocabularyRowDto>> CreateVocabulary([FromBody] AdminVocabularyRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Word) || string.IsNullOrWhiteSpace(request.Pinyin) || string.IsNullOrWhiteSpace(request.Definitions))
-                return BadRequest(new { error = "Word, pinyin va definitions la bat buoc." });
+                return BadRequest(new { error = "Word, pinyin và definitions là bắt buộc." });
 
             if (await _db.Vocabularies.AnyAsync(v => v.Word == request.Word.Trim()))
-                return Conflict(new { error = "Tu vung da ton tai." });
+                return Conflict(new { error = "Từ vựng đã tồn tại." });
 
             var vocab = new Vocabulary
             {
@@ -645,7 +660,7 @@ namespace Hanora.Controllers
                 return NotFound(new { error = "Report not found." });
 
             if (!Enum.TryParse<ReportStatus>(request.Status, true, out var status))
-                return BadRequest(new { error = "Report status khong hop le." });
+                return BadRequest(new { error = "Report status không hợp lệ." });
 
             report.Status = status;
             report.ReviewedBy = GetCurrentUserId();
@@ -685,96 +700,16 @@ namespace Hanora.Controllers
 
         private async Task EnsureTranslationReviewQueueSeeded()
         {
-            var existingVocabularyIds = await _db.TranslationReviews
-                .AsNoTracking()
-                .Where(r => r.SourceType == "vocabulary" && r.SourceEntityId != null)
-                .Select(r => r.SourceEntityId!.Value)
+            // Remove synthetic mock reviews that were automatically generated without real user feedback
+            var mockReviews = await _db.TranslationReviews
+                .Where(r => r.UserId == null && (r.WarningType == "missing_vi_translation" || r.WarningType == "new_word"))
                 .ToListAsync();
 
-            var vocabularySeeds = await _db.Vocabularies
-                .AsNoTracking()
-                .Where(v => v.ViTranslated != true && !existingVocabularyIds.Contains(v.Id))
-                .OrderByDescending(v => v.UpdatedAt ?? v.CreatedAt)
-                .Take(250)
-                .Select(v => new
-                {
-                    v.Id,
-                    v.Word,
-                    v.Definitions,
-                    v.HanViet,
-                    v.UsageNotes,
-                    v.ExampleSentences,
-                    v.Pinyin,
-                    v.WordType,
-                    v.CreatedAt
-                })
-                .ToListAsync();
-
-            var vocabularyItems = vocabularySeeds.Select(v =>
+            if (mockReviews.Any())
             {
-                var hasHanViet = !string.IsNullOrWhiteSpace(v.HanViet);
-                return new TranslationReview
-                {
-                    SourceType = "vocabulary",
-                    SourceEntityId = v.Id,
-                    SourceText = v.Word,
-                    CurrentTranslation = v.Definitions,
-                    ProposedTranslation = v.HanViet,
-                    AiExplanation = v.UsageNotes,
-                    ExampleText = v.ExampleSentences,
-                    Pinyin = v.Pinyin,
-                    WordType = v.WordType?.ToString(),
-                    WarningType = hasHanViet ? "missing_vi_translation" : "new_word",
-                    ConfidenceScore = hasHanViet ? 0.76m : 0.68m,
-                    Priority = hasHanViet ? 2 : 4,
-                    Status = "Pending",
-                    CreatedAt = v.CreatedAt ?? DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-            }).ToList();
-
-            var existingSentenceIds = await _db.TranslationReviews
-                .AsNoTracking()
-                .Where(r => r.SourceType == "sentence" && r.SourceEntityId != null)
-                .Select(r => r.SourceEntityId!.Value)
-                .ToListAsync();
-
-            var sentenceSeeds = await _db.ExampleSentences
-                .AsNoTracking()
-                .Where(e => e.ViText == null && !existingSentenceIds.Contains(e.Id))
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(250)
-                .Select(e => new
-                {
-                    e.Id,
-                    e.ZhText,
-                    e.EnText,
-                    e.ViText,
-                    e.CreatedAt
-                })
-                .ToListAsync();
-
-            var sentenceItems = sentenceSeeds.Select(e => new TranslationReview
-            {
-                SourceType = "sentence",
-                SourceEntityId = e.Id,
-                SourceText = e.ZhText,
-                CurrentTranslation = e.EnText,
-                ProposedTranslation = e.ViText,
-                AiExplanation = "Cau vi du chua co ban dich tieng Viet.",
-                WarningType = "missing_vi_translation",
-                ConfidenceScore = 0.74m,
-                Priority = 2,
-                Status = "Pending",
-                CreatedAt = e.CreatedAt ?? DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            }).ToList();
-
-            if (vocabularyItems.Count == 0 && sentenceItems.Count == 0)
-                return;
-
-            _db.TranslationReviews.AddRange(vocabularyItems.Concat(sentenceItems));
-            await _db.SaveChangesAsync();
+                _db.TranslationReviews.RemoveRange(mockReviews);
+                await _db.SaveChangesAsync();
+            }
         }
 
         private async Task SyncApprovedTranslation(TranslationReview review, string? translation)
@@ -834,6 +769,7 @@ namespace Hanora.Controllers
             date = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
             return true;
         }
+
         private long? GetCurrentUserId()
         {
             var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -923,6 +859,7 @@ namespace Hanora.Controllers
         string? AiExplanation,
         string? ExampleText
     );
+
     public record AdminOverviewStatsDto(
         int TotalUsers,
         int ActiveUsers,
@@ -953,6 +890,17 @@ namespace Hanora.Controllers
         int TotalStudyMinutes,
         int DocumentCount,
         int VocabularyCount
+    );
+
+    public record AdminUserPageDto(
+        List<AdminUserRowDto> Items,
+        int Total,
+        int Page,
+        int PageSize,
+        int TotalPages,
+        int ActiveTotal,
+        int LockedTotal,
+        int AdminTotal
     );
 
     public record AdminDocumentRowDto(
@@ -1004,6 +952,8 @@ namespace Hanora.Controllers
     );
 
     public record AdminUpdateReportRequest(string Status);
+
+    public record AdminBatchApproveRequest(List<long>? Ids);
 
     public record AdminUpdateTranslationApprovalRequest(string? Kind, string Status, string? Translation, string? AdminNote);
 }

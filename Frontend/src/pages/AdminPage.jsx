@@ -129,16 +129,8 @@ function MetricCard({ label, value, delta, icon: Icon, tone = 'blue' }) {
       <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#d7e3ff]/50 opacity-60 transition duration-700 group-hover:scale-125" />
       <div className="relative flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-wider text-[#414753]">{label}</p>
+          <p className="text-xs font-black uppercase tracking-wider text-[#717785]">{label}</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-[#181c22]">{value}</p>
-          {delta && (
-            <span className={`mt-3 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black ${
-              positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-            }`}>
-              {positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-              {delta}
-            </span>
-          )}
         </div>
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${toneClass}`}>
           <Icon className="h-5 w-5" />
@@ -189,11 +181,14 @@ export function AdminPage() {
   const [screen, setScreen] = useState(getScreenFromHash);
   const [overview, setOverview] = useState(null);
   const [revenue, setRevenue] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [usersData, setUsersData] = useState({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1, activeTotal: 0, lockedTotal: 0, adminTotal: 0 });
   const [searchStats, setSearchStats] = useState(null);
   const [translations, setTranslations] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [userRoleFilter, setUserRoleFilter] = useState('All');
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
   const [translationKind, setTranslationKind] = useState('all');
   const [translationStatus, setTranslationStatus] = useState('Pending');
   const [translationWarning, setTranslationWarning] = useState('all');
@@ -222,7 +217,16 @@ export function AdminPage() {
     try {
       if (!overview) await loadOverview();
       if (screen === 'revenue') setRevenue(await adminApi.revenue());
-      if (screen === 'users') setUsers(await adminApi.users({ q: query, status: statusFilter }));
+      if (screen === 'users') {
+        const res = await adminApi.users({
+          q: query,
+          role: userRoleFilter,
+          status: statusFilter,
+          page: userPage,
+          pageSize: userPageSize,
+        });
+        setUsersData(res || { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1, activeTotal: 0, lockedTotal: 0, adminTotal: 0 });
+      }
       if (screen === 'search') setSearchStats(await adminApi.searchStats());
       if (screen === 'translations') {
         setTranslations(await adminApi.translationApprovals({
@@ -242,7 +246,7 @@ export function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [loadOverview, overview, query, screen, statusFilter, translationDateFrom, translationDateTo, translationKind, translationPage, translationPageSize, translationQuery, translationStatus, translationWarning]);
+  }, [loadOverview, overview, query, screen, statusFilter, userPage, userPageSize, userRoleFilter, translationDateFrom, translationDateTo, translationKind, translationPage, translationPageSize, translationQuery, translationStatus, translationWarning]);
 
   useEffect(() => {
     const timer = setTimeout(loadScreen, 150);
@@ -258,11 +262,67 @@ export function AdminPage() {
   const updateUser = async (user, payload) => {
     try {
       await adminApi.updateUser(user.id, payload);
-      setUsers(await adminApi.users({ q: query, status: statusFilter }));
+      const res = await adminApi.users({
+        q: query,
+        role: userRoleFilter,
+        status: statusFilter,
+        page: userPage,
+        pageSize: userPageSize,
+      });
+      setUsersData(res || { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1, activeTotal: 0, lockedTotal: 0, adminTotal: 0 });
       await loadOverview();
       toast.success('Đã cập nhật người dùng.');
     } catch (err) {
       toast.error(err.message || 'Không thể cập nhật người dùng.');
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      toast.info('Đang chuẩn bị file CSV người dùng...');
+      const allUsersRes = await adminApi.users({
+        q: query,
+        role: userRoleFilter,
+        status: statusFilter,
+        page: 1,
+        pageSize: 1000,
+      });
+      const items = allUsersRes?.items || [];
+      if (!items.length) {
+        toast.warning('Không có dữ liệu người dùng để xuất.');
+        return;
+      }
+      const headers = ['ID', 'Tên hiển thị', 'Tên đăng nhập', 'Email', 'Vai trò', 'Trạng thái', 'Tổng XP', 'Chuỗi ngày (Streak)', 'Thời gian học (phút)', 'Số tài liệu', 'Số từ đã lưu', 'Ngày tham gia'];
+      const csvRows = [
+        headers.join(','),
+        ...items.map((u) => [
+          u.id,
+          `"${(u.displayName || '').replace(/"/g, '""')}"`,
+          `"${(u.username || '').replace(/"/g, '""')}"`,
+          `"${(u.email || '').replace(/"/g, '""')}"`,
+          `"${u.role || 'User'}"`,
+          `"${u.isActive ? 'Hoạt động' : 'Bị khóa'}"`,
+          u.totalXp || 0,
+          u.currentStreakDays || 0,
+          u.totalStudyMinutes || 0,
+          u.documentCount || 0,
+          u.vocabularyCount || 0,
+          `"${formatDate(u.createdAt)}"`
+        ].join(','))
+      ];
+      const csvContent = '\uFEFF' + csvRows.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Hanora_NguoiDung_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Đã xuất thành công ${items.length} người dùng ra file CSV!`);
+    } catch (err) {
+      toast.error(err.message || 'Lỗi khi xuất file CSV.');
     }
   };
 
@@ -286,6 +346,31 @@ export function AdminPage() {
     }
   };
 
+  const handleBatchApprove = async () => {
+    try {
+      const pendingIds = (translations?.items || []).filter((i) => i.status === 'Pending').map((i) => i.id);
+      if (!pendingIds.length) {
+        toast.info('Không có bản dịch nào đang chờ duyệt trên trang này.');
+        return;
+      }
+      const res = await adminApi.batchApproveTranslations(pendingIds);
+      setTranslations(await adminApi.translationApprovals({
+        kind: translationKind,
+        status: translationStatus,
+        warningType: translationWarning,
+        dateFrom: translationDateFrom,
+        dateTo: translationDateTo,
+        q: translationQuery,
+        page: translationPage,
+        pageSize: translationPageSize,
+      }));
+      await loadOverview();
+      toast.success(`Đã phê duyệt thành công ${res.approvedCount || pendingIds.length} bản dịch!`);
+    } catch (err) {
+      toast.error(err.message || 'Không thể phê duyệt hàng loạt.');
+    }
+  };
+
   if (loading && !overview) return <LoadingState />;
 
   return (
@@ -301,13 +386,32 @@ export function AdminPage() {
       {screen === 'revenue' && <RevenueScreen revenue={revenue} loading={loading} />}
       {screen === 'users' && (
         <UsersScreen
-          users={users}
+          data={usersData}
           query={query}
-          setQuery={setQuery}
+          setQuery={(val) => {
+            setQuery(val);
+            setUserPage(1);
+          }}
+          roleFilter={userRoleFilter}
+          setRoleFilter={(val) => {
+            setUserRoleFilter(val);
+            setUserPage(1);
+          }}
           statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
+          setStatusFilter={(val) => {
+            setStatusFilter(val);
+            setUserPage(1);
+          }}
+          page={userPage}
+          setPage={setUserPage}
+          pageSize={userPageSize}
+          setPageSize={(val) => {
+            setUserPageSize(val);
+            setUserPage(1);
+          }}
           loading={loading}
           onUpdate={updateUser}
+          onExportCsv={handleExportCsv}
         />
       )}
       {screen === 'search' && <SearchStatsScreen data={searchStats} loading={loading} />}
@@ -353,84 +457,219 @@ export function AdminPage() {
           }}
           loading={loading}
           onUpdate={updateTranslation}
+          onBatchApprove={handleBatchApprove}
         />
       )}
     </div>
   );
 }
 
+function CustomChartTooltip({ active, payload, label, unit = 'học viên', subtitle = '' }) {
+  if (!active || !payload || !payload.length) return null;
+  const value = payload[0].value;
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-md">
+      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+        <Clock className="h-3.5 w-3.5 text-blue-600" />
+        <span>Ngày {label}</span>
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className="text-xl font-black text-slate-900">{formatNumber(value)}</span>
+        <span className="text-xs font-bold text-blue-600">{unit}</span>
+      </div>
+      {subtitle && <p className="mt-1 text-[11px] font-semibold text-slate-400">{subtitle}</p>}
+    </div>
+  );
+}
+
 function DashboardScreen({ overview, loading, onRefresh }) {
   const stats = overview?.stats || {};
-  const activeUserTrend = overview?.activeUserTrend || [];
-  const newUserTrend = overview?.newUserTrend || [];
+  const rawActiveTrend = overview?.activeUserTrend || [];
+  const rawNewUserTrend = overview?.newUserTrend || [];
+
+  const [activeRange, setActiveRange] = useState('30'); // '7' | '14' | '30'
+  const [newRange, setNewRange] = useState('30');
+
+  const activeTrend = useMemo(() => {
+    const count = parseInt(activeRange, 10);
+    return rawActiveTrend.slice(-count);
+  }, [rawActiveTrend, activeRange]);
+
+  const newUserTrend = useMemo(() => {
+    const count = parseInt(newRange, 10);
+    return rawNewUserTrend.slice(-count);
+  }, [rawNewUserTrend, newRange]);
+
+  const activeStats = useMemo(() => {
+    if (!activeTrend.length) return { latest: 0, peak: 0, peakDate: '--' };
+    const latest = activeTrend[activeTrend.length - 1]?.value || 0;
+    let peak = 0;
+    let peakDate = '--';
+    activeTrend.forEach((item) => {
+      if (item.value > peak) {
+        peak = item.value;
+        peakDate = item.label;
+      }
+    });
+    return { latest, peak, peakDate };
+  }, [activeTrend]);
+
+  const newStats = useMemo(() => {
+    if (!newUserTrend.length) return { sum: 0, avg: 0 };
+    const sum = newUserTrend.reduce((acc, curr) => acc + (curr.value || 0), 0);
+    const avg = (sum / newUserTrend.length).toFixed(1);
+    return { sum, avg };
+  }, [newUserTrend]);
 
   return (
     <section id="dashboard">
       <PageTitle
-        eyebrow="Hanora AI"
-        title="Tổng quan"
-        description="Số liệu hiệu suất, người dùng, tài liệu và nội dung cần xử lý theo thời gian thực."
+        eyebrow="Hanora AI Dashboard"
+        title="Tổng quan hệ thống"
+        description="Số liệu hiệu suất, người dùng, tài liệu và chỉ số tăng trưởng học viên theo thời gian thực."
         action={
-          <div className="flex gap-3">
-            <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753] transition hover:bg-[#ecedf7]">
-              <Download className="h-4 w-4" />
-              Xuất dữ liệu
-            </button>
-            <button onClick={onRefresh} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Làm mới
-            </button>
-          </div>
+          <button onClick={onRefresh} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
         }
       />
 
       <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard label="Tổng người dùng" value={formatNumber(stats.totalUsers)} delta={`+${formatNumber(stats.newUsers7d)} / 7 ngày`} icon={Users} />
-        <MetricCard label="Người dùng hoạt động" value={formatNumber(stats.activeUsers)} delta="Đang mở khóa" icon={ShieldCheck} />
-        <MetricCard label="Tài liệu mới" value={formatNumber(stats.documents7d)} delta="7 ngày qua" icon={FileText} />
-        <MetricCard label="Lượt tra cứu từ" value={formatNumber(stats.totalVocabulary)} delta={`${formatNumber(stats.vietnameseReadyVocabulary)} đã dịch`} icon={Search} />
-        <MetricCard label="Tổng XP" value={formatNumber(stats.totalXp)} delta={`${formatNumber(Math.round((stats.totalStudyMinutes || 0) / 60))} giờ học`} icon={TrendingUp} />
-        <MetricCard label="Chờ xử lý" value={formatNumber(stats.pendingReports)} delta="Cần kiểm duyệt" icon={AlertTriangle} tone={stats.pendingReports > 0 ? 'red' : 'blue'} />
+        <MetricCard label="Tổng người dùng" value={formatNumber(stats.totalUsers)} icon={Users} />
+        <MetricCard label="Người dùng hoạt động" value={formatNumber(stats.activeUsers)} icon={ShieldCheck} />
+        <MetricCard label="Tài liệu mới" value={formatNumber(stats.documents7d)} icon={FileText} />
+        <MetricCard label="Tổng từ vựng" value={formatNumber(stats.totalVocabulary)} icon={BookOpenCheck} />
+        <MetricCard label="Tổng XP tích lũy" value={formatNumber(stats.totalXp)} icon={TrendingUp} />
+        <MetricCard label="Chờ xử lý" value={formatNumber(stats.pendingReports)} icon={AlertTriangle} tone={stats.pendingReports > 0 ? 'red' : 'blue'} />
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <ChartCard title="Xu hướng người dùng hoạt động" subtitle="30 ngày gần nhất">
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={activeUserTrend}>
+        {/* Active Users Trend Chart */}
+        <div className={`${CARD} flex flex-col p-6 transition hover:shadow-md`}>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600 ring-4 ring-blue-100" />
+                <h2 className="text-lg font-black text-[#181c22]">Xu hướng người dùng hoạt động</h2>
+              </div>
+              <p className="mt-1 text-xs font-semibold text-[#717785]">Lượt học tập, đọc sách & làm Quiz mỗi ngày</p>
+            </div>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold text-slate-600">
+              {['7', '14', '30'].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setActiveRange(r)}
+                  className={`rounded-lg px-2.5 py-1 font-black transition ${
+                    activeRange === r ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {r} ngày
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-blue-100/80 bg-blue-50/40 px-4 py-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-500">Hôm nay:</span>
+              <span className="text-sm font-black text-blue-700">{formatNumber(activeStats.latest)} học viên</span>
+            </div>
+            <div className="h-3.5 w-[1px] bg-blue-200" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-500">Đỉnh kỳ:</span>
+              <span className="text-sm font-black text-slate-800">{formatNumber(activeStats.peak)} ({activeStats.peakDate})</span>
+            </div>
+          </div>
+
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={activeTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="activeUsersGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor={BLUE} stopOpacity={0.24} />
-                    <stop offset="100%" stopColor={BLUE} stopOpacity={0} />
+                    <stop offset="0%" stopColor="#005cb9" stopOpacity={0.35} />
+                    <stop offset="60%" stopColor="#3b82f6" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#e0e2ec" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#717785' }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#717785' }} />
-                <Tooltip contentStyle={{ borderRadius: 12, borderColor: '#c1c6d6' }} />
-                <Area dataKey="value" stroke={BLUE} strokeWidth={3} fill="url(#activeUsersGradient)" type="monotone" />
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <Tooltip content={<CustomChartTooltip unit="người hoạt động" subtitle="Học viên luyện tập & đọc tài liệu" />} />
+                <Area
+                  dataKey="value"
+                  stroke="#005cb9"
+                  strokeWidth={3}
+                  fill="url(#activeUsersGradient)"
+                  type="monotone"
+                  activeDot={{ r: 6, stroke: '#ffffff', strokeWidth: 3, fill: '#005cb9' }}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </ChartCard>
+        </div>
 
-        <ChartCard title="Người dùng mới hằng ngày" subtitle="Dựa trên created_at trong database">
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <BarChart data={newUserTrend}>
-                <CartesianGrid stroke="#e0e2ec" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#717785' }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#717785' }} />
-                <Tooltip contentStyle={{ borderRadius: 12, borderColor: '#c1c6d6' }} />
-                <Bar dataKey="value" fill={BLUE} radius={[8, 8, 0, 0]} />
+        {/* Daily New Users Bar Chart */}
+        <div className={`${CARD} flex flex-col p-6 transition hover:shadow-md`}>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
+                <h2 className="text-lg font-black text-[#181c22]">Người dùng mới hằng ngày</h2>
+              </div>
+              <p className="mt-1 text-xs font-semibold text-[#717785]">Tài khoản đăng ký mới theo mốc thời gian</p>
+            </div>
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold text-slate-600">
+              {['7', '14', '30'].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setNewRange(r)}
+                  className={`rounded-lg px-2.5 py-1 font-black transition ${
+                    newRange === r ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {r} ngày
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-emerald-100/80 bg-emerald-50/40 px-4 py-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-500">Tổng đăng ký:</span>
+              <span className="text-sm font-black text-emerald-700">+{formatNumber(newStats.sum)} tài khoản</span>
+            </div>
+            <div className="h-3.5 w-[1px] bg-emerald-200" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-500">Trung bình:</span>
+              <span className="text-sm font-black text-slate-800">{newStats.avg} người/ngày</span>
+            </div>
+          </div>
+
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={newUserTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="newUserBarGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#0b74e5" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <Tooltip content={<CustomChartTooltip unit="đăng ký mới" subtitle="Tài khoản gia nhập hệ thống" />} />
+                <Bar dataKey="value" fill="url(#newUserBarGradient)" radius={[6, 6, 2, 2]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </ChartCard>
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <MiniList title="Top học viên" rows={(overview?.topUsers || []).map((u) => ({
+        <MiniList title="Top học viên xuất sắc" rows={(overview?.topUsers || []).map((u) => ({
           title: u.displayName || u.username,
           subtitle: u.email,
           value: `${formatNumber(u.totalXp)} XP`,
@@ -536,66 +775,232 @@ function RevenueScreen({ revenue, loading }) {
   );
 }
 
-function UsersScreen({ users, query, setQuery, statusFilter, setStatusFilter, loading, onUpdate }) {
+function UsersScreen({
+  data,
+  query,
+  setQuery,
+  roleFilter,
+  setRoleFilter,
+  statusFilter,
+  setStatusFilter,
+  page,
+  setPage,
+  pageSize,
+  setPageSize,
+  loading,
+  onUpdate,
+  onExportCsv,
+}) {
+  const items = data?.items || [];
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+  const activeTotal = data?.activeTotal || 0;
+  const lockedTotal = data?.lockedTotal || 0;
+  const adminTotal = data?.adminTotal || 0;
+
+  const startRecord = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endRecord = Math.min(page * pageSize, total);
+
+  // Generate page numbers array with ellipses
+  const pageNumbers = useMemo(() => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push('...');
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      if (page < totalPages - 2) pages.push('...');
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    return pages;
+  }, [page, totalPages]);
+
   return (
     <section id="users">
       <PageTitle
         eyebrow="User Management"
         title="Quản lý người dùng"
-        description="Quản lý quyền truy cập, theo dõi mức độ sử dụng và khóa/mở khóa tài khoản."
-        action={<button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white"><Users className="h-4 w-4" />Tạo tài khoản</button>}
+        description="Quản lý quyền truy cập, theo dõi mức độ sử dụng, phân trang và xuất dữ liệu học viên."
       />
 
-      <div className={`${CARD} mb-4 flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between`}>
-        <label className="relative block w-full lg:max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#717785]" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 w-full rounded-xl border border-[#c1c6d6]/70 bg-[#f2f3fd] pl-10 pr-4 text-sm font-semibold outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30" placeholder="Tìm theo tên, email, ID..." />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753]">
-            <option>All</option>
-            <option>Active</option>
-            <option>Locked</option>
-          </select>
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753]"><Download className="h-4 w-4" />Xuất CSV</button>
+      {/* Summary KPI Badges */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div
+          onClick={() => {
+            setStatusFilter('All');
+            setRoleFilter('All');
+          }}
+          className={`cursor-pointer rounded-2xl border p-3.5 transition ${
+            statusFilter === 'All' && roleFilter === 'All'
+              ? 'border-[#005cb9] bg-[#d5e0f8]/30'
+              : 'border-[#c1c6d6]/40 bg-white hover:border-[#005cb9]/50'
+          }`}
+        >
+          <p className="text-xs font-bold text-[#717785]">Tất cả người dùng</p>
+          <p className="mt-1 text-xl font-black text-[#181c22]">{formatNumber(total)}</p>
+        </div>
+        <div
+          onClick={() => {
+            setStatusFilter('Active');
+            setRoleFilter('All');
+          }}
+          className={`cursor-pointer rounded-2xl border p-3.5 transition ${
+            statusFilter === 'Active' && roleFilter === 'All'
+              ? 'border-emerald-600 bg-emerald-50'
+              : 'border-[#c1c6d6]/40 bg-white hover:border-emerald-500/50'
+          }`}
+        >
+          <p className="text-xs font-bold text-emerald-700">Đang hoạt động</p>
+          <p className="mt-1 text-xl font-black text-emerald-800">{formatNumber(activeTotal)}</p>
+        </div>
+        <div
+          onClick={() => {
+            setStatusFilter('Locked');
+            setRoleFilter('All');
+          }}
+          className={`cursor-pointer rounded-2xl border p-3.5 transition ${
+            statusFilter === 'Locked'
+              ? 'border-rose-600 bg-rose-50'
+              : 'border-[#c1c6d6]/40 bg-white hover:border-rose-500/50'
+          }`}
+        >
+          <p className="text-xs font-bold text-rose-700">Tài khoản bị khóa</p>
+          <p className="mt-1 text-xl font-black text-rose-800">{formatNumber(lockedTotal)}</p>
+        </div>
+        <div
+          onClick={() => {
+            setRoleFilter('Admin');
+            setStatusFilter('All');
+          }}
+          className={`cursor-pointer rounded-2xl border p-3.5 transition ${
+            roleFilter === 'Admin'
+              ? 'border-indigo-600 bg-indigo-50'
+              : 'border-[#c1c6d6]/40 bg-white hover:border-indigo-500/50'
+          }`}
+        >
+          <p className="text-xs font-bold text-indigo-700">Quản trị viên (Admin)</p>
+          <p className="mt-1 text-xl font-black text-indigo-800">{formatNumber(adminTotal)}</p>
         </div>
       </div>
 
-      {loading ? <LoadingState /> : users.length === 0 ? <EmptyState icon={Users} title="Không có người dùng phù hợp." /> : (
-        <div className={`${CARD} overflow-hidden`}>
+      {/* Filter toolbar */}
+      <div className={`${CARD} mb-4 flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between`}>
+        <label className="relative block w-full lg:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#717785]" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-11 w-full rounded-xl border border-[#c1c6d6]/70 bg-[#f2f3fd] pl-10 pr-4 text-sm font-semibold outline-none focus:border-[#0b74e5] focus:ring-4 focus:ring-[#abc7ff]/30"
+            placeholder="Tìm theo tên, email, username..."
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value)}
+            className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] focus:border-[#0b74e5] focus:outline-none"
+          >
+            <option value="All">Tất cả vai trò</option>
+            <option value="User">User (Học viên)</option>
+            <option value="Admin">Admin (Quản trị)</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] focus:border-[#0b74e5] focus:outline-none"
+          >
+            <option value="All">Tất cả trạng thái</option>
+            <option value="Active">Đang hoạt động</option>
+            <option value="Locked">Đã khóa</option>
+          </select>
+
+          <select
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+            className="h-11 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-sm font-bold text-[#414753] focus:border-[#0b74e5] focus:outline-none"
+          >
+            <option value={10}>10 / trang</option>
+            <option value={20}>20 / trang</option>
+            <option value={50}>50 / trang</option>
+            <option value={100}>100 / trang</option>
+          </select>
+
+          <button
+            onClick={onExportCsv}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#005cb9] bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#004a96] active:scale-95"
+            title="Tải danh sách người dùng ra định dạng CSV UTF-8"
+          >
+            <Download className="h-4 w-4" />
+            Xuất CSV
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <LoadingState />
+      ) : items.length === 0 ? (
+        <EmptyState icon={Users} title="Không tìm thấy người dùng phù hợp với bộ lọc." />
+      ) : (
+        <div className={`${CARD} overflow-hidden shadow-sm`}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left">
               <thead className="border-b border-[#c1c6d6]/60 bg-[#f2f3fd] text-xs uppercase tracking-wider text-[#414753]">
                 <tr>
-                  <th className="px-6 py-4 font-black">Tên</th>
+                  <th className="px-6 py-4 font-black">Học viên</th>
                   <th className="px-6 py-4 font-black">Email</th>
                   <th className="px-6 py-4 font-black">Vai trò</th>
-                  <th className="px-6 py-4 font-black">Học tập</th>
-                  <th className="px-6 py-4 font-black">Ngày tạo</th>
+                  <th className="px-6 py-4 font-black">Tiến độ & Học tập</th>
+                  <th className="px-6 py-4 font-black">Ngày tham gia</th>
                   <th className="px-6 py-4 font-black">Trạng thái</th>
                   <th className="px-6 py-4 text-center font-black">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#c1c6d6]/30 bg-white">
-                {users.map((user) => (
+                {items.map((user) => (
                   <tr key={user.id} className={`group transition hover:bg-[#f2f3fd]/70 ${!user.isActive ? 'bg-red-50/40' : ''}`}>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d5e0f8] text-sm font-black text-[#005cb9]">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d5e0f8] text-sm font-black text-[#005cb9]">
                           {(user.displayName || user.username || user.email).charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-black text-[#181c22] group-hover:text-[#005cb9]">{user.displayName || user.username}</span>
+                        <div>
+                          <p className="font-black text-[#181c22] group-hover:text-[#005cb9]">{user.displayName || user.username}</p>
+                          <p className="text-xs text-[#717785]">@{user.username} • ID: {user.id}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-sm font-semibold text-[#414753]">{user.email}</td>
-                    <td className="px-6 py-5"><StatusBadge value={user.role} /></td>
-                    <td className="px-6 py-5 text-sm font-bold text-[#414753]">{formatNumber(user.totalXp)} XP<br /><span className="text-xs text-[#717785]">{user.documentCount} tài liệu</span></td>
-                    <td className="px-6 py-5 text-sm font-semibold text-[#414753]">{formatDate(user.createdAt)}</td>
-                    <td className="px-6 py-5"><StatusBadge value={user.isActive ? 'Active' : 'Locked'} /></td>
-                    <td className="px-6 py-5">
-                      <div className="flex justify-center gap-2 opacity-100 lg:opacity-0 lg:transition lg:group-hover:opacity-100">
-                        <button onClick={() => onUpdate(user, { role: user.role === 'Admin' ? 'User' : 'Admin' })} className="rounded-xl p-2 text-[#414753] transition hover:bg-[#ecedf7] hover:text-[#005cb9]"><ShieldCheck className="h-4 w-4" /></button>
-                        <button onClick={() => onUpdate(user, { isActive: !user.isActive })} className={`rounded-xl p-2 transition ${user.isActive ? 'text-red-700 hover:bg-red-50' : 'text-emerald-700 hover:bg-emerald-50'}`}>
+                    <td className="px-6 py-4 text-sm font-semibold text-[#414753]">{user.email}</td>
+                    <td className="px-6 py-4"><StatusBadge value={user.role} /></td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#414753]">
+                      <span className="text-[#005cb9]">{formatNumber(user.totalXp)} XP</span>
+                      <div className="flex items-center gap-2 text-xs font-medium text-[#717785]">
+                        <span>🔥 {user.currentStreakDays} ngày</span>
+                        <span>•</span>
+                        <span>📚 {user.documentCount} tài liệu</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-[#414753]">{formatDate(user.createdAt)}</td>
+                    <td className="px-6 py-4"><StatusBadge value={user.isActive ? 'Active' : 'Locked'} /></td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => onUpdate(user, { role: user.role === 'Admin' ? 'User' : 'Admin' })}
+                          title={user.role === 'Admin' ? 'Chuyển sang User thường' : 'Cấp quyền Quản trị (Admin)'}
+                          className="rounded-xl p-2 text-[#414753] transition hover:bg-[#ecedf7] hover:text-[#005cb9]"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onUpdate(user, { isActive: !user.isActive })}
+                          title={user.isActive ? 'Khóa tài khoản này' : 'Mở khóa tài khoản'}
+                          className={`rounded-xl p-2 transition ${user.isActive ? 'text-red-700 hover:bg-red-50' : 'text-emerald-700 hover:bg-emerald-50'}`}
+                        >
                           {user.isActive ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
                         </button>
                       </div>
@@ -604,6 +1009,60 @@ function UsersScreen({ users, query, setQuery, statusFilter, setStatusFilter, lo
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-[#c1c6d6]/50 bg-[#f9f9ff] px-6 py-4 sm:flex-row">
+            <p className="text-sm font-bold text-[#717785]">
+              Hiển thị <span className="text-[#181c22]">{startRecord} - {endRecord}</span> trong tổng số{' '}
+              <span className="text-[#181c22]">{formatNumber(total)}</span> người dùng
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-xs font-black text-[#414753] transition hover:bg-[#ecedf7] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Trước
+              </button>
+
+              <div className="flex items-center gap-1">
+                {pageNumbers.map((p, idx) => {
+                  if (p === '...') {
+                    return (
+                      <span key={`dots-${idx}`} className="px-2 text-xs font-bold text-[#717785]">
+                        ...
+                      </span>
+                    );
+                  }
+                  const isCurrent = p === page;
+                  return (
+                    <button
+                      key={`page-${p}`}
+                      onClick={() => setPage(p)}
+                      className={`h-9 min-w-[36px] rounded-xl px-2 text-xs font-black transition ${
+                        isCurrent
+                          ? 'bg-[#005cb9] text-white shadow-sm'
+                          : 'border border-[#c1c6d6]/60 bg-white text-[#414753] hover:bg-[#ecedf7]'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#c1c6d6]/70 bg-white px-3 text-xs font-black text-[#414753] transition hover:bg-[#ecedf7] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Sau
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -625,45 +1084,30 @@ function SearchStatsScreen({ data, loading }) {
       />
 
       <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <MetricCard label="Tổng lượt tra cứu" value={formatNumber(summary.totalLookups)} delta="từ user_vocabulary" icon={Search} />
-        <MetricCard label="Lượt tra hôm nay" value={formatNumber(summary.todayLookups)} delta="+ hôm nay" icon={Clock} />
-        <MetricCard label="Người dùng đang tra cứu" value={formatNumber(summary.activeUsers)} delta="real-time pulse" icon={Users} tone="red" />
+        <MetricCard label="Tổng lượt tra cứu" value={formatNumber(summary.totalLookups)} icon={Search} />
+        <MetricCard label="Lượt tra hôm nay" value={formatNumber(summary.todayLookups)} icon={Clock} />
+        <MetricCard label="Người dùng đang học từ" value={formatNumber(summary.activeUsers)} icon={Users} />
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <ChartCard title="Lượt tra theo ngày" subtitle="7 ngày gần nhất" className="lg:col-span-2">
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={data?.dailyLookups || []}>
+      <div className="mb-8">
+        <ChartCard title="Xu hướng tra cứu từ vựng" subtitle="14 ngày gần nhất">
+          <div className="h-[340px] w-full">
+            <ResponsiveContainer width="100%" height={340}>
+              <AreaChart data={data?.dailyLookups || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="lookupGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor={BLUE} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={BLUE} stopOpacity={0} />
+                    <stop offset="0%" stopColor="#005cb9" stopOpacity={0.35} />
+                    <stop offset="60%" stopColor="#3b82f6" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#e0e2ec" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Area dataKey="value" stroke={BLUE} strokeWidth={3} fill="url(#lookupGradient)" type="monotone" />
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                <Tooltip content={<CustomChartTooltip unit="lượt tra cứu" subtitle="Từ vựng được tìm kiếm & lưu" />} />
+                <Area dataKey="value" stroke="#005cb9" strokeWidth={3} fill="url(#lookupGradient)" type="monotone" activeDot={{ r: 6, stroke: '#fff', strokeWidth: 3, fill: '#005cb9' }} />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard title="Thiết bị truy cập">
-          <div className="space-y-6">
-            {(data?.deviceSegments || []).map((item) => (
-              <div key={item.label}>
-                <div className="mb-2 flex items-end justify-between text-sm font-bold">
-                  <span className="text-[#414753]">{item.label}</span>
-                  <span>{item.value}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[#ecedf7]">
-                  <div className="h-full rounded-full" style={{ width: `${item.value}%`, background: item.color }} />
-                </div>
-              </div>
-            ))}
           </div>
         </ChartCard>
       </div>
@@ -696,6 +1140,7 @@ function TranslationsScreen({
   setPageSize,
   loading,
   onUpdate,
+  onBatchApprove,
 }) {
   const pageData = items || {
     items: [],
@@ -743,7 +1188,15 @@ function TranslationsScreen({
         eyebrow="Translation Approval"
         title="Phê duyệt dịch thuật"
         description="Xem xét các từ/câu đang thiếu bản dịch tiếng Việt và phê duyệt nội dung để đưa vào kho học liệu."
-        action={<button className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white"><CheckCircle2 className="h-4 w-4" />Phê duyệt hàng loạt</button>}
+        action={
+          <button
+            onClick={onBatchApprove}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Phê duyệt trang này
+          </button>
+        }
       />
 
       <div className={`${CARD} mb-5 p-4`}>

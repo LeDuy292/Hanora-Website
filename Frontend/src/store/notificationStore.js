@@ -46,11 +46,11 @@ export const useNotificationStore = create((set) => ({
   closeConfirm: () => set({ confirmModal: null })
 }));
 
-// Export helper shortcuts
 export const toast = {
   success: (msg, duration) => useNotificationStore.getState().addToast(msg, 'success', duration),
   info: (msg, duration) => useNotificationStore.getState().addToast(msg, 'info', duration),
   warning: (msg, duration) => useNotificationStore.getState().addToast(msg, 'warning', duration),
   error: (msg, duration) => useNotificationStore.getState().addToast(msg, 'error', duration),
+  loading: (msg, duration = 2000) => useNotificationStore.getState().addToast(msg, 'info', duration),
   confirm: (msg, onConfirm, title) => useNotificationStore.getState().showConfirm(msg, onConfirm, title)
 };
