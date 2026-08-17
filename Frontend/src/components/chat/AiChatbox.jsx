@@ -225,7 +225,7 @@ export function AiChatbox() {
               <img
                 src={logoImg}
                 alt="Hanora logo"
-                className="w-6 h-6 object-contain"
+                className="h-6 w-auto max-w-[80px] object-contain"
               />
               <div>
                 <h3 className="text-sm font-bold tracking-wide">Hanora AI Tutor</h3>

@@ -35,16 +35,14 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-screen fixed top-0 left-0 z-30 overflow-y-auto shadow-[0_8px_30px_rgb(15,23,42,0.02)]">
       {/* Brand Header */}
-      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-        <img
-          src={logoImg}
-          className="w-9 h-9 object-contain rounded-xl border border-slate-100"
-          alt="Hanora logo"
-        />
-        <div>
-          <h1 className="text-base font-bold text-slate-900 tracking-wide">Hanora</h1>
-          <p className="text-[10px] text-blue-500 font-bold tracking-widest uppercase">Trung Tâm Học Tập</p>
-        </div>
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-center bg-gradient-to-b from-blue-50/70 via-sky-50/30 to-white">
+        <NavLink to="/" className="flex items-center justify-center w-full group">
+          <img
+            src={logoImg}
+            className="h-16 sm:h-18 w-auto max-w-[210px] object-contain transition-transform duration-300 group-hover:scale-105"
+            alt="Hanora logo"
+          />
+        </NavLink>
       </div>
 
       {/* User Stats Card */}

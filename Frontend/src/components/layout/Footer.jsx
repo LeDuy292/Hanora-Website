@@ -8,10 +8,9 @@ export function Footer() {
           <div className="flex items-center gap-2">
             <img
               src={logoImg}
-              className="w-8 h-8 object-contain rounded-lg"
+              className="h-8 w-auto object-contain"
               alt="Hanora logo"
             />
-            <span className="text-sm font-extrabold text-slate-800">Hanora</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
             Trung tâm hỗ trợ ôn tập, đọc hiểu chữ Hán hàng đầu Việt Nam giúp bạn làm chủ tiếng Trung tự nhiên qua từng văn cảnh.
