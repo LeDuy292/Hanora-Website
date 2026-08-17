@@ -353,11 +353,20 @@ public class DocumentsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetLibraryDocuments()
     {
-        Response.Headers["Cache-Control"] = "public, max-age=600";
-        var docs = await _db.Documents
-            .Where(d => 
-                EF.Functions.ILike(d.Title, "%hsk%") || 
-                EF.Functions.ILike(d.OriginalFilename, "%hsk%"))
+        Response.Headers["Cache-Control"] = "no-cache";
+        var query = _db.Documents.AsNoTracking().AsQueryable();
+
+        // Must be official HSK book
+        query = query.Where(d => 
+            EF.Functions.ILike(d.Title, "(HSK%") || 
+            (EF.Functions.ILike(d.Title, "%HSK%") && (EF.Functions.ILike(d.Title, "%Sách giáo trình%") || EF.Functions.ILike(d.Title, "%Sách bài tập%"))));
+
+        // Must NOT be mock learner documents or test papers
+        query = query.Where(d => d.OriginalFilename == null || !d.OriginalFilename.Contains("_doc_"));
+        query = query.Where(d => d.FileUrl == null || (!d.FileUrl.Contains("/seed/") && !d.FileUrl.Contains("hanora-storage")));
+        query = query.Where(d => !EF.Functions.ILike(d.Title, "%ZHENTI%"));
+
+        var docs = await query
             .OrderBy(d => d.Title)
             .Select(d => new
             {
