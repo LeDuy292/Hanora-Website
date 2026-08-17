@@ -225,7 +225,13 @@ export function LibraryPage() {
       setLoading(true);
       setError(null);
       const data = await getLibraryDocuments();
-      const hskDocs = data.filter(doc => detectHskLevel(doc) !== null);
+      const hskDocs = (data || []).filter(doc => 
+        detectHskLevel(doc) !== null && 
+        !doc.title?.toLowerCase().includes('zhenti') &&
+        !doc.originalFilename?.toLowerCase().includes('zhenti') &&
+        !doc.originalFilename?.includes('_doc_') && 
+        !doc.fileUrl?.includes('/seed/')
+      );
       setDocuments(hskDocs);
     } catch (err) {
       setError('Không thể tải danh sách sách. Vui lòng thử lại.');
