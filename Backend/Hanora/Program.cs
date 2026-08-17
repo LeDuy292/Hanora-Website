@@ -30,7 +30,19 @@ namespace Hanora
             {
                 connectionString = "Host=reseau.proxy.rlwy.net;Port=32993;Database=railway;Username=postgres;Password=yMEnWyNEDKcPQRgdrnzlXclATiyOjZjo";
             }
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
+            var connStrBuilder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Timeout = 30,
+                CommandTimeout = 60,
+                KeepAlive = 15,
+                ConnectionIdleLifetime = 45,
+                ConnectionPruningInterval = 10,
+                Pooling = true,
+                MinPoolSize = 1,
+                MaxPoolSize = 25
+            };
+
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connStrBuilder.ConnectionString);
             dataSourceBuilder.MapEnum<BusinessObjects.Models.ChannelType>("channel_type_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.DocumentStatus>("document_status_enum");
             dataSourceBuilder.MapEnum<BusinessObjects.Models.FlashcardMode>("flashcard_mode_enum");
@@ -44,7 +56,13 @@ namespace Hanora
 
             var dataSource = dataSourceBuilder.Build();
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(dataSource));
+                options.UseNpgsql(dataSource, npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null);
+                }));
 
             // DI
             builder.Services.AddScoped<IUserRepository, UserRepository>();

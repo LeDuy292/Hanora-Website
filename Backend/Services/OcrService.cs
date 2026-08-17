@@ -266,10 +266,12 @@ public class OcrService : IOcrService
                 ?? throw new InvalidOperationException("AzureComputerVision:Key is not configured.");
 
             byte[] singlePageBytes;
+            bool extractedSinglePage = false;
             try
             {
                 using var srcMs = new MemoryStream(bytes);
                 using var srcReader = new iText.Kernel.Pdf.PdfReader(srcMs);
+                srcReader.SetUnethicalReading(true);
                 using var srcDoc = new iText.Kernel.Pdf.PdfDocument(srcReader);
                 using var destMs = new MemoryStream();
                 using (var writer = new iText.Kernel.Pdf.PdfWriter(destMs))
@@ -278,6 +280,7 @@ public class OcrService : IOcrService
                     srcDoc.CopyPagesTo(pageNumber, pageNumber, destDoc);
                 }
                 singlePageBytes = destMs.ToArray();
+                extractedSinglePage = true;
             }
             catch (Exception ex)
             {
@@ -285,8 +288,9 @@ public class OcrService : IOcrService
                 singlePageBytes = bytes;
             }
 
-            // We query page 1 of our newly generated single-page PDF
-            var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, "1");
+            // If we managed to extract a single page, query page 1 of it; otherwise query original pageNumber
+            var queryPage = extractedSinglePage ? "1" : pageNumber.ToString();
+            var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, queryPage);
             if (!string.IsNullOrWhiteSpace(pagePass.errorMessage))
             {
                 return (null, pagePass.errorMessage);
@@ -358,10 +362,12 @@ public class OcrService : IOcrService
                     await Task.Delay(200);
 
                     byte[] singlePageBytes;
+                    bool extractedSinglePage = false;
                     try
                     {
                         using var srcMs = new MemoryStream(bytes);
                         using var srcReader = new iText.Kernel.Pdf.PdfReader(srcMs);
+                        srcReader.SetUnethicalReading(true);
                         using var srcDoc = new iText.Kernel.Pdf.PdfDocument(srcReader);
                         using var destMs = new MemoryStream();
                         using (var writer = new iText.Kernel.Pdf.PdfWriter(destMs))
@@ -370,6 +376,7 @@ public class OcrService : IOcrService
                             srcDoc.CopyPagesTo(missingPage, missingPage, destDoc);
                         }
                         singlePageBytes = destMs.ToArray();
+                        extractedSinglePage = true;
                     }
                     catch (Exception ex)
                     {
@@ -377,7 +384,8 @@ public class OcrService : IOcrService
                         singlePageBytes = bytes;
                     }
 
-                    var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, "1");
+                    var queryPage = extractedSinglePage ? "1" : missingPage.ToString();
+                    var pagePass = await AnalyzeAzureReadPdfAsync(singlePageBytes, endpoint, key, queryPage);
                     if (!string.IsNullOrWhiteSpace(pagePass.errorMessage))
                     {
                         _logger.LogWarning("Azure Read page {PageNumber} fallback failed: {Error}", missingPage, pagePass.errorMessage);
