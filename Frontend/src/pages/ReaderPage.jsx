@@ -1754,7 +1754,6 @@ const ReaderPage = () => {
 
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (() => {
-        const halfWidth = bubbleWidth / 2;
         let viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
         
         // If sidebar is open and displayed as a vertical panel on the right (sm breakpoint)
@@ -1762,22 +1761,23 @@ const ReaderPage = () => {
           viewportWidth -= 436; // 420px (sidebar width) + 16px (spacing/padding)
         }
 
-        // Center horizontally in the available viewport width
-        const clampedX = viewportWidth / 2;
+        // Align to the left of the screen at 50px
+        const clampedX = 50;
         const arrowOffset = bubbleMenu.x - clampedX;
         
-        const maxArrowOffset = Math.max(0, halfWidth - 20);
-        const clampedArrowOffset = Math.max(-maxArrowOffset, Math.min(maxArrowOffset, arrowOffset));
+        const clampedArrowOffset = bubbleWidth > 0 
+          ? Math.max(16, Math.min(bubbleWidth - 16, arrowOffset)) 
+          : 0;
 
         return (
           <div
             ref={bubbleMenuRef}
             className="reader-bubble-menu fixed z-[100] flex items-center gap-1 overflow-x-auto rounded-2xl border border-gray-800 bg-gray-950/95 p-1.5 text-[11px] text-white shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
             style={{
-              left: `${bubbleWidth > 0 ? clampedX : bubbleMenu.x}px`,
+              left: `${clampedX}px`,
               top: `${bubbleMenu.y}px`,
-              transform: 'translate(-50%, -100%)',
-              maxWidth: `${viewportWidth - 24}px`
+              transform: 'translate(0, -100%)',
+              maxWidth: `${viewportWidth - 74}px`
             }}
             onMouseDown={(event) => event.preventDefault()}
           >
@@ -1859,8 +1859,8 @@ const ReaderPage = () => {
             <div
               className="absolute top-full border-[6px] border-transparent border-t-gray-950"
               style={{
-                left: '50%',
-                transform: `translate(calc(-50% + ${bubbleWidth > 0 ? clampedArrowOffset : 0}px), 0)`
+                left: '0px',
+                transform: `translate(calc(${clampedArrowOffset}px - 50%), 0)`
               }}
             />
           </div>
