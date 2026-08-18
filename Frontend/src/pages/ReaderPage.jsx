@@ -234,7 +234,7 @@ const ReaderPage = () => {
   const [sidebarTab, setSidebarTab] = useState('dict'); // dict, chat, stats
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
-    return window.matchMedia('(min-width: 1024px)').matches;
+    return window.matchMedia('(min-width: 1280px)').matches;
   });
   const [readerSidebarTop, setReaderSidebarTop] = useState(216);
   const [readerSidebarBottom, setReaderSidebarBottom] = useState(8);
@@ -353,7 +353,7 @@ const ReaderPage = () => {
   useEffect(() => () => clearLongPressTimer(), []);
   useEffect(() => {
     const syncSidebarForViewport = () => {
-      if (window.matchMedia('(min-width: 1024px)').matches) {
+      if (window.matchMedia('(min-width: 1280px)').matches) {
         setIsSidebarOpen(true);
       } else {
         setIsSidebarOpen(false);
@@ -1755,31 +1755,29 @@ const ReaderPage = () => {
       {/* Bubble Context Menu */}
       {bubbleMenu.visible && (() => {
         const halfWidth = bubbleWidth / 2;
-        const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
-        let clampedX = bubbleMenu.x;
-        let arrowOffset = 0;
-        if (bubbleWidth > 0) {
-          const minX = halfWidth + 12;
-          const maxX = viewportWidth - halfWidth - 12;
-          if (clampedX < minX) {
-            clampedX = minX;
-            arrowOffset = bubbleMenu.x - minX;
-          } else if (clampedX > maxX) {
-            clampedX = maxX;
-            arrowOffset = bubbleMenu.x - maxX;
-          }
+        let viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+        
+        // If sidebar is open and displayed as a vertical panel on the right (sm breakpoint)
+        if (isSidebarOpen && viewportWidth >= 640) {
+          viewportWidth -= 436; // 420px (sidebar width) + 16px (spacing/padding)
         }
+
+        // Center horizontally in the available viewport width
+        const clampedX = viewportWidth / 2;
+        const arrowOffset = bubbleMenu.x - clampedX;
+        
         const maxArrowOffset = Math.max(0, halfWidth - 20);
         const clampedArrowOffset = Math.max(-maxArrowOffset, Math.min(maxArrowOffset, arrowOffset));
 
         return (
           <div
             ref={bubbleMenuRef}
-            className="reader-bubble-menu fixed z-[100] flex max-w-[calc(100vw-24px)] items-center gap-1 overflow-x-auto rounded-2xl border border-gray-800 bg-gray-950/95 p-1.5 text-[11px] text-white shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+            className="reader-bubble-menu fixed z-[100] flex items-center gap-1 overflow-x-auto rounded-2xl border border-gray-800 bg-gray-950/95 p-1.5 text-[11px] text-white shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
             style={{
               left: `${bubbleWidth > 0 ? clampedX : bubbleMenu.x}px`,
               top: `${bubbleMenu.y}px`,
-              transform: 'translate(-50%, -100%)'
+              transform: 'translate(-50%, -100%)',
+              maxWidth: `${viewportWidth - 24}px`
             }}
             onMouseDown={(event) => event.preventDefault()}
           >
@@ -2950,7 +2948,7 @@ const ReaderPage = () => {
           {isSidebarOpen && (
             <div
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900/30 backdrop-blur-[1px] z-[60] lg:hidden"
+              className="fixed inset-0 bg-slate-900/30 backdrop-blur-[1px] z-[60] xl:hidden"
             />
           )}
 
@@ -2958,8 +2956,8 @@ const ReaderPage = () => {
           {document && (
             <div
               className={`bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-[70] ${isSidebarOpen
-                ? 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-0 sm:inset-x-auto sm:right-4 sm:w-[420px] lg:fixed lg:right-2 lg:top-[var(--reader-sidebar-top)] lg:bottom-[var(--reader-sidebar-bottom)] lg:h-auto lg:min-h-0 lg:max-h-none lg:w-[clamp(340px,24vw,430px)] lg:min-w-0 lg:max-w-none lg:rounded-3xl'
-                : 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-[calc(100%+6rem)] sm:inset-x-auto sm:right-4 sm:w-[420px] lg:hidden lg:translate-y-0'
+                ? 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-0 sm:inset-x-auto sm:right-4 sm:w-[420px] xl:fixed xl:right-2 xl:top-[var(--reader-sidebar-top)] xl:bottom-[var(--reader-sidebar-bottom)] xl:h-auto xl:min-h-0 xl:max-h-none xl:w-[clamp(340px,24vw,430px)] xl:min-w-0 xl:max-w-none xl:rounded-3xl'
+                : 'fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] top-auto h-[min(66vh,620px)] max-h-[calc(100svh-7rem)] w-auto rounded-2xl translate-y-[calc(100%+6rem)] sm:inset-x-auto sm:right-4 sm:w-[420px] xl:hidden xl:translate-y-0'
                 }`}
               style={{ '--reader-sidebar-top': `${readerSidebarTop}px`, '--reader-sidebar-bottom': `${readerSidebarBottom}px` }}
             >

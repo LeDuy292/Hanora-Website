@@ -2,7 +2,7 @@ import logoImg from '../../assets/logo.png';
 
 export function Footer() {
   return (
-    <footer className="bg-white border-t border-slate-100 text-slate-500 text-xs px-4 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] lg:pb-12">
+    <footer className="bg-white border-t border-slate-100 text-slate-500 text-xs px-4 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] xl:pb-12">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8 text-left">
         <div className="space-y-3">
           <div className="flex items-center gap-2">
