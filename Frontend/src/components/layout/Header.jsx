@@ -154,7 +154,7 @@ export function Header({ offsetTop }) {
         {/* Mobile menu toggle */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="lg:hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white hover:bg-white/10 hover:text-white/80 transition-colors"
+          className="xl:hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white hover:bg-white/10 hover:text-white/80 transition-colors"
         >
           {isMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
@@ -162,7 +162,7 @@ export function Header({ offsetTop }) {
 
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
-        <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#32A0F4] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 lg:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#32A0F4] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 xl:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
           {user && (
             <div className="flex items-center gap-6 pb-4 border-b border-white/20 text-xs font-black uppercase tracking-widest text-white/95">
               <div className="flex items-center gap-1.5">
