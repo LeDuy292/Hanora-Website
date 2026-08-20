@@ -57,8 +57,27 @@ namespace Services
                  (u.UserStat.TotalStudyMinutes ?? 0) > 0)).ToList();
 
             // 2. Fetch progress logs and reading progress to compute period stats
-            var progressLogs = await _db.LearningProgresses.ToListAsync();
-            var readingProgressList = await _db.DocumentReadingProgresses.Include(p => p.Document).ToListAsync();
+            DateOnly dateBoundary = period == "today" ? today : (period == "weekly" ? startOfWeek : startOfMonth);
+            DateTime timeBoundaryUtc = period == "today" ? DateTime.SpecifyKind(today.ToDateTime(TimeOnly.MinValue) - VietnamOffset, DateTimeKind.Utc) : (period == "weekly" ? startOfWeekUtc : startOfMonthUtc);
+
+            var progressLogs = new List<LearningProgress>();
+            if (period != "global")
+            {
+                progressLogs = await _db.LearningProgresses
+                    .Where(p => p.ActivityDate >= dateBoundary)
+                    .ToListAsync();
+            }
+
+            var readingProgressList = new List<DocumentReadingProgress>();
+            if (criteria == "reading")
+            {
+                var query = _db.DocumentReadingProgresses.Include(p => p.Document).AsQueryable();
+                if (period != "global")
+                {
+                    query = query.Where(p => p.LastReadAt >= timeBoundaryUtc);
+                }
+                readingProgressList = await query.ToListAsync();
+            }
 
             // 3. Calculate score for each user
             var list = new List<LeaderboardUserDto>();
@@ -89,19 +108,15 @@ namespace Services
 
                 if (period == "today" || period == "weekly" || period == "monthly")
                 {
-                    DateOnly dateBoundary = period == "today" ? today : (period == "weekly" ? startOfWeek : startOfMonth);
-                    DateTime timeBoundaryUtc = period == "today" ? DateTime.SpecifyKind(today.ToDateTime(TimeOnly.MinValue) - VietnamOffset, DateTimeKind.Utc) : (period == "weekly" ? startOfWeekUtc : startOfMonthUtc);
-
-                    periodXp = period == "today" ? (stats.XpToday ?? 0) : (period == "weekly" ? (stats.XpThisWeek ?? 0) : (stats.XpThisMonth ?? 0));
-                    
-                    var userProgress = progressLogs.Where(p => p.UserId == u.Id && p.ActivityDate >= dateBoundary).ToList();
+                    var userProgress = progressLogs.Where(p => p.UserId == u.Id).ToList();
+                    periodXp = userProgress.Sum(p => p.XpEarned ?? 0);
                     periodVocab = userProgress.Sum(p => p.NewWordsSaved ?? 0);
                     periodPractice = userProgress.Sum(p => (p.FlashcardsReviewed ?? 0) + (p.QuizzesCompleted ?? 0));
                     periodReadingDocs = userProgress.Sum(p => p.DocumentsRead ?? 0);
                     periodReadingMins = userProgress.Sum(p => p.StudyMinutes ?? 0);
 
                     periodReadingChars = readingProgressList
-                        .Where(p => p.UserId == u.Id && p.LastReadAt >= timeBoundaryUtc)
+                        .Where(p => p.UserId == u.Id)
                         .Sum(p => (p.Document != null && p.Document.ExtractedText != null)
                             ? ((double)(p.ProgressPercent ?? 0) / 100.0 * p.Document.ExtractedText.Length)
                             : 0.0);
@@ -163,6 +178,7 @@ namespace Services
 
             // 4. Sort list and assign ranks
             var sortedList = list
+                .Where(x => period == "global" || x.Score > 0)
                 .OrderByDescending(x => x.Score)
                 .ThenByDescending(x => x.UserId) // break ties consistently
                 .Select((item, index) => new LeaderboardUserDto

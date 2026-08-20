@@ -39,10 +39,16 @@ export function ProfilePage() {
   useEffect(() => {
     if (!user) {
       navigate('/login');
-    } else {
+    }
+  }, [user, navigate]);
+
+  // Refresh profile once on mount
+  useEffect(() => {
+    if (user) {
       refreshProfile();
     }
-  }, [user, navigate, refreshProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshProfile]);
 
   // Form State
   const [fullName, setFullName] = useState('');
