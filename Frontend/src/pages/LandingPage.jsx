@@ -565,8 +565,8 @@ export function LandingPage() {
       </section>
 
       {/* SECTION 3: Bảng giá (Pricing) */}
-      <section id="pricing" className="bg-white border-t border-slate-100 py-32">
-        <div className="max-w-7xl mx-auto px-6 text-center space-y-16">
+      <section id="pricing" className="bg-white border-t border-slate-100 py-16 md:py-32">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 text-center space-y-10 md:space-y-16">
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -580,7 +580,7 @@ export function LandingPage() {
           </motion.div>
 
           {/* Pricing cards grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
+          <div className="grid grid-cols-3 gap-1 xs:gap-3 sm:gap-6 md:gap-8 max-w-6xl mx-auto items-stretch px-1 xs:px-2 md:px-0">
 
             {/* Package 1: Basic */}
             <motion.div
@@ -588,36 +588,37 @@ export function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="bg-slate-50 border border-slate-150 rounded-[2.5rem] p-10 flex flex-col justify-between text-left hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
+              className="bg-slate-50 border border-slate-150 rounded-xl xs:rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] p-2.5 xs:p-5 sm:p-8 md:p-10 flex flex-col justify-between text-left hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
             >
-              <div className="space-y-8">
+              <div className="space-y-3 sm:space-y-8">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Gói Cơ Bản</h4>
-                  <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black text-slate-900">0đ</span>
-                    <span className="text-sm font-bold text-slate-400">/tháng</span>
+                  <h4 className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider md:tracking-widest">Gói Cơ Bản</h4>
+                  <div className="flex flex-row items-baseline gap-0.5 sm:gap-1 mt-1.5 sm:mt-4">
+                    <span className="text-xl xs:text-2xl sm:text-3xl md:text-5xl font-black text-slate-900 leading-none">0đ</span>
+                    <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-slate-400">/tháng</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">Phù hợp cho các bạn mới bắt đầu làm quen với việc đọc tiếng Trung.</p>
+                <p className="text-[7.5px] xs:text-[9.5px] sm:text-xs md:text-sm text-slate-500 leading-normal sm:leading-relaxed">Phù hợp cho các bạn mới bắt đầu làm quen với việc đọc tiếng Trung.</p>
                 <div className="w-full h-[1px] bg-slate-200"></div>
-                <ul className="space-y-4">
+                <ul className="space-y-2 sm:space-y-4">
                   {[
                     "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
                     "Đọc và phân tích tối đa 3 tài liệu/tháng",
                     "Lưu từ mới vào bộ thẻ cá nhân",
                     "Ôn từ vựng bằng flashcard SRS"
                   ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm text-slate-600 font-medium">
-                      <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
+                    <li key={i} className="flex items-start gap-1 text-[7.5px] xs:text-[9px] sm:text-xs md:text-sm text-slate-600 font-medium leading-tight sm:leading-normal">
+                      <Check className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-4 sm:h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <button
                 onClick={handleStart}
-                className="w-full mt-10 py-5 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-sm"
+                className="w-full mt-4 sm:mt-10 py-2 sm:py-5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-[9px] xs:text-xs sm:text-sm"
               >
-                Bắt đầu miễn phí
+                Bắt đầu
               </button>
             </motion.div>
 
@@ -627,22 +628,22 @@ export function LandingPage() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="bg-white border-2 border-blue-600 rounded-[2.5rem] p-10 flex flex-col justify-between text-left relative shadow-2xl shadow-blue-500/10 transform hover:-translate-y-3 transition-all duration-300"
+              className="bg-white border border-blue-600 xs:border-2 rounded-xl xs:rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] p-2.5 xs:p-5 sm:p-8 md:p-10 flex flex-col justify-between text-left relative shadow-2xl shadow-blue-500/10 transform hover:-translate-y-3 transition-all duration-300"
             >
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white font-bold text-[10px] px-6 py-1.5 rounded-full uppercase tracking-widest shadow-xl">
-                Phổ biến nhất
+              <div className="absolute -top-3 xs:-top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white font-bold text-[7px] xs:text-[9px] md:text-[10px] px-2 xs:px-3 md:px-6 py-0.5 xs:py-1 md:py-1.5 rounded-full uppercase tracking-wider md:tracking-widest shadow-xl whitespace-nowrap">
+                Hot
               </div>
-              <div className="space-y-8">
+              <div className="space-y-3 sm:space-y-8">
                 <div>
-                  <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest">Gói Tháng</h4>
-                  <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black text-slate-900">59k</span>
-                    <span className="text-sm font-bold text-slate-400">/tháng</span>
+                  <h4 className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-blue-600 uppercase tracking-wider md:tracking-widest">Gói Tháng</h4>
+                  <div className="flex flex-row items-baseline gap-0.5 sm:gap-1 mt-1.5 sm:mt-4">
+                    <span className="text-xl xs:text-2xl sm:text-3xl md:text-5xl font-black text-slate-900 leading-none">59k</span>
+                    <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-slate-400">/tháng</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 tháng.</p>
+                <p className="text-[7.5px] xs:text-[9.5px] sm:text-xs md:text-sm text-slate-500 leading-normal sm:leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 tháng.</p>
                 <div className="w-full h-[1px] bg-slate-100"></div>
-                <ul className="space-y-4">
+                <ul className="space-y-2 sm:space-y-4">
                   {[
                     "Đọc và phân tích tài liệu không giới hạn",
                     "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
@@ -650,17 +651,18 @@ export function LandingPage() {
                     "Lưu từ mới và ôn tập flashcard SRS không giới hạn",
                     "Luyện phát âm với chấm điểm và phản hồi từ AI"
                   ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm text-slate-700 font-bold">
-                      <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
+                    <li key={i} className="flex items-start gap-1 text-[7.5px] xs:text-[9px] sm:text-xs md:text-sm text-slate-700 font-bold leading-tight sm:leading-normal">
+                      <Check className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-4 sm:h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <button
                 onClick={handleStart}
-                className="w-full mt-10 py-5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/25 transition-all text-sm"
+                className="w-full mt-4 sm:mt-10 py-2 sm:py-5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/25 transition-all text-[9px] xs:text-xs sm:text-sm"
               >
-                Đăng ký ngay
+                Đăng ký
               </button>
             </motion.div>
 
@@ -670,19 +672,19 @@ export function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="bg-slate-50 border border-slate-150 rounded-[2.5rem] p-10 flex flex-col justify-between text-left hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
+              className="bg-slate-50 border border-slate-150 rounded-xl xs:rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] p-2.5 xs:p-5 sm:p-8 md:p-10 flex flex-col justify-between text-left hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
             >
-              <div className="space-y-8">
+              <div className="space-y-3 sm:space-y-8">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Gói Năm</h4>
-                  <div className="flex items-baseline gap-1 mt-4">
-                    <span className="text-5xl font-black text-slate-900">599k</span>
-                    <span className="text-sm font-bold text-slate-400">/năm</span>
+                  <h4 className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider md:tracking-widest">Gói Năm</h4>
+                  <div className="flex flex-row items-baseline gap-0.5 sm:gap-1 mt-1.5 sm:mt-4">
+                    <span className="text-xl xs:text-2xl sm:text-3xl md:text-5xl font-black text-slate-900 leading-none">599k</span>
+                    <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-bold text-slate-400">/năm</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 năm.</p>
+                <p className="text-[7.5px] xs:text-[9.5px] sm:text-xs md:text-sm text-slate-500 leading-normal sm:leading-relaxed">Mở khóa toàn bộ tính năng và sử dụng không giới hạn trong 1 năm.</p>
                 <div className="w-full h-[1px] bg-slate-200"></div>
-                <ul className="space-y-4">
+                <ul className="space-y-2 sm:space-y-4">
                   {[
                     "Đọc và phân tích tài liệu không giới hạn",
                     "Tra từ Hán, Pinyin, nghĩa và cấp độ HSK",
@@ -690,17 +692,18 @@ export function LandingPage() {
                     "Lưu từ mới và ôn tập flashcard SRS không giới hạn",
                     "Luyện phát âm với chấm điểm và phản hồi từ AI"
                   ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm text-slate-600 font-medium">
-                      <Check className="w-5 h-5 text-blue-600 shrink-0" /> {item}
+                    <li key={i} className="flex items-start gap-1 text-[7.5px] xs:text-[9px] sm:text-xs md:text-sm text-slate-600 font-medium leading-tight sm:leading-normal">
+                      <Check className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-4 sm:h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <button
                 onClick={handleStart}
-                className="w-full mt-10 py-5 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-sm"
+                className="w-full mt-4 sm:mt-10 py-2 sm:py-5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-[9px] xs:text-xs sm:text-sm"
               >
-                Đăng ký ngay
+                Đăng ký
               </button>
             </motion.div>
 
@@ -938,24 +941,24 @@ export function LandingPage() {
 
       {/* Footer in Vietnamese */}
       <footer className="py-12 bg-white border-t border-slate-100 text-slate-500 text-xs">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 text-left">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-4 gap-1.5 xs:gap-3 sm:gap-6 md:gap-8 mb-8 text-left">
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex items-center gap-2">
               <img
                 src={logoImg}
-                className="h-8 w-auto object-contain"
+                className="h-6 sm:h-8 w-auto object-contain"
                 alt="Hanora logo"
               />
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="hidden sm:block text-xs text-slate-400 leading-relaxed">
               Trung tâm hỗ trợ ôn tập, đọc hiểu chữ Hán hàng đầu Việt Nam giúp bạn làm chủ tiếng Trung tự nhiên qua từng văn cảnh.
             </p>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Đường dẫn</h4>
-            <ul className="space-y-2 text-slate-500">
+          <div className="space-y-2 sm:space-y-3">
+            <h4 className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-slate-800 uppercase tracking-wider">Đường dẫn</h4>
+            <ul className="space-y-1 sm:space-y-2 text-[8.5px] xs:text-[10px] sm:text-xs text-slate-500">
               <li><a href="#" className="hover:text-blue-600">Trang chủ</a></li>
               <li><a href="#about" className="hover:text-blue-600">Giới thiệu</a></li>
               <li><a href="#features" className="hover:text-blue-600">Tính năng</a></li>
@@ -963,19 +966,19 @@ export function LandingPage() {
             </ul>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Hỗ trợ</h4>
-            <ul className="space-y-2 text-slate-500">
-              <li><a href="#" className="hover:text-blue-600">Trung tâm trợ giúp</a></li>
-              <li><a href="#" className="hover:text-blue-600">Điều khoản dịch vụ</a></li>
-              <li><a href="#" className="hover:text-blue-600">Chính sách bảo mật</a></li>
+          <div className="space-y-2 sm:space-y-3">
+            <h4 className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-slate-800 uppercase tracking-wider">Hỗ trợ</h4>
+            <ul className="space-y-1 sm:space-y-2 text-[8.5px] xs:text-[10px] sm:text-xs text-slate-500">
+              <li><a href="#" className="hover:text-blue-600">Trợ giúp</a></li>
+              <li><a href="#" className="hover:text-blue-600">Điều khoản</a></li>
+              <li><a href="#" className="hover:text-blue-600">Bảo mật</a></li>
             </ul>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Liên hệ</h4>
-            <p className="text-xs text-slate-400">Email: support@hanora.com</p>
-            <p className="text-xs text-slate-400">Hotline: 1900 6868</p>
+          <div className="space-y-2 sm:space-y-3">
+            <h4 className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-slate-800 uppercase tracking-wider">Liên hệ</h4>
+            <p className="text-[8.5px] xs:text-[10px] sm:text-xs text-slate-400 break-all">Email: support@hanora.com</p>
+            <p className="text-[8.5px] xs:text-[10px] sm:text-xs text-slate-400">Hotline: 1900 6868</p>
           </div>
 
         </div>

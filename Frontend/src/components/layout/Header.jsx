@@ -38,13 +38,13 @@ export function Header({ offsetTop }) {
   };
 
   return (
-    <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#32A0F4]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(50,160,244,0.22)] transition-all duration-300`}>
+    <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#001C5B]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(0,28,91,0.22)] transition-all duration-300`}>
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <NavLink to="/" className="group flex items-center transition-all p-1 rounded-2xl hover:bg-white/10">
           <img
             src={logoImg}
-            className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_2px_12px_rgba(255,255,255,0.9)]"
+            className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 brightness-0 invert drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
             alt="Hanora logo"
           />
         </NavLink>
@@ -120,7 +120,7 @@ export function Header({ offsetTop }) {
             <NavLink
               to="/profile"
               title={displayName}
-              className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-black text-sm hover:bg-white hover:text-[#32A0F4] transition-all shadow-lg overflow-hidden"
+              className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-black text-sm hover:bg-white hover:text-[#001C5B] transition-all shadow-lg overflow-hidden"
             >
               {user.avatar ? (
                 <img
@@ -145,7 +145,7 @@ export function Header({ offsetTop }) {
         ) : (
           <NavLink
             to="/login"
-            className="px-8 py-2.5 text-sm font-display font-semibold text-[#32A0F4] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
+            className="px-8 py-2.5 text-sm font-display font-semibold text-[#001C5B] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
           >
             Đăng nhập
           </NavLink>
@@ -162,7 +162,7 @@ export function Header({ offsetTop }) {
 
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
-        <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#32A0F4] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 xl:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#001C5B] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 xl:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
           {user && (
             <div className="flex items-center gap-6 pb-4 border-b border-white/20 text-xs font-black uppercase tracking-widest text-white/95">
               <div className="flex items-center gap-1.5">

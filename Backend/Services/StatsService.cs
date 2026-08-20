@@ -118,13 +118,23 @@ public class StatsService : IStatsService
         int todayMinutes = await _statsRepo.GetMinutesOnDateAsync(userId, today);
         int totalXp = stats.TotalXp ?? 0;
 
+        DateOnly startOfWeek = today.AddDays(-(7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7);
+
+        int xpToday = await _db.LearningProgresses
+            .Where(p => p.UserId == userId && p.ActivityDate == today)
+            .SumAsync(p => p.XpEarned ?? 0);
+
+        int xpThisWeek = await _db.LearningProgresses
+            .Where(p => p.UserId == userId && p.ActivityDate >= startOfWeek)
+            .SumAsync(p => p.XpEarned ?? 0);
+
         return new UserStatsDto
         {
             Streak = stats.CurrentStreakDays ?? 0,
             LongestStreak = stats.LongestStreakDays ?? 0,
             Xp = totalXp,
-            XpToday = stats.XpToday ?? 0,
-            XpThisWeek = stats.XpThisWeek ?? 0,
+            XpToday = xpToday,
+            XpThisWeek = xpThisWeek,
             Level = LevelForXp(totalXp),
             TodayMinutes = todayMinutes,
             TargetDailyMinutes = goal,
