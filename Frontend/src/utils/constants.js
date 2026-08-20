@@ -9,8 +9,7 @@ export const ALLOWED_HSK_EMAILS = [
   'phuongkttds180186@fpt.edu.vn',
   'duongthithaonhi0808@gmail.com',
   'boquanhoa301204@gmail.com',
-  'namsonlk2k4@gmail.com',
-  'tvan20152@gmail.com'
+  'namsonlk2k4@gmail.com'
 ];
 
 export function isAllowedHskUser(user) {
