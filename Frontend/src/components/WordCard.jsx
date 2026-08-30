@@ -481,7 +481,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
             className="text-[10px] font-bold text-blue-650 hover:text-blue-800 hover:underline flex items-center gap-1 transition-colors"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>Dịch sai? Góp ý</span>
+            <span>Góp ý</span>
           </button>
         </div>
 

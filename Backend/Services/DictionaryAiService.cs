@@ -209,11 +209,28 @@ Do NOT output any markdown blocks like ```json or anything else.";
         }
     }
 
-    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence)
+    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi")
     {
         if (string.IsNullOrEmpty(_apiKey)) return null;
 
-        var prompt = $@"
+        string prompt;
+        if (targetLang == "zh")
+        {
+            prompt = $@"
+Translate this text into standard Chinese (Simplified): '{sentence}'.
+Return ONLY a valid JSON object matching exactly this schema:
+{{
+  ""originalText"": ""{sentence}"",
+  ""pinyin"": ""Full pinyin of the translated Chinese text with tone marks"",
+  ""hanViet"": """",
+  ""vietnamese"": ""The translated Chinese text"",
+  ""grammarAnalysis"": ""Detailed explanation of the translated Chinese sentence structure and key words (in Vietnamese)""
+}}
+Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
+        }
+        else
+        {
+            prompt = $@"
 Analyze this Chinese sentence: '{sentence}'.
 Return ONLY a valid JSON object matching exactly this schema:
 {{
@@ -224,6 +241,7 @@ Return ONLY a valid JSON object matching exactly this schema:
   ""grammarAnalysis"": ""Detailed explanation of grammar, identifying Subject, Verb, Object, complements, and key structures (in Vietnamese)""
 }}
 Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
+        }
 
         var url = "https://api.deepseek.com/chat/completions";
         var payload = new 

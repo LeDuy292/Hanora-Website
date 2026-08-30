@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
 import logoImg from '../../assets/logo.png';
+import { isAllowedHskUser } from '../../utils/constants';
 
 export function Sidebar() {
   const { user } = useAuthStore();
@@ -27,7 +28,7 @@ export function Sidebar() {
     { to: '/dashboard', label: 'Tiến trình', icon: TrendingUp },
     { to: '/vocabulary', label: 'Từ vựng', icon: BookMarked },
     { to: '/flashcards', label: 'Flashcard', icon: Layers },
-    { to: '/library', label: 'Thư viện HSK', icon: Library },
+    ...(isAllowedHskUser(user) ? [{ to: '/library', label: 'Thư viện HSK', icon: Library }] : []),
     { to: '/reader', label: 'Dịch thuật', icon: BookOpen },
     { to: '/pronunciation', label: 'Luyện phát âm', icon: Mic },
   ];

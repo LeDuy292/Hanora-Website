@@ -237,18 +237,19 @@ export const saveDocumentAnnotations = async (id, annotationsJson) => {
 
 export const translateSentence = async (text) => {
   const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/vocabulary/translate-sentence`, {
+  const response = await fetch(`${API_BASE_URL}/translation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, sourceLanguage: 'auto', targetLanguage: 'vi' })
   });
   if (!response.ok) {
     throw new Error('Failed to translate sentence');
   }
-  return await response.json();
+  const result = await response.json();
+  return result.success ? result.data : result;
 };
 
 export const compareSentences = async (originalText, modifiedText) => {

@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getDocument, getVocabulary, getMyDocuments, getDocumentAnnotations,
-  saveDocumentAnnotations, exportDocx, askAiAssistant, deleteDocument
+  saveDocumentAnnotations, exportDocx, askAiAssistant, deleteDocument,
+  translateSentence
 } from '../lib/api';
 import { toast } from '../store/notificationStore';
 import WordCard from '../components/WordCard';
@@ -30,7 +31,7 @@ import {
   Maximize2, Minimize2, Palette, Type, BookOpen, MessageSquare,
   Activity, GraduationCap, Trophy, Flame, Play, Clock, Search, Send,
   Copy, Trash2, Undo2, Redo2, Folder, FolderPlus, Plus, Filter,
-  MoreVertical, Edit2, PlusCircle, Lock
+  MoreVertical, Edit2, PlusCircle, Lock, Languages, Loader2
 } from 'lucide-react';
 
 const HIGHLIGHT_COLORS = [
@@ -231,7 +232,16 @@ const ReaderPage = () => {
   const readMode = 'normal';
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [pdfZoomState, setPdfZoomState] = useState({ scale: 1, fitMode: 'custom' });
-  const [sidebarTab, setSidebarTab] = useState('dict'); // dict, chat, stats
+  const [sidebarTab, setSidebarTab] = useState('translate'); // dict, chat, translate
+
+  // Independent translation states
+  const [translationInput, setTranslationInput] = useState('');
+  const [translationResult, setTranslationResult] = useState(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState(null);
+  const [translationType, setTranslationType] = useState('word'); // 'word' | 'sentence'
+  const [sourceLang, setSourceLang] = useState('auto'); // 'auto', 'zh', 'vi'
+  const [targetLang, setTargetLang] = useState('vi');   // 'zh', 'vi'
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.matchMedia('(min-width: 1280px)').matches;
@@ -1528,9 +1538,90 @@ const ReaderPage = () => {
     }
   };
 
+  const performTranslation = async (textToTranslate, src, tgt) => {
+    const text = textToTranslate.trim();
+    if (!text) return;
+
+    setIsTranslating(true);
+    setTranslationError(null);
+
+    // Check if input is a single word (length <= 4, pure CJK characters) and we are translating zh/auto to vi
+    const isSingleWord = (src === 'auto' || src === 'zh') && tgt === 'vi' && text.length <= 4 && /^[\u3400-\u9FFF]+$/.test(text);
+
+    if (isSingleWord) {
+      try {
+        const res = await getVocabulary(text);
+        if (res && res.Word) {
+          setTranslationResult(res);
+          setTranslationType('word');
+          setIsTranslating(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Dictionary lookup failed, falling back to sentence translation.");
+      }
+    }
+
+    // Default: translate sentence/phrase/paragraph using the AI service
+    try {
+      const res = await translateSentence(text, src, tgt);
+      if (res) {
+        setTranslationResult(res);
+        setTranslationType('sentence');
+      } else {
+        setTranslationError('Không nhận được phản hồi dịch từ máy chủ.');
+      }
+    } catch (err) {
+      console.error(err);
+      setTranslationError('Không thể thực hiện dịch lúc này. Vui lòng thử lại sau.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleIndependentTranslate = () => {
+    performTranslation(translationInput, sourceLang, targetLang);
+  };
+
+  const handleSwapLanguages = () => {
+    const newSource = targetLang;
+    const newTarget = sourceLang === 'auto' ? 'zh' : sourceLang;
+    
+    setSourceLang(newSource);
+    setTargetLang(newTarget);
+
+    if (translationResult) {
+      const currentInput = translationInput;
+      const currentOutput = translationResult.Vietnamese || translationResult.vietnamese || '';
+      if (currentOutput) {
+        setTranslationInput(currentOutput);
+      }
+      setTranslationResult(null);
+    }
+  };
+
+  // Debounced translation as user types (800ms)
+  useEffect(() => {
+    const text = translationInput.trim();
+    if (!text) {
+      setTranslationResult(null);
+      setTranslationError(null);
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      performTranslation(text, sourceLang, targetLang);
+    }, 800);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [translationInput, sourceLang, targetLang]);
+
   const closeWordCard = () => {
     setSelectedWord(null);
     setVocabData(null);
+    setSidebarTab('translate');
   };
 
   const toggleFullscreen = () => {
@@ -2962,36 +3053,40 @@ const ReaderPage = () => {
               style={{ '--reader-sidebar-top': `${readerSidebarTop}px`, '--reader-sidebar-bottom': `${readerSidebarBottom}px` }}
             >
               {/* Sidebar Tab Header */}
-              <div className="flex border-b border-slate-150 bg-slate-50/50 shrink-0">
+              <div className="flex gap-2 p-3 bg-white border-b border-slate-100 shrink-0">
                 <button
-                  onClick={() => setSidebarTab('dict')}
-                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'dict'
-                    ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                    }`}
+                  onClick={() => {
+                    if (!selectedWord) {
+                      toast.info('Nhấp chọn chữ Hán hoặc câu trong tài liệu để xem giải nghĩa từ điển.');
+                      setSidebarTab('translate');
+                    } else {
+                      setSidebarTab('dict');
+                    }
+                  }}
+                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center ${sidebarTab === 'dict'
+                    ? 'bg-[#DCE9FF] text-blue-800 font-extrabold shadow-sm'
+                    : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
+                  }`}
                 >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Từ điển</span>
+                  Từ điển
+                </button>
+                <button
+                  onClick={() => setSidebarTab('translate')}
+                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center ${sidebarTab === 'translate'
+                    ? 'bg-[#DCE9FF] text-blue-800 font-extrabold shadow-sm'
+                    : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
+                  }`}
+                >
+                  Dịch
                 </button>
                 <button
                   onClick={() => setSidebarTab('chat')}
-                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'chat'
-                    ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                    }`}
+                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center ${sidebarTab === 'chat'
+                    ? 'bg-[#DCE9FF] text-blue-800 font-extrabold shadow-sm'
+                    : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
+                  }`}
                 >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Trợ lý AI</span>
-                </button>
-                <button
-                  onClick={() => setSidebarTab('stats')}
-                  className={`flex-1 py-2.5 text-[11px] sm:py-3.5 sm:text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${sidebarTab === 'stats'
-                    ? 'border-blue-600 text-blue-600 bg-white font-extrabold shadow-sm'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
-                    }`}
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>Tiến trình</span>
+                  Trợ lý AI
                 </button>
               </div>
 
@@ -3106,96 +3201,141 @@ const ReaderPage = () => {
                   </div>
                 )}
 
-                {/* Tab 3: Study progress statistics dashboard */}
-                {sidebarTab === 'stats' && (
-                  <div className="space-y-6">
-                    {/* Reading stats card */}
-                    <div className="bg-blue-50/20 border border-blue-100 rounded-2xl p-4 space-y-4">
-                      <h4 className="text-xs font-black uppercase text-blue-800 tracking-wider flex items-center gap-1.5 border-b border-blue-100 pb-2">
-                        <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Thông số bài học</span>
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-450 font-bold uppercase block">Thời gian học</span>
-                          <span className="text-lg font-black text-slate-850 flex items-center gap-1.5">
-                            {Math.floor(readingSeconds / 60)}m {readingSeconds % 60}s
+                {/* Tab 3: Translate tab */}
+                {sidebarTab === 'translate' && (
+                  <div className="h-full flex flex-col min-h-[300px]">
+                    <div className="bg-slate-100/70 border border-slate-200/50 rounded-2xl p-4 flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+                      
+                      {/* From Auto-detect */}
+                      <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 hover:text-amber-800 cursor-pointer uppercase tracking-wider">
+                        <span>From</span>
+                        <span className="underline decoration-dotted decoration-2 underline-offset-4">
+                          {sourceLang === 'auto' ? 'Auto-detect' : sourceLang === 'zh' ? 'Chinese' : 'Vietnamese'}
+                        </span>
+                        <span className="text-[8px] ml-0.5">▼</span>
+                      </div>
+
+                      {/* Input Textarea */}
+                      <textarea
+                        value={translationInput}
+                        onChange={(e) => {
+                          setTranslationInput(e.target.value);
+                          if (!e.target.value.trim()) {
+                            setTranslationResult(null);
+                            setTranslationError(null);
+                          }
+                        }}
+                        placeholder="Select text from the document or enter text here to translate."
+                        className="w-full h-[120px] min-h-[100px] p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-700/20 focus:border-amber-700/60 transition-all font-medium leading-relaxed resize-none shrink-0"
+                      />
+
+                      {/* Swap / Translate trigger */}
+                      <button
+                        onClick={handleSwapLanguages}
+                        className="flex justify-center my-1.5 text-lg font-black text-amber-700 hover:scale-115 active:scale-95 transition-all cursor-pointer shrink-0"
+                        title="Chuyển đổi ngôn ngữ"
+                      >
+                        ⇅
+                      </button>
+
+                      {/* To Vietnamese */}
+                      <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 hover:text-amber-800 cursor-pointer uppercase tracking-wider">
+                        <span>To</span>
+                        <span className="underline decoration-dotted decoration-2 underline-offset-4">
+                          {targetLang === 'zh' ? 'Chinese' : 'Vietnamese'}
+                        </span>
+                        <span className="text-[8px] ml-0.5">▼</span>
+                      </div>
+
+                      {/* Output result box */}
+                      <div className="flex-1 min-h-[140px] p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-800 font-medium leading-relaxed flex flex-col overflow-y-auto scrollbar-thin">
+                        {isTranslating ? (
+                          <div className="flex-grow flex flex-col items-center justify-center gap-2 py-8">
+                            <Loader2 className="w-5 h-5 text-amber-700 animate-spin" />
+                            <span className="text-[10px] text-slate-400 font-bold">đang phân tích và dịch...</span>
+                          </div>
+                        ) : translationError ? (
+                          <span className="text-red-500 font-bold">{translationError}</span>
+                        ) : translationResult ? (
+                          <div className="flex-1 flex flex-col min-h-0">
+                            {translationType === 'word' ? (
+                              <WordCard
+                                word={translationResult.Word}
+                                data={translationResult}
+                                isLoading={false}
+                                onWordClick={async (w) => {
+                                  setIsTranslating(true);
+                                  setTranslationError(null);
+                                  try {
+                                    const res = await getVocabulary(w);
+                                    setTranslationResult(res);
+                                    setTranslationType('word');
+                                  } catch (err) {
+                                    try {
+                                      const res = await translateSentence(w);
+                                      setTranslationResult(res);
+                                      setTranslationType('sentence');
+                                    } catch (fallbackErr) {
+                                      setTranslationError('Không thể tra cứu từ này.');
+                                    }
+                                  } finally {
+                                    setIsTranslating(false);
+                                  }
+                                }}
+                                documentId={null}
+                                documentTitle={null}
+                                documentText={null}
+                              />
+                            ) : (
+                              <div className="space-y-4">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Bản dịch</span>
+                                  <p className="text-xs font-bold text-emerald-600 leading-relaxed break-words">{translationResult.Vietnamese || translationResult.vietnamese}</p>
+                                </div>
+                                {(translationResult.Pinyin || translationResult.pinyin) && (
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Pinyin</span>
+                                    <span className="text-xs font-bold text-blue-600 break-words">{translationResult.Pinyin || translationResult.pinyin}</span>
+                                  </div>
+                                )}
+                                {(translationResult.HanViet || translationResult.hanViet) && (
+                                  <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-100/60 shadow-sm shadow-amber-900/5">
+                                    <span className="text-[11px] text-amber-800/70 font-black uppercase tracking-wider block mb-1">Hán Việt</span>
+                                    <span className="text-sm font-black text-amber-800 tracking-wide break-words leading-tight block">{translationResult.HanViet || translationResult.hanViet}</span>
+                                  </div>
+                                )}
+                                {(translationResult.GrammarAnalysis || translationResult.grammarAnalysis) && (
+                                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Phân tích chi tiết</span>
+                                    <div className="text-xs text-slate-700 leading-relaxed font-medium space-y-2 prose prose-slate max-w-none">
+                                      <FormattedMarkdownText content={translationResult.GrammarAnalysis || translationResult.grammarAnalysis} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic font-normal leading-relaxed">
+                            Bản dịch và phân tích chi tiết của bạn sẽ hiển thị tại đây sau khi dịch...
                           </span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Tổng ký tự</span>
-                          <span className="text-lg font-black text-slate-850">{totalDocChars} từ</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã tra từ điển</span>
-                          <span className="text-lg font-black text-slate-850">{lookupCount} từ</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã bôi màu</span>
-                          <span className="text-lg font-black text-slate-850">{Object.keys(annotations.highlights).length} nét</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Số ghi chú</span>
-                          <span className="text-lg font-black text-slate-850">
-                            {Object.keys(annotations.textNotes).length + Object.keys(annotations.stickyNotes).length} ghi chú
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã lưu sổ tay</span>
-                          <span className="text-lg font-black text-emerald-600 font-extrabold flex items-center gap-1">
-                            {savedWordsInDoc} từ
-                          </span>
-                        </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Student Gamification card */}
-                    {user && (
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 space-y-4">
-                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5 border-b border-slate-200/80 pb-2">
-                          <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Học viên Hanora</span>
-                        </h4>
-
-                        {/* Streak & XP Display */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Flame className="w-5 h-5 text-orange-500 fill-orange-500/10" />
-                            <div>
-                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Chuỗi học tập</span>
-                              <span className="text-sm font-black text-slate-805">{user.streak || 0} ngày</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <GraduationCap className="w-5 h-5 text-blue-500" />
-                            <div>
-                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Trình độ XP</span>
-                              <span className="text-sm font-black text-slate-805">{user.level || 'HSK 1'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Daily minutes progress */}
-                        <div className="space-y-2 border-t border-slate-200/50 pt-3">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-500 font-semibold">Mục tiêu hằng ngày:</span>
-                            <span className="font-extrabold text-slate-855">
-                              {user.todayMinutes || 0} / {user.targetDailyMinutes || 20} phút
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                            <div
-                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                              style={{
-                                width: `${Math.min(100, ((user.todayMinutes || 0) / (user.targetDailyMinutes || 20)) * 100)}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="text-[10px] text-slate-400 font-semibold italic text-center pt-2 leading-relaxed">
-                          Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
-                        </div>
+                    {/* Reset Control */}
+                    {translationResult && !isTranslating && (
+                      <div className="flex gap-2 shrink-0 pt-2.5">
+                        <button
+                          onClick={() => {
+                            setTranslationResult(null);
+                            setTranslationError(null);
+                            setTranslationInput('');
+                          }}
+                          className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+                        >
+                          Xóa nội dung
+                        </button>
                       </div>
                     )}
                   </div>
