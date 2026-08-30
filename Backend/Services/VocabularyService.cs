@@ -403,37 +403,41 @@ public class VocabularyService : IVocabularyService
             .Distinct()
             .ToList();
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
-
-        if (deleteFlashcards && flashcardIds.Count > 0)
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            await _db.FlipReviews.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
-            await _db.LearnRounds.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
-            await _db.MatchPairs.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
-            await _db.Flashcards.Where(f => flashcardIds.Contains(f.Id)).ExecuteDeleteAsync();
-        }
+            await using var tx = await _db.Database.BeginTransactionAsync();
 
-        foreach (var entry in entries)
-        {
-            entry.IsDeleted = true;
-            entry.DeletedAt = now;
-        }
+            if (deleteFlashcards && flashcardIds.Count > 0)
+            {
+                await _db.FlipReviews.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+                await _db.LearnRounds.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+                await _db.MatchPairs.Where(r => flashcardIds.Contains(r.FlashcardId)).ExecuteDeleteAsync();
+                await _db.Flashcards.Where(f => flashcardIds.Contains(f.Id)).ExecuteDeleteAsync();
+            }
 
-        await _db.SaveChangesAsync();
-        await tx.CommitAsync();
+            foreach (var entry in entries)
+            {
+                entry.IsDeleted = true;
+                entry.DeletedAt = now;
+            }
 
-        return new VocabularyDeleteResult
-        {
-            Success = true,
-            DeletedCount = entries.Count,
-            FlashcardsAffected = flashcardIds.Count,
-            NotFoundIds = missingIds
-        };
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return new VocabularyDeleteResult
+            {
+                Success = true,
+                DeletedCount = entries.Count,
+                FlashcardsAffected = flashcardIds.Count,
+                NotFoundIds = missingIds
+            };
+        });
     }
 
-    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence)
+    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi")
     {
-        return await _aiService.AnalyzeSentenceAsync(sentence);
+        return await _aiService.AnalyzeSentenceAsync(sentence, sourceLang, targetLang);
     }
 
     public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText)
