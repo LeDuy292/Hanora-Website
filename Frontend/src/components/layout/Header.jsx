@@ -6,6 +6,7 @@ import { useTimerStore } from '../../store/timerStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useTourStore } from '../../store/tourStore';
 import logoImg from '../../assets/logo.png';
+import { isAllowedHskUser } from '../../utils/constants';
 
 export function Header({ offsetTop }) {
   const { user, logout, refreshProfile } = useAuthStore();
@@ -28,7 +29,7 @@ export function Header({ offsetTop }) {
     { to: '/vocabulary', label: 'Từ vựng' },
     { to: '/flashcards', label: 'Flashcard' },
     { to: '/reader', label: 'Dịch thuật' },
-    { to: '/library', label: 'Thư viện HSK' },
+    ...(isAllowedHskUser(user) ? [{ to: '/library', label: 'Thư viện HSK' }] : []),
     { to: '/pronunciation', label: 'Luyện phát âm' },
     ...(user?.role === 'Admin' ? [{ to: '/admin', label: 'Admin' }] : []),
   ];

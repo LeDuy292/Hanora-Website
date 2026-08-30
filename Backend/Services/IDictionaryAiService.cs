@@ -49,7 +49,7 @@ public interface IDictionaryAiService
     Task<VocabularyAiResponse?> GetVocabularyInfoAsync(string word);
     Task<List<string>?> TranslateSentencesAsync(List<string> englishSentences);
     Task<RelationsDto?> GetRelationsAsync(string word);
-    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence);
+    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi");
     Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText);
     Task<string> AskAiAssistantAsync(string word, string question, string contextSentence);
 }

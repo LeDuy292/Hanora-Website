@@ -8,7 +8,7 @@ public interface IVocabularyService
     Task<VocabularySaveResult> SaveToNotebookAsync(long userId, string word, long? documentId, string? customDefinition = null, string? pinyin = null, string? hanViet = null, string? wordType = null, int? pageNumber = null, string? personalNote = null);
     Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId);
     Task<VocabularyDeleteResult> DeleteFromNotebookAsync(long userId, IReadOnlyCollection<long> userVocabularyIds, bool deleteFlashcards = false);
-    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence);
+    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi");
     Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText);
     Task<string> AskAiAssistantAsync(string word, string question, string contextSentence);
     Task<bool> ReportTranslationErrorAsync(long userId, string word, string currentTranslation, string proposedTranslation, string? notes = null);
