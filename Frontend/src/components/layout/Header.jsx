@@ -39,20 +39,20 @@ export function Header({ offsetTop }) {
   };
 
   return (
-    <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-12 h-16 md:h-20 flex items-center justify-between z-50 bg-[#001C5B]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(0,28,91,0.22)] transition-all duration-300`}>
+    <header className={`hanora-site-header fixed ${offsetTop ? 'top-10' : 'top-0'} left-0 w-full px-3 sm:px-5 md:px-8 xl:px-10 h-14 md:h-16 flex items-center justify-between z-50 bg-[#001C5B]/95 backdrop-blur-md border-b border-white/20 shadow-[0_10px_40px_rgba(0,28,91,0.22)] transition-all duration-300`}>
       {/* Left: Brand Logo */}
       <div className="flex items-center gap-3 shrink-0">
         <NavLink to="/" className="group flex items-center transition-all p-1 rounded-2xl hover:bg-white/10">
           <img
             src={logoImg}
-            className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 brightness-0 invert drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
+            className="h-8 sm:h-9 md:h-10 lg:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105 brightness-0 invert drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
             alt="Hanora logo"
           />
         </NavLink>
       </div>
 
       {/* Center: Navigation links list */}
-      <nav data-tour="nav-menu" className="hidden xl:flex items-center gap-8 2xl:gap-10">
+      <nav data-tour="nav-menu" className="hidden xl:flex items-center gap-5 xl:gap-6 2xl:gap-8">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -61,7 +61,7 @@ export function Header({ offsetTop }) {
             data-tour-nav={item.to}
             id={item.to === '/dashboard' ? 'dashboard-menu' : item.to === '/reader' ? 'translation-menu' : item.to === '/vocabulary' ? 'vocabulary-menu' : item.to === '/flashcards' ? 'flashcard-menu' : undefined}
             className={({ isActive }) =>
-              `relative font-medium text-[15px] py-2 transition-all duration-300 group tracking-tight ${isActive
+              `relative font-semibold text-[13px] py-1.5 transition-all duration-300 group tracking-normal ${isActive
                 ? 'text-white'
                 : 'text-white/70 hover:text-white'
               }`
@@ -70,7 +70,7 @@ export function Header({ offsetTop }) {
             {({ isActive }) => (
               <>
                 {item.label}
-                <span className={`absolute bottom-[-4px] left-0 w-full h-[3px] bg-white rounded-full transition-all duration-300 transform origin-center ${isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`} />
+                <span className={`absolute bottom-[-2px] left-0 w-full h-[2.5px] bg-white rounded-full transition-all duration-300 transform origin-center ${isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`} />
               </>
             )}
           </NavLink>
@@ -78,16 +78,16 @@ export function Header({ offsetTop }) {
       </nav>
 
       {/* Right: Actions / CTA */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
         {user ? (
-          <div className="flex items-center gap-4">
-            <div className="hidden xl:flex items-center gap-5 text-[11px] font-black uppercase tracking-widest text-white/80">
-              <div className="flex items-center gap-1.5 text-white">
-                <Flame className="w-4 h-4 fill-white/20" />
+          <div className="flex items-center gap-3 md:gap-3.5">
+            <div className="hidden xl:flex items-center gap-3.5 text-[10px] font-bold uppercase tracking-wider text-white/80">
+              <div className="flex items-center gap-1 text-white">
+                <Flame className="w-3.5 h-3.5 fill-white/20" />
                 <span>{user.streak ?? 0} NGÀY</span>
               </div>
-              <div className="flex items-center gap-1.5 text-white">
-                <Sparkles className="w-3.5 h-3.5 fill-white/20" />
+              <div className="flex items-center gap-1 text-white">
+                <Sparkles className="w-3 h-3 fill-white/20" />
                 <span>{user.xp ?? 0} XP</span>
               </div>
             </div>
@@ -96,14 +96,14 @@ export function Header({ offsetTop }) {
               id="pomodoro-button"
               data-tour="timer-button"
               onClick={toggleWidget}
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-sm ${
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-all shadow-sm ${
                 timerState === 'running'
                   ? 'bg-white text-blue-600 border-white shadow-blue-500/20'
                   : 'bg-white/15 text-white border-white/20 hover:bg-white/25'
               }`}
               title={isTimerHidden ? "Bật đồng hồ học tập nổi" : "Ẩn đồng hồ học tập nổi"}
             >
-              <Clock className={`w-3.5 h-3.5 ${timerState === 'running' ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
+              <Clock className={`w-3 h-3 ${timerState === 'running' ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
               <span>Đồng hồ</span>
             </button>
 
@@ -111,17 +111,17 @@ export function Header({ offsetTop }) {
               onClick={() => {
                 useTourStore.getState().resetTour(window.location.pathname);
               }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/20 bg-white/15 hover:bg-white/25 text-white text-[11px] font-semibold transition-all shadow-sm cursor-pointer"
               title="Xem hướng dẫn sử dụng website"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
+              <HelpCircle className="w-3 h-3" />
               <span>Hướng dẫn</span>
             </button>
 
             <NavLink
               to="/profile"
               title={displayName}
-              className="w-11 h-11 md:w-10 md:h-10 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-black text-sm hover:bg-white hover:text-[#001C5B] transition-all shadow-lg overflow-hidden"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/20 text-white border border-white/30 flex items-center justify-center font-extrabold text-xs hover:bg-white hover:text-[#001C5B] transition-all shadow-md overflow-hidden"
             >
               {user.avatar ? (
                 <img
@@ -136,17 +136,17 @@ export function Header({ offsetTop }) {
             </NavLink>
             <button
               onClick={handleLogout}
-              className="hidden sm:flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+              className="hidden sm:flex p-1.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
               title="Đăng xuất"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
 
         ) : (
           <NavLink
             to="/login"
-            className="px-8 py-2.5 text-sm font-display font-semibold text-[#001C5B] bg-white hover:bg-slate-50 rounded-lg shadow-xl active:scale-95 transition-all text-center uppercase tracking-widest"
+            className="px-5 py-1.5 text-xs font-display font-bold text-[#001C5B] bg-white hover:bg-slate-50 rounded-lg shadow-md active:scale-95 transition-all text-center uppercase tracking-wider"
           >
             Đăng nhập
           </NavLink>
@@ -155,9 +155,9 @@ export function Header({ offsetTop }) {
         {/* Mobile menu toggle */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="xl:hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white hover:bg-white/10 hover:text-white/80 transition-colors"
+          className="xl:hidden p-1.5 rounded-lg text-white hover:bg-white/10 hover:text-white/80 transition-colors"
         >
-          {isMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
+          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
