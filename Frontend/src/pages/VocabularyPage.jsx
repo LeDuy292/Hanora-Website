@@ -27,6 +27,7 @@ import { useToastStore } from '../store/toastStore';
 import { getMyDocuments } from '../lib/api';
 import { toast } from '../store/notificationStore';
 import { extractPlainMeaning } from '../utils/chineseUtils';
+import { useLanguageStore } from '../store/languageStore';
 
 
 const WINDOWS_1252_BYTE_MAP = new Map([
@@ -168,6 +169,8 @@ const WORD_DETAILS_DB = {
 
 export function VocabularyPage() {
   const navigate = useNavigate();
+  const { language, t } = useLanguageStore();
+  const isEn = language === 'en';
   const { vocabList, removeWord, bulkAddCards, createFlashcardSet, deleteVocabulary, deleteVocabularies, fetchUserFlashcards } = useVocabularyStore();
   const { addXp } = useAuthStore();
 
@@ -186,7 +189,7 @@ export function VocabularyPage() {
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
   const [deckDescription, setDeckDescription] = useState('');
-  const [deckSource, setDeckSource] = useState('Tổng hợp');
+  const [deckSource, setDeckSource] = useState(isEn ? 'Comprehensive' : 'Tổng hợp');
   const [deckDocumentId, setDeckDocumentId] = useState(null);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
 
@@ -197,7 +200,7 @@ export function VocabularyPage() {
     const firstWord = selectedWordsList[0];
     const allSameSource = selectedWordsList.every(w => w.source === firstWord.source && w.documentId === firstWord.documentId);
     
-    let sourceStr = 'Tổng hợp';
+    let sourceStr = isEn ? 'Comprehensive' : 'Tổng hợp';
     let docId = null;
     let defaultDeckName;
 
@@ -205,9 +208,9 @@ export function VocabularyPage() {
       sourceStr = firstWord.source;
       docId = firstWord.documentId;
       const cleanDocTitle = firstWord.source.replace(/\.[^/.]+$/, "");
-      defaultDeckName = `${cleanDocTitle} - Lesson ${new Date().toLocaleDateString('vi-VN')}`;
+      defaultDeckName = `${cleanDocTitle} - Lesson ${new Date().toLocaleDateString(isEn ? 'en-US' : 'vi-VN')}`;
     } else {
-      defaultDeckName = `Bộ từ vựng tổng hợp - ${new Date().toLocaleDateString('vi-VN')}`;
+      defaultDeckName = isEn ? `Vocabulary Set - ${new Date().toLocaleDateString('en-US')}` : `Bộ từ vựng tổng hợp - ${new Date().toLocaleDateString('vi-VN')}`;
     }
 
     setNewDeckName(defaultDeckName);
@@ -220,7 +223,7 @@ export function VocabularyPage() {
   const handleCreateDeckSubmit = async (e) => {
     e.preventDefault();
     if (!newDeckName.trim()) {
-      useToastStore.getState().addToast('Vui lòng nhập tên bộ Flashcard.', 'error');
+      useToastStore.getState().addToast(isEn ? 'Please enter a Flashcard deck name.' : 'Vui lòng nhập tên bộ Flashcard.', 'error');
       return;
     }
     setIsSavingDeck(true);
@@ -236,13 +239,13 @@ export function VocabularyPage() {
         selectedWordsList
       );
 
-      useToastStore.getState().addToast('Đã tạo bộ Flashcard thành công!', 'success');
+      useToastStore.getState().addToast(isEn ? 'Created Flashcard deck successfully!' : 'Đã tạo bộ Flashcard thành công!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
       navigate('/flashcards');
     } catch (err) {
       console.error(err);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
+      useToastStore.getState().addToast(isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
     } finally {
       setIsSavingDeck(false);
     }
@@ -315,7 +318,7 @@ export function VocabularyPage() {
         text: normalizeVietnameseText(w.text),
         pinyin: normalizeVietnameseText(w.pinyin) || "pīnyīn",
         translation: normalizeVietnameseText(w.translation) || "nghĩa",
-        source: normalizeVietnameseText(w.documentTitle) || "Chưa xác định",
+        source: normalizeVietnameseText(w.documentTitle) || (isEn ? "Unspecified" : "Chưa xác định"),
         documentId: w.documentId,
         dateAdded: w.dateAdded || new Date().toISOString().split('T')[0],
         difficulty: w.difficulty || "medium",
@@ -323,7 +326,7 @@ export function VocabularyPage() {
         isUserWord: true
       };
     });
-  }, [vocabList]);
+  }, [vocabList, isEn]);
 
   // Handle active filters & search queries
   const filteredVocabulary = useMemo(() => {
@@ -454,19 +457,23 @@ export function VocabularyPage() {
   const handleDeleteVocabulary = (row) => {
     const id = Number(row.userVocabularyId);
     if (!id) {
-      toast.error('Từ vựng này chưa đồng bộ ID từ máy chủ. Vui lòng tải lại danh sách rồi thử lại.');
+      toast.error(isEn ? 'This vocabulary item ID has not synchronized from the server. Please reload the list.' : 'Từ vựng này chưa đồng bộ ID từ máy chủ. Vui lòng tải lại danh sách rồi thử lại.');
       return;
     }
 
     const cleanWord = row.text.split('_')[0];
-    const messageParts = [
+    const messageParts = isEn ? [
+      `Are you sure you want to delete the word "${cleanWord} (${row.pinyin || ''})" from your Vocabulary Notebook?`,
+      '',
+      'Deleting this will not affect the original document.'
+    ] : [
       'Bạn có chắc chắn muốn xóa từ "' + cleanWord + ' (' + (row.pinyin || '') + ')" khỏi Sổ tay từ vựng?',
       '',
       'Việc xóa sẽ không ảnh hưởng đến tài liệu gốc.'
     ];
 
     if (row.flashcardCount > 0) {
-      messageParts.push('', 'Từ này đang được sử dụng trong Flashcard. Thao tác này chỉ xóa khỏi Sổ tay, Flashcard sẽ được ẩn khỏi luồng học.');
+      messageParts.push('', isEn ? 'This word is currently used in Flashcards. This only removes it from your Notebook, flashcards will be hidden.' : 'Từ này đang được sử dụng trong Flashcard. Thao tác này chỉ xóa khỏi Sổ tay, Flashcard sẽ được ẩn khỏi luồng học.');
     }
 
     toast.confirm(
@@ -477,23 +484,27 @@ export function VocabularyPage() {
           if (row.text) removeWord(row.text);
           setSelectedRows(prev => prev.filter(key => key !== row.selectionKey));
           setOpenActionMenu(null);
-          toast.success(result?.message || 'Đã xóa từ vựng khỏi Sổ tay của bạn.');
+          toast.success(result?.message || (isEn ? 'Removed vocabulary from your Notebook.' : 'Đã xóa từ vựng khỏi Sổ tay của bạn.'));
         } catch (error) {
           console.error(error);
-          toast.error(error.message || 'Không thể xóa từ vựng.');
+          toast.error(error.message || (isEn ? 'Could not delete vocabulary.' : 'Không thể xóa từ vựng.'));
         }
       },
-      'Xóa từ vựng khỏi Sổ tay'
+      isEn ? 'Delete vocabulary from Notebook' : 'Xóa từ vựng khỏi Sổ tay'
     );
   };
 
   const handleBulkDeleteVocabulary = () => {
     if (selectedVocabularyIds.length === 0) {
-      toast.error('Vui lòng chọn ít nhất 1 từ vựng hợp lệ để xóa.');
+      toast.error(isEn ? 'Please select at least 1 valid word to delete.' : 'Vui lòng chọn ít nhất 1 từ vựng hợp lệ để xóa.');
       return;
     }
 
-    const message = [
+    const message = isEn ? [
+      `Are you sure you want to delete ${selectedVocabularyCount} selected words from your Vocabulary Notebook?`,
+      '',
+      'Words will only be removed from your personal notebook and will not affect the dictionary or original documents.'
+    ].join('\n') : [
       'Bạn có chắc muốn xóa ' + selectedVocabularyCount + ' từ đã chọn khỏi Sổ tay từ vựng của bạn?',
       '',
       'Từ vựng chỉ bị xóa khỏi Sổ tay cá nhân của bạn, không ảnh hưởng đến từ điển chung hay tài liệu gốc.'
@@ -509,13 +520,13 @@ export function VocabularyPage() {
           });
           setSelectedRows([]);
           setOpenActionMenu(null);
-          toast.success(result?.message || ('Đã xóa ' + selectedVocabularyCount + ' từ vựng khỏi Sổ tay thành công.'));
+          toast.success(result?.message || (isEn ? `Deleted ${selectedVocabularyCount} words from Notebook.` : ('Đã xóa ' + selectedVocabularyCount + ' từ vựng khỏi Sổ tay thành công.')));
         } catch (error) {
           console.error(error);
-          toast.error(error.message || 'Không thể xóa các từ vựng đã chọn.');
+          toast.error(error.message || (isEn ? 'Could not delete selected words.' : 'Không thể xóa các từ vựng đã chọn.'));
         }
       },
-      'Xóa từ vựng khỏi Sổ tay'
+      isEn ? 'Delete words from Notebook' : 'Xóa từ vựng khỏi Sổ tay'
     );
   };
 
@@ -527,11 +538,11 @@ export function VocabularyPage() {
     }
     // Fallback template
     return {
-      translation: "Chưa cập nhật chi tiết ngữ cảnh.",
+      translation: isEn ? "Context details not updated yet." : "Chưa cập nhật chi tiết ngữ cảnh.",
       exampleChinese: `我们一起用“${cleanText}”写句子吧。`,
       examplePinyin: `Wǒmen yīqǐ yòng "${cleanText}" xiě jùzi ba.`,
-      exampleVietnamese: `Chúng ta hãy cùng viết câu với từ "${cleanText}" nhé.`,
-      context: `Từ vựng "${cleanText}" được sử dụng phổ biến trong cuộc sống và học tập.`
+      exampleVietnamese: isEn ? `Let's write a sentence with "${cleanText}".` : `Chúng ta hãy cùng viết câu với từ "${cleanText}" nhé.`,
+      context: isEn ? `The word "${cleanText}" is commonly used in daily life and studies.` : `Từ vựng "${cleanText}" được sử dụng phổ biến trong cuộc sống và học tập.`
     };
   };
 
@@ -601,7 +612,7 @@ export function VocabularyPage() {
                   onChange={(e) => setSourceFilter(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[160px]"
                 >
-                  <option value="">Nguồn tài liệu</option>
+                  <option value="">{isEn ? "Document Source" : "Nguồn tài liệu"}</option>
                   {documentsList.map((doc, idx) => (
                     <option key={`${doc.id}-${idx}`} value={normalizeVietnameseText(doc.title)}>{normalizeVietnameseText(doc.title)}</option>
                   ))}
@@ -616,11 +627,11 @@ export function VocabularyPage() {
                   onChange={(e) => setLearningFilter(e.target.value)}
                   className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[150px]"
                 >
-                  <option value="">Tất cả trạng thái</option>
-                  <option value="known">Đã biết ({learningStats.known})</option>
-                  <option value="learning">Đang học ({learningStats.learning})</option>
-                  <option value="not_started">Chưa học ({learningStats.notStarted})</option>
-                  <option value="unreviewed">Chưa ôn tập ({learningStats.unreviewed})</option>
+                  <option value="">{isEn ? "All Statuses" : "Tất cả trạng thái"}</option>
+                  <option value="known">{isEn ? "Mastered" : "Đã biết"} ({learningStats.known})</option>
+                  <option value="learning">{isEn ? "Learning" : "Đang học"} ({learningStats.learning})</option>
+                  <option value="not_started">{isEn ? "New" : "Chưa học"} ({learningStats.notStarted})</option>
+                  <option value="unreviewed">{isEn ? "Unreviewed" : "Chưa ôn tập"} ({learningStats.unreviewed})</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -635,7 +646,7 @@ export function VocabularyPage() {
                 }`}
               >
                 <Star className={`w-3.5 h-3.5 ${starredFilter ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
-                <span>Yêu thích</span>
+                <span>{isEn ? "Starred" : "Yêu thích"}</span>
               </button>
             </div>
 
@@ -644,7 +655,7 @@ export function VocabularyPage() {
               <div className="relative flex-grow lg:w-64">
                 <input
                   type="text"
-                  placeholder="Tìm từ vựng..."
+                  placeholder={isEn ? "Search vocabulary..." : "Tìm từ vựng..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-slate-400"
@@ -662,7 +673,7 @@ export function VocabularyPage() {
                     setSearchQuery('');
                   }}
                   className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-100 flex items-center justify-center transition-colors shrink-0"
-                  title="Xóa bộ lọc"
+                  title={isEn ? "Clear filters" : "Xóa bộ lọc"}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -676,16 +687,16 @@ export function VocabularyPage() {
 
           {/* Total Row Count Indicator & Bulk Action Buttons */}
           <div data-tour="vocab-actions" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs font-bold text-slate-500 px-1 font-sans">
-            <span>Tổng số: <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> từ vựng</span>
+            <span>{isEn ? "Total:" : "Tổng số:"} <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> {isEn ? "words" : "từ vựng"}</span>
             
             <div className="flex flex-wrap items-center gap-2">
               {selectedRows.length > 0 ? (
                 <span className="text-blue-600 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-lg">
-                  Đang chọn: {selectedRows.length} từ
+                  {isEn ? `Selected: ${selectedRows.length} words` : `Đang chọn: ${selectedRows.length} từ`}
                 </span>
               ) : (
                 <span className="text-slate-400 font-bold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-                  Chưa chọn từ vựng
+                  {isEn ? "No words selected" : "Chưa chọn từ vựng"}
                 </span>
               )}
               
@@ -711,10 +722,10 @@ export function VocabularyPage() {
                     ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
                     : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                 }`}
-                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để ôn tập" : "Ôn tập các từ vựng đã chọn"}
+                title={selectedRows.length === 0 ? (isEn ? "Select at least 1 word to review" : "Vui lòng chọn ít nhất 1 từ vựng để ôn tập") : (isEn ? "Review selected words" : "Ôn tập các từ vựng đã chọn")}
               >
                 <GraduationCap className="w-3.5 h-3.5" />
-                <span>Ôn tập ngay</span>
+                <span>{isEn ? "Review Now" : "Ôn tập ngay"}</span>
               </button>
 
               <button
@@ -725,10 +736,10 @@ export function VocabularyPage() {
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                     : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                 }`}
-                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để tạo Flashcard" : "Tạo bộ thẻ Flashcard từ các từ đã chọn"}
+                title={selectedRows.length === 0 ? (isEn ? "Select at least 1 word to create Flashcards" : "Vui lòng chọn ít nhất 1 từ vựng để tạo Flashcard") : (isEn ? "Create Flashcard deck from selected words" : "Tạo bộ thẻ Flashcard từ các từ đã chọn")}
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Tạo Flashcard</span>
+                <span>{isEn ? "Create Flashcard" : "Tạo Flashcard"}</span>
               </button>
 
               <button
@@ -739,10 +750,10 @@ export function VocabularyPage() {
                     ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95'
                     : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                 }`}
-                title={selectedRows.length === 0 ? "Vui lòng chọn ít nhất 1 từ vựng để xóa" : "Xóa các từ vựng đã chọn khỏi Sổ tay"}
+                title={selectedRows.length === 0 ? (isEn ? "Select at least 1 word to delete" : "Vui lòng chọn ít nhất 1 từ vựng để xóa") : (isEn ? "Delete selected words from Notebook" : "Xóa các từ vựng đã chọn khỏi Sổ tay")}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa</span>
+                <span>{isEn ? "Delete" : "Xóa"}</span>
               </button>
             </div>
           </div>
@@ -761,11 +772,11 @@ export function VocabularyPage() {
                         className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4 shadow-sm"
                       />
                     </th>
-                    <th className="py-4.5 px-4 font-black w-[22%]">Từ vựng</th>
+                    <th className="py-4.5 px-4 font-black w-[22%]">{isEn ? "Word" : "Từ vựng"}</th>
                     <th className="py-4.5 px-4 font-black w-[20%]">Pinyin</th>
-                    <th className="py-4.5 px-4 font-black w-[42%]">Nghĩa</th>
-                    <th className="py-4.5 px-4 font-black w-[14%]">Ngày học</th>
-                    <th className="py-4.5 px-4 font-black text-center w-[12%] rounded-tr-2xl">Thao tác</th>
+                    <th className="py-4.5 px-4 font-black w-[42%]">{isEn ? "Meaning" : "Nghĩa"}</th>
+                    <th className="py-4.5 px-4 font-black w-[14%]">{isEn ? "Date Added" : "Ngày học"}</th>
+                    <th className="py-4.5 px-4 font-black text-center w-[12%] rounded-tr-2xl">{isEn ? "Actions" : "Thao tác"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -794,12 +805,12 @@ export function VocabularyPage() {
                           </td>
                           <td className="py-4 px-4 font-display font-extrabold text-base text-slate-800">
                             <div className="flex items-center gap-2">
-                              <span className="group-hover:text-blue-600 transition-colors" title={`Từ vựng: ${cleanWordText}`}>{cleanWordText}</span>
+                              <span className="group-hover:text-blue-600 transition-colors" title={isEn ? `Word: ${cleanWordText}` : `Từ vựng: ${cleanWordText}`}>{cleanWordText}</span>
                               <button 
                                 id="audio-button"
                                 onClick={(e) => speakWord(e, row.text)}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-inner border border-slate-100"
-                                title="Nghe phát âm"
+                                title={isEn ? "Pronounce" : "Nghe phát âm"}
                               >
                                 <Volume2 className="w-3.5 h-3.5" />
                               </button>
@@ -810,7 +821,7 @@ export function VocabularyPage() {
                           </td>
                           <td className="py-4 px-4 font-sans font-semibold text-xs text-slate-600">
                             {(() => {
-                              const rawMeaning = extractPlainMeaning(row.translation);
+                              const rawMeaning = extractPlainMeaning(row.translation, language, row.text);
                               const parts = String(rawMeaning).split(/;|\n/).map(s => s.trim()).filter(Boolean);
                               return parts.length > 2 ? parts.slice(0, 2).join('; ') : rawMeaning;
                             })()}
@@ -824,7 +835,7 @@ export function VocabularyPage() {
                               <button 
                                 onClick={() => toggleStar(row.text)}
                                 className="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Yêu thích"
+                                title={isEn ? "Star" : "Yêu thích"}
                               >
                                 <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
                               </button>
@@ -837,7 +848,7 @@ export function VocabularyPage() {
                                     setOpenActionMenu(openActionMenu === row.selectionKey ? null : row.selectionKey);
                                   }}
                                   className="p-1.5 text-slate-400 hover:text-slate-650 rounded-lg hover:bg-slate-100 transition-colors"
-                                  title="Thao tác khác"
+                                  title={isEn ? "More actions" : "Thao tác khác"}
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
@@ -852,7 +863,7 @@ export function VocabularyPage() {
                                       className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                                     >
                                       <FileText className="h-4 w-4 text-blue-500" />
-                                      Chi tiết từ vựng
+                                      {isEn ? "Word Details" : "Chi tiết từ vựng"}
                                     </button>
                                     <button
                                       onClick={(e) => {
@@ -866,14 +877,14 @@ export function VocabularyPage() {
                                         if (targetDocId) {
                                           navigate(`/reader/${targetDocId}?word=${encodeURIComponent(cleanWordText)}`);
                                         } else {
-                                          toast.info(`Từ "${cleanWordText}" được thêm thủ công hoặc không thuộc bài đọc nào.`);
+                                          toast.info(isEn ? `Word "${cleanWordText}" was added manually or does not belong to any document.` : `Từ "${cleanWordText}" được thêm thủ công hoặc không thuộc bài đọc nào.`);
                                         }
                                       }}
                                       className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-                                      title="Xem vị trí của từ trong tài liệu gốc"
+                                      title={isEn ? "View word location in original document" : "Xem vị trí của từ trong tài liệu gốc"}
                                     >
                                       <BookOpen className="h-4 w-4 text-emerald-500" />
-                                      Tài liệu gốc
+                                      {isEn ? "Original Document" : "Tài liệu gốc"}
                                     </button>
                                     <button
                                       onClick={(e) => {
@@ -883,7 +894,7 @@ export function VocabularyPage() {
                                       className="flex w-full items-center gap-2 border-t border-slate-100 px-3.5 py-2.5 text-xs font-extrabold text-rose-600 hover:bg-rose-50 transition-colors"
                                     >
                                       <Trash2 className="h-4 w-4 text-rose-500" />
-                                      Xóa từ vựng
+                                      {isEn ? "Delete Word" : "Xóa từ vựng"}
                                     </button>
                                   </div>
                                 )}
@@ -896,7 +907,7 @@ export function VocabularyPage() {
                   ) : (
                     <tr>
                       <td colSpan="7" className="py-12 text-center text-slate-400 text-xs font-semibold">
-                        Không tìm thấy từ vựng nào khớp với bộ lọc của bạn.
+                        {isEn ? "No vocabulary found matching your filters." : "Không tìm thấy từ vựng nào khớp với bộ lọc của bạn."}
                       </td>
                     </tr>
                   )}
@@ -965,7 +976,7 @@ export function VocabularyPage() {
                 </div>
 
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-none">
-                  Trang {currentPage} / {totalPages}
+                  {isEn ? `Page ${currentPage} of ${totalPages}` : `Trang ${currentPage} / ${totalPages}`}
                 </div>
               </div>
 
@@ -977,9 +988,9 @@ export function VocabularyPage() {
                     onChange={(e) => setPageSize(Number(e.target.value))}
                     className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 h-9 rounded-xl focus:outline-none transition-colors cursor-pointer shadow-sm"
                   >
-                    <option value={10}>10 / trang</option>
-                    <option value={20}>20 / trang</option>
-                    <option value={50}>50 / trang</option>
+                    <option value={10}>{isEn ? "10 / page" : "10 / trang"}</option>
+                    <option value={20}>{isEn ? "20 / page" : "20 / trang"}</option>
+                    <option value={50}>{isEn ? "50 / page" : "50 / trang"}</option>
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -994,12 +1005,12 @@ export function VocabularyPage() {
           {/* 1. TỔNG QUAN CIRCULAR CHART CARD */}
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 font-sans">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-extrabold text-slate-800">Tổng quan</h3>
+              <h3 className="text-base font-extrabold text-slate-800">{isEn ? "Overview" : "Tổng quan"}</h3>
               <button 
                 onClick={() => navigate('/dashboard')}
                 className="text-xs font-bold text-blue-650 hover:text-blue-700 flex items-center gap-1 transition-colors"
               >
-                <span>Xem chi tiết</span>
+                <span>{isEn ? "View Details" : "Xem chi tiết"}</span>
                 <span>→</span>
               </button>
             </div>
@@ -1062,7 +1073,7 @@ export function VocabularyPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
                   <span className="text-lg font-black text-slate-800 font-display">{learningStats.total}</span>
-                  <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tổng từ vựng</span>
+                  <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1">{isEn ? "Total Words" : "Tổng từ vựng"}</span>
                 </div>
               </div>
 
@@ -1070,19 +1081,19 @@ export function VocabularyPage() {
               <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] font-semibold text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="truncate">Đã biết: <span className="font-extrabold text-slate-800">{learningStats.known}</span></span>
+                  <span className="truncate">{isEn ? "Mastered" : "Đã biết"}: <span className="font-extrabold text-slate-800">{learningStats.known}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                  <span className="truncate">Đang học: <span className="font-extrabold text-slate-800">{learningStats.learning}</span></span>
+                  <span className="truncate">{isEn ? "Learning" : "Đang học"}: <span className="font-extrabold text-slate-800">{learningStats.learning}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-                  <span className="truncate">Chưa học: <span className="font-extrabold text-slate-800">{learningStats.notStarted}</span></span>
+                  <span className="truncate">{isEn ? "New" : "Chưa học"}: <span className="font-extrabold text-slate-800">{learningStats.notStarted}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span className="truncate">Chưa ôn tập: <span className="font-extrabold text-slate-800">{learningStats.unreviewed}</span></span>
+                  <span className="truncate">{isEn ? "Unreviewed" : "Chưa ôn tập"}: <span className="font-extrabold text-slate-800">{learningStats.unreviewed}</span></span>
                 </div>
               </div>
             </div>
@@ -1093,15 +1104,15 @@ export function VocabularyPage() {
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] border border-transparent"
             >
               <GraduationCap className="w-4.5 h-4.5" />
-              <span>Ôn tập ngay</span>
+              <span>{isEn ? "Review Now" : "Ôn tập ngay"}</span>
             </button>
           </div>
 
           {/* 2. TỪ VỰNG THEO NGUỒN TÀI LIỆU (PROGRESS BARS WIDGET) */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4.5 font-sans">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-800">Từ vựng theo nguồn tài liệu</h3>
-              <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Phân bố số lượng từ vựng đã lưu</p>
+              <h3 className="text-sm font-extrabold text-slate-800">{isEn ? "Vocabulary by Source" : "Từ vựng theo nguồn tài liệu"}</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">{isEn ? "Distribution of saved vocabulary" : "Phân bố số lượng từ vựng đã lưu"}</p>
             </div>
 
             <div className="space-y-3.5">
@@ -1143,7 +1154,7 @@ export function VocabularyPage() {
 
           {/* 3. CÔNG CỤ HỌC TẬP (LINKS BOX) */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4 font-sans">
-            <h3 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-2">Công cụ học tập</h3>
+            <h3 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-2">{isEn ? "Learning Tools" : "Công cụ học tập"}</h3>
 
             <div className="space-y-2 text-xs">
               {/* Flashcards */}
@@ -1157,7 +1168,7 @@ export function VocabularyPage() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors">Flashcards</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Ôn tập bằng thẻ ghi nhớ</p>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">{isEn ? "Review with flashcards" : "Ôn tập bằng thẻ ghi nhớ"}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -1173,8 +1184,8 @@ export function VocabularyPage() {
                     <Mic className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-slate-800 group-hover:text-emerald-600 transition-colors">Luyện nói</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Luyện phát âm từ vựng</p>
+                    <h4 className="font-extrabold text-slate-800 group-hover:text-emerald-600 transition-colors">{isEn ? "Pronunciation" : "Luyện nói"}</h4>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">{isEn ? "Practice word pronunciation" : "Luyện phát âm từ vựng"}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -1190,8 +1201,8 @@ export function VocabularyPage() {
                     <BookMarked className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-slate-800 group-hover:text-purple-600 transition-colors">Ôn tập thông minh</h4>
-                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">Hệ thống gợi ý ôn tập</p>
+                    <h4 className="font-extrabold text-slate-800 group-hover:text-purple-600 transition-colors">{isEn ? "Smart SRS" : "Ôn tập thông minh"}</h4>
+                    <p className="text-[10px] text-slate-450 font-bold mt-0.5">{isEn ? "Spaced repetition system" : "Hệ thống gợi ý ôn tập"}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -1216,7 +1227,7 @@ export function VocabularyPage() {
               <button 
                 onClick={() => setDetailWord(null)}
                 className="text-slate-400 hover:text-slate-600 absolute top-5 right-5 p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
-                title="Đóng chi tiết"
+                title={isEn ? "Close details" : "Đóng chi tiết"}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1224,13 +1235,13 @@ export function VocabularyPage() {
               {/* HSK Badge & Top row */}
               <div className="flex justify-between items-center pr-8 border-b border-slate-100 pb-3">
                 <span className="text-xs font-black px-3 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-100">
-                  Nguồn: {detailWord.source}
+                  {isEn ? "Source:" : "Nguồn:"} {detailWord.source}
                 </span>
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => toggleStar(detailWord.text)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors"
-                    title="Đánh dấu từ"
+                    title={isEn ? "Star word" : "Đánh dấu từ"}
                   >
                     <Star className={`w-5 h-5 ${isStarred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'}`} />
                   </button>
@@ -1248,7 +1259,7 @@ export function VocabularyPage() {
                 <button
                   onClick={(e) => speakWord(e, detailWord.text)}
                   className="p-2 text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100/70 rounded-full transition-colors shadow-sm ml-auto"
-                  title="Nghe phát âm"
+                  title={isEn ? "Pronounce" : "Nghe phát âm"}
                 >
                   <Volume2 className="w-5 h-5" />
                 </button>
@@ -1256,17 +1267,17 @@ export function VocabularyPage() {
 
               {/* Translation box */}
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Nghĩa</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">{isEn ? "Meaning" : "Nghĩa"}</span>
                 <div className="bg-blue-50/20 border border-slate-150 rounded-2xl p-4 shadow-inner">
                   <p className="text-blue-650 font-black text-base select-text">
-                    {extractPlainMeaning(detailWord.translation)}
+                    {extractPlainMeaning(detailWord.translation, language, detailWord.text)}
                   </p>
                 </div>
               </div>
 
               {/* Examples block */}
               <div className="space-y-1.5 select-text">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Ví dụ</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">{isEn ? "Example" : "Ví dụ"}</span>
                 <div className="space-y-1 pl-1">
                   <p className="text-sm font-bold text-slate-800 leading-normal">{details.exampleChinese}</p>
                   <p className="text-xs text-slate-450 font-semibold">{details.examplePinyin}</p>
@@ -1276,7 +1287,7 @@ export function VocabularyPage() {
 
               {/* Usage context card */}
               <div className="space-y-1.5">
-                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">Ngữ cảnh</span>
+                <span className="text-xs text-slate-500 font-black uppercase tracking-wider block">{isEn ? "Context" : "Ngữ cảnh"}</span>
                 <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex gap-3 shadow-inner">
                   <Lightbulb className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-slate-600 font-medium leading-relaxed select-text">
@@ -1295,41 +1306,41 @@ export function VocabularyPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col space-y-4 text-slate-700">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-800">Tạo bộ Flashcard mới</h3>
+              <h3 className="text-base font-extrabold text-slate-800">{isEn ? "Create New Flashcard Deck" : "Tạo bộ Flashcard mới"}</h3>
               <button 
                 onClick={() => setShowCreateDeckModal(false)}
                 className="text-slate-400 hover:text-slate-650 transition-colors font-bold text-sm"
               >
-                Đóng
+                {isEn ? "Close" : "Đóng"}
               </button>
             </div>
             
             <form onSubmit={handleCreateDeckSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Tên bộ Flashcard</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">{isEn ? "Deck Name" : "Tên bộ Flashcard"}</label>
                 <input
                   type="text"
                   value={newDeckName}
                   onChange={(e) => setNewDeckName(e.target.value)}
-                  placeholder="Ví dụ: HSK4 Reading Lesson 19"
+                  placeholder={isEn ? "E.g. HSK4 Reading Lesson 19" : "Ví dụ: HSK4 Reading Lesson 19"}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Mô tả (Không bắt buộc)</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">{isEn ? "Description (Optional)" : "Mô tả (Không bắt buộc)"}</label>
                 <input
                   type="text"
                   value={deckDescription}
                   onChange={(e) => setDeckDescription(e.target.value)}
-                  placeholder="Nhập mô tả cho bộ thẻ này..."
+                  placeholder={isEn ? "Enter deck description..." : "Nhập mô tả cho bộ thẻ này..."}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">Nguồn tài liệu</label>
+                <label className="text-[10px] font-black text-slate-450 uppercase tracking-wider">{isEn ? "Source Document" : "Nguồn tài liệu"}</label>
                 <input
                   type="text"
                   value={deckSource}
@@ -1339,7 +1350,7 @@ export function VocabularyPage() {
               </div>
 
               <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-100 flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-700">Số từ:</span>
+                <span className="font-bold text-slate-700">{isEn ? "Word count:" : "Số từ:"}</span>
                 <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-extrabold">{selectedRows.length}</span>
               </div>
               
@@ -1349,14 +1360,14 @@ export function VocabularyPage() {
                   onClick={() => setShowCreateDeckModal(false)}
                   className="flex-1 py-2.5 border border-slate-200 text-slate-500 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
                 >
-                  Hủy
+                  {isEn ? "Cancel" : "Hủy"}
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingDeck}
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
                 >
-                  {isSavingDeck ? 'Đang tạo...' : 'Tạo'}
+                  {isSavingDeck ? (isEn ? 'Creating...' : 'Đang tạo...') : (isEn ? 'Create' : 'Tạo')}
                 </button>
               </div>
             </form>

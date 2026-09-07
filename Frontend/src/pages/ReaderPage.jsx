@@ -19,6 +19,7 @@ import { useVocabularyStore } from '../store/vocabularyStore';
 import { useDocumentStore } from '../store/documentStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { useLanguageStore } from '../store/languageStore';
 import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
@@ -216,6 +217,7 @@ const ReaderPage = () => {
   const showVisualReader = Boolean(visualDocumentType);
   const readerContainerRef = useRef(null);
   const navigate = useNavigate();
+  const { language, t } = useLanguageStore();
 
   // Document Store & Folder Management
   const { folders, addFolder, renameFolder, deleteFolder, moveDocumentToFolder, documents: storeDocs } = useDocumentStore();
@@ -630,11 +632,13 @@ const ReaderPage = () => {
         {
           id: 'welcome-doc',
           sender: 'ai',
-          text: `Chào bạn! Tôi là Trợ lý Học tập AI của Hanora. Bạn đang đọc tài liệu **"${document.title}"**.\nBạn cần tôi giải thích nội dung chung, tóm tắt đoạn văn hay hỗ trợ gì khác không?`
+          text: language === 'en'
+            ? `Hello! I am your Hanora AI Study Assistant. You are reading **"${document.title}"**.\nWould you like me to explain the context, summarize paragraphs, or assist with anything else?`
+            : `Chào bạn! Tôi là Trợ lý Học tập AI của Hanora. Bạn đang đọc tài liệu **"${document.title}"**.\nBạn cần tôi giải thích nội dung chung, tóm tắt đoạn văn hay hỗ trợ gì khác không?`
         }
       ]);
     }
-  }, [document]);
+  }, [document, language]);
 
   // Auto-scroll general document chat
   useEffect(() => {
@@ -1482,10 +1486,16 @@ const ReaderPage = () => {
     if (!bubbleMenu.text) return;
     try {
       await updateServerStatus(bubbleMenu.text, "learning", 0);
-      useToastStore.getState().addToast('Đã lưu vào danh sách Flashcard thành công!', 'success');
+      useToastStore.getState().addToast(
+        language === 'en' ? 'Saved to Flashcards successfully!' : 'Đã lưu vào danh sách Flashcard thành công!',
+        'success'
+      );
     } catch (error) {
       console.error(error);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
+      useToastStore.getState().addToast(
+        language === 'en' ? 'An error occurred while saving.' : 'Có lỗi xảy ra khi lưu vào sổ tay.',
+        'error'
+      );
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
     }
@@ -1508,20 +1518,20 @@ const ReaderPage = () => {
     setIsSendingDocChat(true);
 
     try {
-      const titleContext = document?.title || "Tài liệu tiếng Trung";
+      const titleContext = document?.title || (language === 'en' ? "Chinese Document" : "Tài liệu tiếng Trung");
       const snippetContext = joinDocumentSegments(segments.slice(0, 30));
-      const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext);
+      const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext, language);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
+        text: res.reply || res.Reply || (language === 'en' ? "Sorry, no response was returned by the AI." : "Tôi xin lỗi, không có câu trả lời nào từ AI.")
       }]);
     } catch (err) {
       console.error(err);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: "Không thể kết nối với AI vào lúc này. Vui lòng thử lại sau."
+        text: language === 'en' ? "Unable to connect to AI at the moment. Please try again later." : "Không thể kết nối với AI vào lúc này. Vui lòng thử lại sau."
       }]);
     } finally {
       setIsSendingDocChat(false);
@@ -1788,7 +1798,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <GraduationCap className="h-3.5 w-3.5" />
-              <span>+ Flashcard</span>
+              <span>{t('reader.bubbleMenu.saveFlashcard')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1796,7 +1806,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              <span>+ Sổ tay</span>
+              <span>{t('reader.bubbleMenu.saveNotebook')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1808,7 +1818,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Highlighter className="h-3.5 w-3.5" />
-              <span>Highlight</span>
+              <span>{t('reader.bubbleMenu.highlight')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1819,7 +1829,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <FileText className="h-3.5 w-3.5" />
-              <span>Ghi chú</span>
+              <span>{t('reader.bubbleMenu.addNote')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1844,19 +1854,19 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Search className="h-3.5 w-3.5 text-blue-300" />
-              <span>Dịch nhanh</span>
+              <span>{t('reader.bubbleMenu.quickTranslate')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
               onClick={() => {
                 navigator.clipboard.writeText(bubbleMenu.text);
-                toast.success('Đã sao chép nội dung.');
+                toast.success(language === 'en' ? 'Content copied.' : 'Đã sao chép nội dung.');
                 setBubbleMenu(prev => ({ ...prev, visible: false }));
               }}
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Copy className="h-3.5 w-3.5" />
-              <span>Sao chép</span>
+              <span>{t('reader.bubbleMenu.copy')}</span>
             </button>
             <div
               className="absolute top-full border-[6px] border-transparent border-t-gray-950"
@@ -2973,7 +2983,7 @@ const ReaderPage = () => {
                     }`}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Từ điển</span>
+                  <span>{t('reader.tabs.dict')}</span>
                 </button>
                 <button
                   onClick={() => setSidebarTab('chat')}
@@ -2983,7 +2993,7 @@ const ReaderPage = () => {
                     }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Trợ lý AI</span>
+                  <span>{t('reader.tabs.chat')}</span>
                 </button>
                 <button
                   onClick={() => setSidebarTab('stats')}
@@ -2993,7 +3003,7 @@ const ReaderPage = () => {
                     }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
-                  <span>Tiến trình</span>
+                  <span>{t('reader.tabs.stats')}</span>
                 </button>
               </div>
 
@@ -3008,9 +3018,11 @@ const ReaderPage = () => {
                         <div className="w-14 h-14 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-5">
                           <Search className="w-6 h-6" />
                         </div>
-                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Tra cứu thông minh</h3>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">
+                          {t('reader.dict.emptyTitle')}
+                        </h3>
                         <p className="text-slate-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                          Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
+                          {t('reader.dict.emptyDesc')}
                         </p>
                       </div>
                     ) : (
@@ -3018,7 +3030,7 @@ const ReaderPage = () => {
                         <button
                           onClick={closeWordCard}
                           className="absolute -top-1 right-0 p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-655 rounded-full transition-colors z-10"
-                          title="Đóng bảng tra từ"
+                          title={t('reader.dict.close')}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -3062,7 +3074,9 @@ const ReaderPage = () => {
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                          <span className="text-[10px] text-gray-400 font-bold ml-1">AI đang soạn câu trả lời...</span>
+                          <span className="text-[10px] text-gray-400 font-bold ml-1">
+                            {language === 'en' ? 'AI is generating answer...' : 'AI đang soạn câu trả lời...'}
+                          </span>
                         </div>
                       )}
                       <div ref={docChatBottomRef} />
@@ -3071,18 +3085,20 @@ const ReaderPage = () => {
                     {/* Suggestions triggers */}
                     {docChatMessages.length === 1 && (
                       <div className="flex flex-col gap-1.5 mb-4">
-                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Hỏi nhanh AI</span>
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                          {language === 'en' ? 'Quick AI prompts' : 'Hỏi nhanh AI'}
+                        </span>
                         <button
-                          onClick={(e) => handleSendDocChat(e, "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
+                          onClick={(e) => handleSendDocChat(e, language === 'en' ? "Please briefly summarize the main content of this document." : "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
                           className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
                         >
-                          📖 Tóm tắt nội dung chính tài liệu?
+                          {language === 'en' ? '📖 Summarize document content?' : '📖 Tóm tắt nội dung chính tài liệu?'}
                         </button>
                         <button
-                          onClick={(e) => handleSendDocChat(e, "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
+                          onClick={(e) => handleSendDocChat(e, language === 'en' ? "What is the main topic of this document and what difficult HSK words does it contain?" : "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
                           className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
                         >
-                          💡 Chủ đề & Từ vựng quan trọng?
+                          {language === 'en' ? '💡 Main topic & Key vocabulary?' : '💡 Chủ đề & Từ vựng quan trọng?'}
                         </button>
                       </div>
                     )}
@@ -3094,7 +3110,7 @@ const ReaderPage = () => {
                         value={docChatInput}
                         onChange={(e) => setDocChatInput(e.target.value)}
                         disabled={isSendingDocChat}
-                        placeholder="Hỏi AI về chủ đề hoặc tóm tắt..."
+                        placeholder={language === 'en' ? "Ask AI about topic or summary..." : "Hỏi AI về chủ đề hoặc tóm tắt..."}
                         className="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
                       />
                       <button
@@ -3115,37 +3131,55 @@ const ReaderPage = () => {
                     <div className="bg-blue-50/20 border border-blue-100 rounded-2xl p-4 space-y-4">
                       <h4 className="text-xs font-black uppercase text-blue-800 tracking-wider flex items-center gap-1.5 border-b border-blue-100 pb-2">
                         <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Thông số bài học</span>
+                        <span>{language === 'en' ? 'Session Stats' : 'Thông số bài học'}</span>
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <span className="text-[10px] text-slate-450 font-bold uppercase block">Thời gian học</span>
+                          <span className="text-[10px] text-slate-450 font-bold uppercase block">
+                            {language === 'en' ? 'Study Time' : 'Thời gian học'}
+                          </span>
                           <span className="text-lg font-black text-slate-850 flex items-center gap-1.5">
                             {Math.floor(readingSeconds / 60)}m {readingSeconds % 60}s
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Tổng ký tự</span>
-                          <span className="text-lg font-black text-slate-850">{totalDocChars} từ</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã tra từ điển</span>
-                          <span className="text-lg font-black text-slate-850">{lookupCount} từ</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã bôi màu</span>
-                          <span className="text-lg font-black text-slate-850">{Object.keys(annotations.highlights).length} nét</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Số ghi chú</span>
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">
+                            {language === 'en' ? 'Total Characters' : 'Tổng ký tự'}
+                          </span>
                           <span className="text-lg font-black text-slate-850">
-                            {Object.keys(annotations.textNotes).length + Object.keys(annotations.stickyNotes).length} ghi chú
+                            {totalDocChars} {language === 'en' ? 'chars' : 'từ'}
                           </span>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[10px] text-slate-455 font-bold uppercase block">Đã lưu sổ tay</span>
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">
+                            {language === 'en' ? 'Words Looked Up' : 'Đã tra từ điển'}
+                          </span>
+                          <span className="text-lg font-black text-slate-850">
+                            {lookupCount} {language === 'en' ? 'words' : 'từ'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">
+                            {language === 'en' ? 'Highlights' : 'Đã bôi màu'}
+                          </span>
+                          <span className="text-lg font-black text-slate-850">
+                            {Object.keys(annotations.highlights).length} {language === 'en' ? 'strokes' : 'nét'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">
+                            {language === 'en' ? 'Notes Created' : 'Số ghi chú'}
+                          </span>
+                          <span className="text-lg font-black text-slate-850">
+                            {Object.keys(annotations.textNotes).length + Object.keys(annotations.stickyNotes).length} {language === 'en' ? 'notes' : 'ghi chú'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-455 font-bold uppercase block">
+                            {language === 'en' ? 'Saved to Notebook' : 'Đã lưu sổ tay'}
+                          </span>
                           <span className="text-lg font-black text-emerald-600 font-extrabold flex items-center gap-1">
-                            {savedWordsInDoc} từ
+                            {savedWordsInDoc} {language === 'en' ? 'words' : 'từ'}
                           </span>
                         </div>
                       </div>
@@ -3156,7 +3190,7 @@ const ReaderPage = () => {
                       <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 space-y-4">
                         <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5 border-b border-slate-200/80 pb-2">
                           <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Học viên Hanora</span>
+                          <span>{language === 'en' ? 'Hanora Student' : 'Học viên Hanora'}</span>
                         </h4>
 
                         {/* Streak & XP Display */}
@@ -3164,14 +3198,20 @@ const ReaderPage = () => {
                           <div className="flex items-center gap-1.5">
                             <Flame className="w-5 h-5 text-orange-500 fill-orange-500/10" />
                             <div>
-                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Chuỗi học tập</span>
-                              <span className="text-sm font-black text-slate-805">{user.streak || 0} ngày</span>
+                              <span className="text-[10px] text-slate-400 font-bold block leading-none">
+                                {language === 'en' ? 'Study Streak' : 'Chuỗi học tập'}
+                              </span>
+                              <span className="text-sm font-black text-slate-805">
+                                {user.streak || 0} {language === 'en' ? 'days' : 'ngày'}
+                              </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <GraduationCap className="w-5 h-5 text-blue-500" />
                             <div>
-                              <span className="text-[10px] text-slate-400 font-bold block leading-none">Trình độ XP</span>
+                              <span className="text-[10px] text-slate-400 font-bold block leading-none">
+                                {language === 'en' ? 'XP Level' : 'Trình độ XP'}
+                              </span>
                               <span className="text-sm font-black text-slate-805">{user.level || 'HSK 1'}</span>
                             </div>
                           </div>
@@ -3180,9 +3220,11 @@ const ReaderPage = () => {
                         {/* Daily minutes progress */}
                         <div className="space-y-2 border-t border-slate-200/50 pt-3">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-500 font-semibold">Mục tiêu hằng ngày:</span>
+                            <span className="text-slate-500 font-semibold">
+                              {language === 'en' ? 'Daily Goal:' : 'Mục tiêu hằng ngày:'}
+                            </span>
                             <span className="font-extrabold text-slate-855">
-                              {user.todayMinutes || 0} / {user.targetDailyMinutes || 20} phút
+                              {user.todayMinutes || 0} / {user.targetDailyMinutes || 20} {language === 'en' ? 'mins' : 'phút'}
                             </span>
                           </div>
                           <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
@@ -3196,7 +3238,9 @@ const ReaderPage = () => {
                         </div>
 
                         <div className="text-[10px] text-slate-400 font-semibold italic text-center pt-2 leading-relaxed">
-                          Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!
+                          {language === 'en'
+                            ? 'Your reading and lookup time is automatically tracked to calculate daily study XP!'
+                            : 'Thời gian đọc sách và tra từ của bạn đang được tự động đồng bộ để tính toán XP học tập hàng ngày!'}
                         </div>
                       </div>
                     )}

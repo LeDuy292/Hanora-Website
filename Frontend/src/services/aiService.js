@@ -27,32 +27,39 @@ const defaultExamples = {
   ]
 };
 
+import { getLanguage } from '../store/languageStore';
+
 export const aiService = {
   /**
-   * Generates English translation for a sentence.
+   * Generates translation for a sentence based on user language.
    */
-  async translateSentence(sentence) {
-    await new Promise(resolve => setTimeout(resolve, 800));
+  async translateSentence(sentence, lang = getLanguage()) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const isEn = lang === 'en';
     
     // Fallback simple translation helper
-    if (sentence.includes("你好")) return "Hello!";
-    if (sentence.includes("谢谢")) return "Thank you!";
-    if (sentence.includes("汉语") && sentence.includes("简单")) return "Chinese language is simple.";
-    if (sentence.includes("喜欢") && sentence.includes("咖啡")) return "Like coffee.";
-    if (sentence.includes("看书")) return "Reading a book.";
-    if (sentence.includes("工作")) return "Working at a job.";
+    if (sentence.includes("你好")) return isEn ? "Hello!" : "Xin chào!";
+    if (sentence.includes("谢谢")) return isEn ? "Thank you!" : "Cảm ơn bạn!";
+    if (sentence.includes("汉语") && sentence.includes("简单")) return isEn ? "Chinese language is simple." : "Tiếng Trung rất đơn giản.";
+    if (sentence.includes("喜欢") && sentence.includes("咖啡")) return isEn ? "I like coffee." : "Tôi thích cà phê.";
+    if (sentence.includes("看书")) return isEn ? "Reading a book." : "Đang đọc sách.";
+    if (sentence.includes("工作")) return isEn ? "Working at a job." : "Đang làm việc.";
     
-    // Dynamic mock translation
-    return `[AI Translation]: "${sentence}" — An illustrative translation of this sentence detailing the activities or expressions described.`;
+    return isEn
+      ? `[AI Translation]: "${sentence}" — An illustrative translation detailing the activities described in this sentence.`
+      : `[Bản dịch AI]: "${sentence}" — Bản dịch mẫu minh họa chi tiết ngữ cảnh và hoạt động được miêu tả trong câu.`;
   },
 
   /**
    * Explains grammar particles contained in a sentence.
    */
-  async explainGrammar(sentence) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  async explainGrammar(sentence, lang = getLanguage()) {
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const isEn = lang === 'en';
     
-    let explanations = `## Grammar Breakdown for: *"${sentence}"*\n\n`;
+    let explanations = isEn 
+      ? `## Grammar Breakdown for: *"${sentence}"*\n\n`
+      : `## Phân tích ngữ pháp cho câu: *"${sentence}"*\n\n`;
     let found = false;
 
     Object.keys(GRAMMAR_DATABASE).forEach(particle => {
@@ -63,9 +70,13 @@ export const aiService = {
     });
 
     if (!found) {
-      explanations += `### General Sentence Structure\nThis sentence follows the typical Chinese **Subject + Adverb + Verb + Object (SVO)** sentence structure. No complex aspect particles (like 了, 的, 在) were detected.`;
+      explanations += isEn
+        ? `### General Sentence Structure\nThis sentence follows the typical Chinese **Subject + Adverb + Verb + Object (SVO)** structure. No complex aspect particles were detected.`
+        : `### Cấu trúc câu cơ bản\nCâu này tuân theo trật tự câu tiếng Trung điển hình **Chủ ngữ + Trạng từ + Động từ + Tân ngữ (SVO)**. Chưa phát hiện trợ từ trạng thái phức tạp.`;
     } else {
-      explanations += `### Translation Tip\nPay close attention to particle modifiers as they define tense, emphasis, and possession in Chinese.`;
+      explanations += isEn
+        ? `### Translation Tip\nPay close attention to particle modifiers as they define tense, emphasis, and possession in Chinese.`
+        : `### Mẹo ghi nhớ ngữ pháp\nHãy chú ý đến các trợ từ ngữ pháp vì chúng xác định thì, sự nhấn mạnh và quan hệ sở hữu trong tiếng Trung.`;
     }
 
     return explanations;
@@ -74,8 +85,13 @@ export const aiService = {
   /**
    * Generates usage examples for a Chinese word.
    */
-  async generateExamples(word) {
-    await new Promise(resolve => setTimeout(resolve, 700));
+  async getWordExamples(word, lang = getLanguage()) {
+    return this.generateExamples(word, lang);
+  },
+
+  async generateExamples(word, lang = getLanguage()) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const isEn = lang === 'en';
 
     if (defaultExamples[word]) {
       return defaultExamples[word];
@@ -86,12 +102,14 @@ export const aiService = {
       {
         chinese: `这是我第一次用“${word}”写句子。`,
         pinyin: `Zhè shì wǒ dì-yī cì yòng "${word}" xiě jùzi.`,
-        english: `This is the first time I write a sentence using "${word}".`
+        english: `This is the first time I write a sentence using "${word}".`,
+        vietnamese: `Đây là lần đầu tiên tôi dùng từ "${word}" để đặt câu.`
       },
       {
         chinese: `你明白这个“${word}”的意思吗？`,
         pinyin: `Nǐ míngbai zhè ge "${word}" de yìsi ma?`,
-        english: `Do you understand the meaning of this "${word}"?`
+        english: `Do you understand the meaning of this "${word}"?`,
+        vietnamese: `Bạn có hiểu ý nghĩa của từ "${word}" này không?`
       }
     ];
   }

@@ -1,5 +1,6 @@
 import { getToken } from '../services/apiClient';
 import { validateUploadFile } from '../utils/uploadRules';
+import { getLanguage } from '../store/languageStore';
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const isLocalApiBaseUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/?$/i.test(configuredApiBaseUrl || '');
@@ -145,9 +146,10 @@ export const generateDocumentOcrPage = async (id, pageNumber) => {
   return await response.json();
 };
 
-export const getVocabulary = async (word) => {
+export const getVocabulary = async (word, language = getLanguage()) => {
   const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}`, {
+  const langParam = language ? `?language=${encodeURIComponent(language)}` : '';
+  const response = await fetch(`${API_BASE_URL}/vocabulary/${encodeURIComponent(word)}${langParam}`, {
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
@@ -235,7 +237,7 @@ export const saveDocumentAnnotations = async (id, annotationsJson) => {
   return await response.json();
 };
 
-export const translateSentence = async (text) => {
+export const translateSentence = async (text, language = getLanguage()) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/translate-sentence`, {
     method: 'POST',
@@ -243,7 +245,7 @@ export const translateSentence = async (text) => {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, language })
   });
   if (!response.ok) {
     throw new Error('Failed to translate sentence');
@@ -251,7 +253,7 @@ export const translateSentence = async (text) => {
   return await response.json();
 };
 
-export const compareSentences = async (originalText, modifiedText) => {
+export const compareSentences = async (originalText, modifiedText, language = getLanguage()) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/interactive-compare`, {
     method: 'POST',
@@ -259,7 +261,7 @@ export const compareSentences = async (originalText, modifiedText) => {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: JSON.stringify({ originalText, modifiedText })
+    body: JSON.stringify({ originalText, modifiedText, language })
   });
   if (!response.ok) {
     throw new Error('Failed to compare sentences');
@@ -280,7 +282,7 @@ export const getAllHighlights = async () => {
   return await response.json();
 };
 
-export const askAiAssistant = async (word, question, contextSentence) => {
+export const askAiAssistant = async (word, question, contextSentence, language = getLanguage()) => {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/vocabulary/ai-chat`, {
     method: 'POST',
@@ -288,7 +290,7 @@ export const askAiAssistant = async (word, question, contextSentence) => {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: JSON.stringify({ word, question, contextSentence })
+    body: JSON.stringify({ word, question, contextSentence, language })
   });
   if (!response.ok) {
     throw new Error('Failed to fetch AI assistant reply');

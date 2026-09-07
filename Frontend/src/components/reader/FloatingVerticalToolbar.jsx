@@ -3,23 +3,24 @@ import {
   MousePointer, Highlighter, Pencil, Eraser, FileText, Pin,
   Undo2, Redo2, Palette, Type, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
+import { useLanguageStore } from '../../store/languageStore';
 
-const HIGHLIGHT_COLORS = [
-  { id: 'yellow', name: 'Vàng (Từ mới)', value: '#fef08a' },
-  { id: 'green', name: 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
-  { id: 'blue', name: 'Xanh dương (Quan trọng)', value: '#bfdbfe' },
-  { id: 'purple', name: 'Tím (Ngữ pháp)', value: '#e9d5ff' },
-  { id: 'pink', name: 'Hồng (Thành ngữ)', value: '#fbcfe8' },
-  { id: 'red', name: 'Đỏ (Cần xem lại)', value: '#fecaca' }
+const GET_HIGHLIGHT_COLORS = (lang) => [
+  { id: 'yellow', name: lang === 'en' ? 'Yellow (New Word)' : 'Vàng (Từ mới)', value: '#fef08a' },
+  { id: 'green', name: lang === 'en' ? 'Green (Understood)' : 'Xanh lá (Đã hiểu)', value: '#bbf7d0' },
+  { id: 'blue', name: lang === 'en' ? 'Blue (Important)' : 'Xanh dương (Quan trọng)', value: '#bfdbfe' },
+  { id: 'purple', name: lang === 'en' ? 'Purple (Grammar)' : 'Tím (Ngữ pháp)', value: '#e9d5ff' },
+  { id: 'pink', name: lang === 'en' ? 'Pink (Idiom)' : 'Hồng (Thành ngữ)', value: '#fbcfe8' },
+  { id: 'red', name: lang === 'en' ? 'Red (Review)' : 'Đỏ (Cần xem lại)', value: '#fecaca' }
 ];
 
-const DRAWING_COLORS = [
-  { id: 'red', name: 'Đỏ', value: '#ef4444' },
-  { id: 'yellow', name: 'Vàng', value: '#facc15' },
-  { id: 'green', name: 'Xanh lá', value: '#22c55e' },
-  { id: 'blue', name: 'Xanh dương', value: '#2563eb' },
-  { id: 'purple', name: 'Tím', value: '#9333ea' },
-  { id: 'black', name: 'Đen', value: '#111827' }
+const GET_DRAWING_COLORS = (lang) => [
+  { id: 'red', name: lang === 'en' ? 'Red' : 'Đỏ', value: '#ef4444' },
+  { id: 'yellow', name: lang === 'en' ? 'Yellow' : 'Vàng', value: '#facc15' },
+  { id: 'green', name: lang === 'en' ? 'Green' : 'Xanh lá', value: '#22c55e' },
+  { id: 'blue', name: lang === 'en' ? 'Blue' : 'Xanh dương', value: '#2563eb' },
+  { id: 'purple', name: lang === 'en' ? 'Purple' : 'Tím', value: '#9333ea' },
+  { id: 'black', name: lang === 'en' ? 'Black' : 'Đen', value: '#111827' }
 ];
 
 const PEN_WIDTHS = [
@@ -29,11 +30,11 @@ const PEN_WIDTHS = [
   { value: 8, label: '8px' }
 ];
 
-const PEN_STYLES = [
-  { id: 'solid', name: 'Nét liền' },
-  { id: 'dashed', name: 'Nét đứt' },
+const GET_PEN_STYLES = (lang) => [
+  { id: 'solid', name: lang === 'en' ? 'Solid' : 'Nét liền' },
+  { id: 'dashed', name: lang === 'en' ? 'Dashed' : 'Nét đứt' },
   { id: 'highlight', name: 'Highlight' },
-  { id: 'pencil', name: 'Bút chì' },
+  { id: 'pencil', name: lang === 'en' ? 'Pencil' : 'Bút chì' },
   { id: 'marker', name: 'Marker' }
 ];
 
@@ -53,6 +54,10 @@ export default function FloatingVerticalToolbar({
   canUndo,
   canRedo
 }) {
+  const { language, t } = useLanguageStore();
+  const highlightColors = GET_HIGHLIGHT_COLORS(language);
+  const drawingColors = GET_DRAWING_COLORS(language);
+  const penStyles = GET_PEN_STYLES(language);
   const [activeSubMenu, setActiveSubMenu] = useState(null); // 'highlight' | 'pencil' | null
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -68,7 +73,7 @@ export default function FloatingVerticalToolbar({
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="w-8 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
-          title={isCollapsed ? "Mở rộng thanh công cụ" : "Thu gọn"}
+          title={isCollapsed ? (language === 'en' ? "Expand toolbar" : "Mở rộng thanh công cụ") : (language === 'en' ? "Collapse" : "Thu gọn")}
         >
           {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5 rotate-90" />}
         </button>
@@ -88,7 +93,7 @@ export default function FloatingVerticalToolbar({
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-              title="Con trỏ tra cứu (Pointer)"
+              title={t('reader.toolbar.pointer')}
             >
               <MousePointer className="w-4 h-4" />
             </button>
@@ -105,7 +110,7 @@ export default function FloatingVerticalToolbar({
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
-                title="Bôi màu Highlight (H)"
+                title={t('reader.toolbar.highlighter')}
               >
                 <Highlighter className="w-4 h-4" />
                 <span
@@ -127,7 +132,7 @@ export default function FloatingVerticalToolbar({
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
-                title="Bút vẽ tay (Pencil)"
+                title={t('reader.toolbar.pencil')}
               >
                 <Pencil className="w-4 h-4" />
                 <span
@@ -148,7 +153,7 @@ export default function FloatingVerticalToolbar({
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-              title="Tẩy nét vẽ (Eraser)"
+              title={t('reader.toolbar.eraser')}
             >
               <Eraser className="w-4 h-4" />
             </button>
@@ -164,7 +169,7 @@ export default function FloatingVerticalToolbar({
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-              title="Thêm Ghi chú văn bản"
+              title={t('reader.toolbar.textNote')}
             >
               <FileText className="w-4 h-4" />
             </button>
@@ -180,7 +185,7 @@ export default function FloatingVerticalToolbar({
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-              title="Thêm Sticky Note"
+              title={t('reader.toolbar.stickyNote')}
             >
               <Pin className="w-4 h-4" />
             </button>
@@ -192,7 +197,7 @@ export default function FloatingVerticalToolbar({
               onClick={onUndo}
               disabled={!canUndo}
               className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-              title="Hoàn tác (Undo)"
+              title={t('reader.toolbar.undo')}
             >
               <Undo2 className="w-4 h-4" />
             </button>
@@ -202,7 +207,7 @@ export default function FloatingVerticalToolbar({
               onClick={onRedo}
               disabled={!canRedo}
               className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-              title="Làm lại (Redo)"
+              title={t('reader.toolbar.redo')}
             >
               <Redo2 className="w-4 h-4" />
             </button>
@@ -214,13 +219,13 @@ export default function FloatingVerticalToolbar({
       {!isCollapsed && activeSubMenu === 'highlight' && (
         <div className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl p-3 flex flex-col gap-2 min-w-[180px] animate-in fade-in slide-in-from-left-2 duration-150">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <span className="text-xs font-bold text-slate-700">Màu Highlight</span>
+            <span className="text-xs font-bold text-slate-700">{language === 'en' ? 'Highlight Color' : 'Màu Highlight'}</span>
             <button onClick={() => setActiveSubMenu(null)} className="text-slate-400 hover:text-slate-600">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {HIGHLIGHT_COLORS.map(c => (
+            {highlightColors.map(c => (
               <button
                 key={c.id}
                 onClick={() => {
@@ -242,7 +247,7 @@ export default function FloatingVerticalToolbar({
       {!isCollapsed && activeSubMenu === 'pencil' && (
         <div className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl p-3 flex flex-col gap-3 min-w-[210px] animate-in fade-in slide-in-from-left-2 duration-150">
           <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-            <span className="text-xs font-bold text-slate-700">Cấu hình bút nét vẽ</span>
+            <span className="text-xs font-bold text-slate-700">{language === 'en' ? 'Pen & Stroke Config' : 'Cấu hình bút nét vẽ'}</span>
             <button onClick={() => setActiveSubMenu(null)} className="text-slate-400 hover:text-slate-600">
               <X className="w-3.5 h-3.5" />
             </button>
@@ -250,9 +255,9 @@ export default function FloatingVerticalToolbar({
 
           {/* Pencil Colors */}
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Màu bút</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">{language === 'en' ? 'Pen Color' : 'Màu bút'}</span>
             <div className="flex items-center gap-1.5 flex-wrap">
-              {DRAWING_COLORS.map(c => (
+              {drawingColors.map(c => (
                 <button
                   key={c.id}
                   onClick={() => setPenColor(c.value)}
@@ -268,7 +273,7 @@ export default function FloatingVerticalToolbar({
 
           {/* Pen Widths */}
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Độ nét</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">{language === 'en' ? 'Stroke Width' : 'Độ nét'}</span>
             <div className="grid grid-cols-4 gap-1">
               {PEN_WIDTHS.map(w => (
                 <button
@@ -286,13 +291,13 @@ export default function FloatingVerticalToolbar({
 
           {/* Pen Style */}
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Kiểu nét</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">{language === 'en' ? 'Stroke Style' : 'Kiểu nét'}</span>
             <select
               value={penStyle}
               onChange={(e) => setPenStyle(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
-              {PEN_STYLES.map(s => (
+              {penStyles.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>

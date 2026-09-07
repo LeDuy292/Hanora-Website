@@ -34,6 +34,7 @@ Return ONLY a valid JSON object matching exactly this schema:
   ""pinyin"": ""pinyin with tone marks"",
   ""hanViet"": ""Sino-Vietnamese equivalent in Vietnamese (Hán Việt), e.g. 'Tranh Thủ'"",
   ""definitions"": ""Vietnamese meaning"",
+  ""definitionsEn"": ""English meaning (concise dictionary definition, e.g. 'to seize; to strive for')"",
   ""usageNotes"": ""Ngữ cảnh sử dụng, các trường hợp dùng từ này (tiếng Việt)"",
   ""wordType"": ""Verb"" (Must be exactly one of: Noun, Verb, Adjective, Adverb, Pronoun, Preposition, Conjunction, Particle, MeasureWord, Interjection, Other),
   ""collocations"": [""collocation 1"", ""collocation 2""],
@@ -41,11 +42,13 @@ Return ONLY a valid JSON object matching exactly this schema:
   ""examples"": [ // Provide ONLY 1 to 2 example sentences here. Do NOT provide more than 2.
     {{
       ""zhText"": ""Chinese example sentence"",
-      ""viText"": ""Vietnamese translation""
+      ""viText"": ""Vietnamese translation"",
+      ""enText"": ""English translation""
     }},
     {{
       ""zhText"": ""Another Chinese example sentence"",
-      ""viText"": ""Vietnamese translation""
+      ""viText"": ""Vietnamese translation"",
+      ""enText"": ""English translation""
     }}
   ]
 }}
@@ -154,6 +157,54 @@ Sentences:
         }
     }
 
+    public async Task<string?> TranslateTextAsync(string text, string targetLanguage = "en")
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrEmpty(_apiKey)) return null;
+
+        var targetLangName = targetLanguage.ToLower() == "en" ? "English" : "Vietnamese";
+        var prompt = $@"Translate the following dictionary meaning into {targetLangName}. Keep it concise and return ONLY a valid JSON object matching this schema:
+{{ ""translation"": ""..."" }}
+Text: {text}";
+
+        var url = "https://api.deepseek.com/chat/completions";
+        var payload = new
+        {
+            model = "deepseek-chat",
+            messages = new[]
+            {
+                new { role = "user", content = prompt }
+            },
+            response_format = new { type = "json_object" }
+        };
+
+        try
+        {
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(httpRequest);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseJson);
+            var textResponse = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            if (string.IsNullOrEmpty(textResponse)) return null;
+
+            using var resDoc = JsonDocument.Parse(textResponse);
+            if (resDoc.RootElement.TryGetProperty("translation", out var transProp))
+            {
+                return transProp.GetString();
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to translate text: {Text}", text);
+            return null;
+        }
+    }
+
     public async Task<RelationsDto?> GetRelationsAsync(string word)
     {
         if (string.IsNullOrEmpty(_apiKey)) return null;
@@ -209,11 +260,25 @@ Do NOT output any markdown blocks like ```json or anything else.";
         }
     }
 
-    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence)
+    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string language = "vi")
     {
         if (string.IsNullOrEmpty(_apiKey)) return null;
 
-        var prompt = $@"
+        var isEnglish = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+
+        var prompt = isEnglish ? $@"
+Analyze this Chinese sentence: '{sentence}'.
+Return ONLY a valid JSON object matching exactly this schema:
+{{
+  ""originalText"": ""{sentence}"",
+  ""pinyin"": ""Full pinyin of the sentence with tone marks"",
+  ""hanViet"": ""Sino-Vietnamese equivalent (Hán Việt) of each character/word in the sentence, separated by spaces"",
+  ""vietnamese"": ""Natural English translation of the sentence"",
+  ""translation"": ""Natural English translation of the sentence"",
+  ""grammarAnalysis"": ""Detailed explanation of grammar, identifying Subject, Verb, Object, complements, and key structures (in English)""
+}}
+Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object."
+: $@"
 Analyze this Chinese sentence: '{sentence}'.
 Return ONLY a valid JSON object matching exactly this schema:
 {{
@@ -221,6 +286,7 @@ Return ONLY a valid JSON object matching exactly this schema:
   ""pinyin"": ""Full pinyin of the sentence with tone marks"",
   ""hanViet"": ""Sino-Vietnamese equivalent (Hán Việt) of each character/word in the sentence, separated by spaces"",
   ""vietnamese"": ""Natural Vietnamese translation of the sentence"",
+  ""translation"": ""Natural Vietnamese translation of the sentence"",
   ""grammarAnalysis"": ""Detailed explanation of grammar, identifying Subject, Verb, Object, complements, and key structures (in Vietnamese)""
 }}
 Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
@@ -255,7 +321,12 @@ Do NOT output any markdown blocks like ```json or anything else, just the raw JS
             if (string.IsNullOrEmpty(textResponse)) return null;
 
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            return JsonSerializer.Deserialize<SentenceAnalysisResponse>(textResponse, options);
+            var result = JsonSerializer.Deserialize<SentenceAnalysisResponse>(textResponse, options);
+            if (result != null && string.IsNullOrEmpty(result.Translation))
+            {
+                result.Translation = result.Vietnamese;
+            }
+            return result;
         }
         catch (Exception ex)
         {
@@ -264,11 +335,25 @@ Do NOT output any markdown blocks like ```json or anything else, just the raw JS
         }
     }
 
-    public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText)
+    public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText, string language = "vi")
     {
         if (string.IsNullOrEmpty(_apiKey)) return null;
 
-        var prompt = $@"
+        var isEnglish = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+
+        var prompt = isEnglish ? $@"
+Compare the original Chinese sentence: '{originalText}'
+with the modified Chinese sentence: '{modifiedText}'.
+Return ONLY a valid JSON object matching exactly this schema:
+{{
+  ""originalText"": ""{originalText}"",
+  ""originalTranslation"": ""English translation of the original sentence"",
+  ""modifiedText"": ""{modifiedText}"",
+  ""modifiedTranslation"": ""English translation of the modified sentence"",
+  ""differences"": ""Explanation of grammar or semantic differences between these two sentences (in English)""
+}}
+Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object."
+: $@"
 Compare the original Chinese sentence: '{originalText}'
 with the modified Chinese sentence: '{modifiedText}'.
 Return ONLY a valid JSON object matching exactly this schema:
@@ -320,11 +405,20 @@ Do NOT output any markdown blocks like ```json or anything else, just the raw JS
         }
     }
 
-    public async Task<string> AskAiAssistantAsync(string word, string question, string contextSentence)
+    public async Task<string> AskAiAssistantAsync(string word, string question, string contextSentence, string language = "vi")
     {
         if (string.IsNullOrEmpty(_apiKey)) return "AI key is not configured.";
 
-        var prompt = $@"
+        var isEnglish = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+
+        var prompt = isEnglish ? $@"
+You are Hanora's intelligent Chinese learning assistant.
+The student is reading a document and has a question about the word/phrase/sentence: '{word}'.
+The context sentence in the document is: '{contextSentence}'.
+The student's question is: '{question}'.
+
+Answer concisely, clearly, and helpfully in English to help the student understand, providing memory tips or practical examples if helpful."
+: $@"
 Bạn là trợ lý học tập tiếng Trung thông minh của Hanora.
 Học viên đang đọc một tài liệu và thắc mắc về từ/cụm từ/câu: '{word}'.
 Ngữ cảnh trong câu gốc của tài liệu là: '{contextSentence}'.
@@ -351,19 +445,19 @@ Hãy trả lời ngắn gọn, súc tích, dễ hiểu bằng tiếng Việt đ�
             {
                 var error = await response.Content.ReadAsStringAsync();
                 _logger.LogWarning("Deepseek API error (AskAiAssistant): {StatusCode} {Error}", response.StatusCode, error);
-                return "Không thể kết nối với AI lúc này.";
+                return isEnglish ? "Cannot connect to AI service at the moment." : "Không thể kết nối với AI lúc này.";
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
             var textResponse = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
-            return textResponse ?? "Không nhận được phản hồi từ AI.";
+            return textResponse ?? (isEnglish ? "No response received from AI." : "Không nhận được phản hồi từ AI.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to ask AI assistant for word: {Word}", word);
-            return "Đã xảy ra lỗi hệ thống khi kết nối với AI.";
+            return isEnglish ? "System error occurred while connecting to AI." : "Đã xảy ra lỗi hệ thống khi kết nối với AI.";
         }
     }
 }

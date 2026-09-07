@@ -25,10 +25,14 @@ import { useVocabularyStore } from '../store/vocabularyStore';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
+import { LanguageSwitcher } from '../components/common/LanguageSwitcher';
+import { useLanguageStore } from '../store/languageStore';
 import confetti from 'canvas-confetti';
 
 export function ProfilePage() {
   const navigate = useNavigate();
+  const { language, t } = useLanguageStore();
+  const isEn = language === 'en';
   
   // Stores
   const { user, updateProfile, updatePreferences, logout, refreshProfile, updateProfileOnServer } = useAuthStore();
@@ -111,7 +115,7 @@ export function ProfilePage() {
     });
 
     if (!res.success) {
-      showToast(res.error || 'Lỗi lưu cấu hình', 'warning');
+      showToast(res.error || (isEn ? 'Failed to save settings' : 'Lỗi lưu cấu hình'), 'warning');
       return;
     }
 
@@ -130,7 +134,7 @@ export function ProfilePage() {
       origin: { y: 0.8 }
     });
 
-    showToast('Lưu cấu hình thiết lập thành công!');
+    showToast(isEn ? 'Preferences saved successfully!' : 'Lưu cấu hình thiết lập thành công!');
   };
 
   // Avatar upload handler
@@ -149,9 +153,9 @@ export function ProfilePage() {
       // Call server
       const res = await updateProfileOnServer({ avatarUrl: base64String });
       if (!res.success) {
-        showToast('Lỗi khi tải ảnh lên!', 'warning');
+        showToast(isEn ? 'Error uploading image!' : 'Lỗi khi tải ảnh lên!', 'warning');
       } else {
-        showToast('Đã cập nhật ảnh đại diện thành công!');
+        showToast(isEn ? 'Avatar updated successfully!' : 'Đã cập nhật ảnh đại diện thành công!');
       }
     };
     reader.readAsDataURL(file);
@@ -188,7 +192,7 @@ export function ProfilePage() {
     downloadAnchor.click();
     downloadAnchor.remove();
 
-    showToast('Đã xuất dữ liệu học tập thành công!');
+    showToast(isEn ? 'Learning data exported successfully!' : 'Đã xuất dữ liệu học tập thành công!');
   };
 
   // Clear learning history handler
@@ -206,7 +210,7 @@ export function ProfilePage() {
     });
 
     setActiveModal(null);
-    showToast('Đã xóa toàn bộ lịch sử học tập!', 'warning');
+    showToast(isEn ? 'Cleared entire learning history!' : 'Đã xóa toàn bộ lịch sử học tập!', 'warning');
   };
 
   // Delete Account handler
@@ -223,7 +227,7 @@ export function ProfilePage() {
   const handleUpdateAccountField = async (type) => {
     const newErrors = {};
     if (type === 'edit_profile') {
-      if (!editForm.name.trim()) newErrors.name = 'Họ và tên không được để trống';
+      if (!editForm.name.trim()) newErrors.name = isEn ? 'Full name cannot be empty' : 'Họ và tên không được để trống';
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         return;
@@ -234,12 +238,12 @@ export function ProfilePage() {
         return;
       }
       setFullName(editForm.name);
-      showToast('Cập nhật tên thành công!');
+      showToast(isEn ? 'Name updated successfully!' : 'Cập nhật tên thành công!');
     } else if (type === 'email_address') {
       if (!editForm.email.trim()) {
-        newErrors.email = 'Email không được để trống';
+        newErrors.email = isEn ? 'Email cannot be empty' : 'Email không được để trống';
       } else if (!/\S+@\S+\.\S+/.test(editForm.email)) {
-        newErrors.email = 'Định dạng email không hợp lệ';
+        newErrors.email = isEn ? 'Invalid email format' : 'Định dạng email không hợp lệ';
       }
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
@@ -251,11 +255,11 @@ export function ProfilePage() {
         return;
       }
       setEmailAddress(editForm.email);
-      showToast('Cập nhật địa chỉ email thành công!');
+      showToast(isEn ? 'Email address updated successfully!' : 'Cập nhật địa chỉ email thành công!');
     } else if (type === 'change_password') {
-      if (!editForm.currentPassword) newErrors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
-      if (!editForm.newPassword || editForm.newPassword.length < 6) newErrors.newPassword = 'Mật khẩu mới phải từ 6 ký tự trở lên';
-      if (editForm.newPassword !== editForm.confirmPassword) newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+      if (!editForm.currentPassword) newErrors.currentPassword = isEn ? 'Please enter your current password' : 'Vui lòng nhập mật khẩu hiện tại';
+      if (!editForm.newPassword || editForm.newPassword.length < 6) newErrors.newPassword = isEn ? 'New password must be at least 6 characters' : 'Mật khẩu mới phải từ 6 ký tự trở lên';
+      if (editForm.newPassword !== editForm.confirmPassword) newErrors.confirmPassword = isEn ? 'Confirm password does not match' : 'Mật khẩu xác nhận không khớp';
       
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
@@ -269,7 +273,7 @@ export function ProfilePage() {
         setErrors({ currentPassword: res.error });
         return;
       }
-      showToast('Đã cập nhật mật khẩu mới thành công!');
+      showToast(isEn ? 'New password updated successfully!' : 'Đã cập nhật mật khẩu mới thành công!');
     }
     
     setErrors({});
@@ -307,8 +311,12 @@ export function ProfilePage() {
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-slate-900">Account</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Thông tin tài khoản chính của bạn</p>
+              <h3 className="text-base font-extrabold text-slate-900">
+                {language === 'en' ? 'Account' : 'Tài khoản'}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                {language === 'en' ? 'Your primary account details' : 'Thông tin tài khoản chính của bạn'}
+              </p>
             </div>
           </div>
 
@@ -321,16 +329,22 @@ export function ProfilePage() {
               }}
               className="group flex cursor-pointer flex-col gap-2 rounded-2xl px-3 py-4 transition-all hover:bg-blue-50/60 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Full Name</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                {language === 'en' ? 'Full Name' : 'Họ và tên'}
+              </span>
               <div className="flex items-center gap-2">
-                <span className="max-w-full break-words text-sm font-bold text-slate-900">{fullName || "Chưa thiết lập"}</span>
+                <span className="max-w-full break-words text-sm font-bold text-slate-900">
+                  {fullName || (language === 'en' ? "Not set" : "Chưa thiết lập")}
+                </span>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
             {/* Email Address Row (Non-editable) */}
             <div className="flex flex-col gap-2 rounded-2xl px-3 py-4 transition-all sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Email Address</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                {language === 'en' ? 'Email Address' : 'Địa chỉ Email'}
+              </span>
               <div className="flex items-center gap-2">
                 <span className="max-w-full break-words text-sm font-bold text-slate-900">{emailAddress}</span>
                 <Lock className="w-3.5 h-3.5 text-slate-300" />
@@ -345,7 +359,9 @@ export function ProfilePage() {
               }}
               className="group flex cursor-pointer flex-col gap-2 rounded-2xl px-3 py-4 transition-all hover:bg-blue-50/60 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Password</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                {language === 'en' ? 'Password' : 'Mật khẩu'}
+              </span>
               <div className="flex items-center gap-2">
                 <span className="max-w-full break-words text-sm font-bold text-slate-900">********</span>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -354,7 +370,9 @@ export function ProfilePage() {
 
             {/* Joined Date Row */}
             <div className="flex flex-col gap-2 px-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Joined Date</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                {language === 'en' ? 'Joined Date' : 'Ngày tham gia'}
+              </span>
               <span className="max-w-full break-words text-sm font-bold text-slate-900">{user.joinedDate || "March 15, 2024"}</span>
             </div>
           </div>
@@ -411,7 +429,7 @@ export function ProfilePage() {
               className="flex min-h-11 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] sm:justify-start"
             >
               <User className="w-4 h-4 text-slate-400" />
-              <span>Edit Profile</span>
+              <span>{language === 'en' ? 'Edit Profile' : 'Chỉnh sửa hồ sơ'}</span>
             </button>
 
             <button 
@@ -422,11 +440,47 @@ export function ProfilePage() {
               className="flex min-h-11 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] sm:justify-start"
             >
               <Lock className="w-4 h-4 text-slate-400" />
-              <span>Change Password</span>
+              <span>{language === 'en' ? 'Change Password' : 'Đổi mật khẩu'}</span>
             </button>
           </div>
         </div>
 
+      </div>
+
+      {/* Preferences & System Language Settings Card */}
+      <div className="rounded-[1.75rem] border border-white/80 bg-white/90 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 backdrop-blur-xl sm:p-6 lg:p-8">
+        <div className="flex items-start gap-3 border-b border-slate-200/80 pb-4 mb-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+            <Globe className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold text-slate-900">
+              {language === 'en' ? 'System Preferences' : 'Tùy chọn hệ thống'}
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+              {language === 'en' ? 'Configure display language & learning preferences' : 'Tùy chỉnh ngôn ngữ hiển thị và cấu hình học tập'}
+            </p>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-200/80">
+          {/* Language Row */}
+          <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-bold text-slate-900">
+                {language === 'en' ? 'Interface & Translation Language' : 'Ngôn ngữ giao diện & Dịch thuật'}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {language === 'en' 
+                  ? 'Switch entire UI, dictionary definitions, and AI analysis between English and Vietnamese.'
+                  : 'Chuyển đổi toàn bộ giao diện, tra từ điển và phân tích câu AI giữa Tiếng Việt và Tiếng Anh.'}
+              </div>
+            </div>
+            <div>
+              <LanguageSwitcher variant="default" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -440,13 +494,13 @@ export function ProfilePage() {
           setActiveModal(null);
           setErrors({});
         }}
-        title="Edit Full Name"
+        title={isEn ? "Edit Full Name" : "Chỉnh sửa họ tên"}
         size="sm"
       >
         <div className="space-y-4">
           <Input 
-            label="Full Name"
-            placeholder="Nhập họ và tên mới"
+            label={isEn ? "Full Name" : "Họ và tên"}
+            placeholder={isEn ? "Enter your full name" : "Nhập họ và tên mới"}
             icon={User}
             value={editForm.name}
             onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
@@ -459,13 +513,13 @@ export function ProfilePage() {
               onClick={() => setActiveModal(null)}
               className="px-4 py-2 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
             >
-              Hủy
+              {isEn ? "Cancel" : "Hủy"}
             </button>
             <Button 
               variant="primary"
               onClick={() => handleUpdateAccountField('edit_profile')}
             >
-              Lưu thay đổi
+              {isEn ? "Save changes" : "Lưu thay đổi"}
             </Button>
           </div>
         </div>
@@ -478,12 +532,12 @@ export function ProfilePage() {
           setActiveModal(null);
           setErrors({});
         }}
-        title="Update Email Address"
+        title={isEn ? "Update Email Address" : "Cập nhật địa chỉ email"}
         size="sm"
       >
         <div className="space-y-4">
           <Input 
-            label="Email Address"
+            label={isEn ? "Email Address" : "Địa chỉ Email"}
             placeholder="name@example.com"
             type="email"
             icon={Mail}
@@ -498,13 +552,13 @@ export function ProfilePage() {
               onClick={() => setActiveModal(null)}
               className="px-4 py-2 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
             >
-              Hủy
+              {isEn ? "Cancel" : "Hủy"}
             </button>
             <Button 
               variant="primary"
               onClick={() => handleUpdateAccountField('email_address')}
             >
-              Cập nhật
+              {isEn ? "Update" : "Cập nhật"}
             </Button>
           </div>
         </div>
@@ -517,12 +571,12 @@ export function ProfilePage() {
           setActiveModal(null);
           setErrors({});
         }}
-        title="Change Password"
+        title={isEn ? "Change Password" : "Đổi mật khẩu"}
         size="sm"
       >
         <div className="space-y-4">
           <Input 
-            label="Current Password"
+            label={isEn ? "Current Password" : "Mật khẩu hiện tại"}
             placeholder="••••••••"
             type="password"
             icon={Lock}
@@ -532,7 +586,7 @@ export function ProfilePage() {
           />
 
           <Input 
-            label="New Password"
+            label={isEn ? "New Password" : "Mật khẩu mới"}
             placeholder="••••••••"
             type="password"
             icon={Lock}
@@ -542,7 +596,7 @@ export function ProfilePage() {
           />
 
           <Input 
-            label="Confirm New Password"
+            label={isEn ? "Confirm New Password" : "Xác nhận mật khẩu mới"}
             placeholder="••••••••"
             type="password"
             icon={Lock}
@@ -556,13 +610,13 @@ export function ProfilePage() {
               onClick={() => setActiveModal(null)}
               className="px-4 py-2 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
             >
-              Hủy
+              {isEn ? "Cancel" : "Hủy"}
             </button>
             <Button 
               variant="primary"
               onClick={() => handleUpdateAccountField('change_password')}
             >
-              Cập nhật mật khẩu
+              {isEn ? "Update Password" : "Cập nhật mật khẩu"}
             </Button>
           </div>
         </div>
@@ -572,7 +626,7 @@ export function ProfilePage() {
       <Modal
         isOpen={activeModal === 'manage_plan'}
         onClose={() => setActiveModal(null)}
-        title="Subscription Plan"
+        title={isEn ? "Subscription Plan" : "Gói thành viên"}
         size="sm"
       >
         <div className="space-y-5 text-center py-4">
@@ -581,9 +635,11 @@ export function ProfilePage() {
           </div>
           
           <div className="space-y-2">
-            <h4 className="text-sm font-black text-slate-800">Bạn đang sử dụng gói Hanora Pro</h4>
+            <h4 className="text-sm font-black text-slate-800">{isEn ? "You are using Hanora Pro" : "Bạn đang sử dụng gói Hanora Pro"}</h4>
             <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-              Cảm ơn bạn đã đồng hành cùng Hanora! Gói của bạn hiện được miễn phí trọn đời nhằm hỗ trợ cộng đồng học tiếng Trung tốt nhất.
+              {isEn 
+                ? "Thank you for being part of Hanora! Your account has lifetime free access to support the Chinese learning community."
+                : "Cảm ơn bạn đã đồng hành cùng Hanora! Gói của bạn hiện được miễn phí trọn đời nhằm hỗ trợ cộng đồng học tiếng Trung tốt nhất."}
             </p>
           </div>
           
@@ -592,7 +648,7 @@ export function ProfilePage() {
               variant="primary"
               onClick={() => setActiveModal(null)}
             >
-              Đồng ý
+              {isEn ? "Got it" : "Đồng ý"}
             </Button>
           </div>
         </div>
@@ -602,14 +658,16 @@ export function ProfilePage() {
       <Modal
         isOpen={activeModal === 'delete_history'}
         onClose={() => setActiveModal(null)}
-        title="Delete Learning History?"
+        title={isEn ? "Delete Learning History?" : "Xóa lịch sử học tập?"}
         size="sm"
       >
         <div className="space-y-4">
           <div className="p-4 bg-amber-50/50 border border-amber-100 text-amber-900 rounded-2xl flex items-start gap-3">
             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-xs font-semibold leading-relaxed">
-              Hành động này sẽ xóa toàn bộ danh sách từ vựng đã lưu, các tài liệu bạn đã tải lên, cũng như reset điểm kinh nghiệm (XP) và Streak về 0. Bạn có chắc chắn muốn tiếp tục?
+              {isEn
+                ? "This action will delete all your saved vocabulary, uploaded documents, and reset your XP and Streak to 0. Are you sure you want to proceed?"
+                : "Hành động này sẽ xóa toàn bộ danh sách từ vựng đã lưu, các tài liệu bạn đã tải lên, cũng như reset điểm kinh nghiệm (XP) và Streak về 0. Bạn có chắc chắn muốn tiếp tục?"}
             </div>
           </div>
           
@@ -618,13 +676,13 @@ export function ProfilePage() {
               onClick={() => setActiveModal(null)}
               className="px-4 py-2 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
             >
-              Hủy bỏ
+              {isEn ? "Cancel" : "Hủy bỏ"}
             </button>
             <button 
               onClick={handleClearHistory}
               className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 rounded-xl transition-all shadow-sm active:scale-95"
             >
-              Xác nhận xóa
+              {isEn ? "Confirm Delete" : "Xác nhận xóa"}
             </button>
           </div>
         </div>
@@ -634,14 +692,16 @@ export function ProfilePage() {
       <Modal
         isOpen={activeModal === 'delete_account'}
         onClose={() => setActiveModal(null)}
-        title="Delete Account permanently?"
+        title={isEn ? "Delete Account permanently?" : "Xóa tài khoản vĩnh viễn?"}
         size="sm"
       >
         <div className="space-y-4">
           <div className="p-4 bg-red-50/60 border border-red-100 text-red-900 rounded-2xl flex items-start gap-3">
             <Trash2 className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
             <div className="text-xs font-semibold leading-relaxed">
-              Bạn đang chuẩn bị xóa tài khoản vĩnh viễn. Mọi dữ liệu học tập của bạn trên Hanora sẽ bị xóa hoàn toàn khỏi hệ thống lưu trữ local storage và không thể khôi phục lại.
+              {isEn
+                ? "You are about to delete your account permanently. All your learning data on Hanora will be deleted from storage and cannot be restored."
+                : "Bạn đang chuẩn bị xóa tài khoản vĩnh viễn. Mọi dữ liệu học tập của bạn trên Hanora sẽ bị xóa hoàn toàn khỏi hệ thống lưu trữ local storage và không thể khôi phục lại."}
             </div>
           </div>
           
@@ -650,13 +710,13 @@ export function ProfilePage() {
               onClick={() => setActiveModal(null)}
               className="px-4 py-2 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all"
             >
-              Hủy bỏ
+              {isEn ? "Cancel" : "Hủy bỏ"}
             </button>
             <button 
               onClick={handleDeleteAccount}
               className="px-4 py-2 text-xs font-bold text-white bg-red-650 hover:bg-red-500 rounded-xl transition-all shadow-sm active:scale-95"
             >
-              Xóa tài khoản
+              {isEn ? "Delete Account" : "Xóa tài khoản"}
             </button>
           </div>
         </div>

@@ -17,9 +17,12 @@ import {
 } from 'lucide-react';
 import { leaderboardApi } from '../services/leaderboardService';
 import { useAuthStore } from '../store/authStore';
+import { useLanguageStore } from '../store/languageStore';
 
 export function LeaderboardPage() {
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const [period, setPeriod] = useState('global');
   const [criteria, setCriteria] = useState('default');
   const [loading, setLoading] = useState(true);
@@ -35,35 +38,35 @@ export function LeaderboardPage() {
         setData(result);
       } catch (err) {
         console.error('Failed to load leaderboard', err);
-        setError('Không thể tải bảng xếp hạng. Vui lòng thử lại sau.');
+        setError(isEn ? 'Failed to load leaderboard. Please try again later.' : 'Không thể tải bảng xếp hạng. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
     }
     fetchLeaderboard();
-  }, [period, criteria]);
+  }, [period, criteria, isEn]);
 
   // Period Tabs
   const periods = [
-    { id: 'global', label: 'Tất cả' },
-    { id: 'weekly', label: 'Hàng tuần' },
-    { id: 'monthly', label: 'Hàng tháng' }
+    { id: 'global', label: isEn ? 'All Time' : 'Tất cả' },
+    { id: 'weekly', label: isEn ? 'Weekly' : 'Hàng tuần' },
+    { id: 'monthly', label: isEn ? 'Monthly' : 'Hàng tháng' }
   ];
 
   // Criteria Filters with matching icons
   const criteriaFilters = [
-    { id: 'default', label: 'Tổng Điểm', icon: Sparkles, color: 'text-amber-500 bg-amber-50' },
-    { id: 'vocabulary', label: 'Từ Vựng', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50' },
-    { id: 'practice', label: 'Luyện Tập', icon: Layers, color: 'text-sky-500 bg-sky-50' },
-    { id: 'reading', label: 'Đọc Dịch', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50' },
-    { id: 'pronunciation', label: 'Phát Âm', icon: Mic, color: 'text-rose-500 bg-rose-50' }
+    { id: 'default', label: isEn ? 'Total Score' : 'Tổng Điểm', icon: Sparkles, color: 'text-amber-500 bg-amber-50' },
+    { id: 'vocabulary', label: isEn ? 'Vocabulary' : 'Từ Vựng', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50' },
+    { id: 'practice', label: isEn ? 'Practice' : 'Luyện Tập', icon: Layers, color: 'text-sky-500 bg-sky-50' },
+    { id: 'reading', label: isEn ? 'Reading' : 'Đọc Dịch', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50' },
+    { id: 'pronunciation', label: isEn ? 'Pronunciation' : 'Phát Âm', icon: Mic, color: 'text-rose-500 bg-rose-50' }
   ];
 
   if (loading && !data) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-        <p className="text-slate-400 font-medium">Đang tải bảng xếp hạng...</p>
+        <p className="text-slate-400 font-medium">{isEn ? 'Loading leaderboard...' : 'Đang tải bảng xếp hạng...'}</p>
       </div>
     );
   }
@@ -90,13 +93,13 @@ export function LeaderboardPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-extrabold uppercase tracking-wider mb-2">
               <Trophy className="w-4 h-4 text-yellow-300 fill-yellow-300/30" />
-              <span>Bảng Xếp Hạng Người Học</span>
+              <span>{isEn ? "Learner Leaderboard" : "Bảng Xếp Hạng Người Học"}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
-              Đua Top & Tích Lũy Điểm Thưởng
+              {isEn ? "Compete & Earn Reward Points" : "Đua Top & Tích Lũy Điểm Thưởng"}
             </h1>
             <p className="text-white/80 font-medium text-xs md:text-sm max-w-lg mt-1">
-              Cạnh tranh lành mạnh, nâng cao trình độ tiếng Trung và nhận thưởng XP hàng tuần.
+              {isEn ? "Compete healthily, master your Chinese, and receive weekly XP rewards." : "Cạnh tranh lành mạnh, nâng cao trình độ tiếng Trung và nhận thưởng XP hàng tuần."}
             </p>
           </div>
 
@@ -107,7 +110,7 @@ export function LeaderboardPage() {
                 <Award className="w-6 h-6 text-yellow-300" />
               </div>
               <div className="space-y-0.5">
-                <span className="text-[10px] text-white/80 font-extrabold uppercase tracking-wider block">Thứ hạng của bạn</span>
+                <span className="text-[10px] text-white/80 font-extrabold uppercase tracking-wider block">{isEn ? "Your Rank" : "Thứ hạng của bạn"}</span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-black text-yellow-300">#{currentUserCard.rank}</span>
                   <span className="text-xs font-bold text-white">({currentUserCard.score.toLocaleString()} XP)</span>
@@ -117,8 +120,8 @@ export function LeaderboardPage() {
             </div>
           ) : (
             <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[220px] text-left shrink-0">
-              <span className="text-[10px] text-white/70 font-extrabold uppercase tracking-wider block">Thứ hạng của bạn</span>
-              <span className="text-xs font-bold text-white mt-1 block">Chưa xếp hạng — Học bài để đua top!</span>
+              <span className="text-[10px] text-white/70 font-extrabold uppercase tracking-wider block">{isEn ? "Your Rank" : "Thứ hạng của bạn"}</span>
+              <span className="text-xs font-bold text-white mt-1 block">{isEn ? "Unranked — Study to climb the leaderboard!" : "Chưa xếp hạng — Học bài để đua top!"}</span>
             </div>
           )}
         </div>
@@ -185,9 +188,9 @@ export function LeaderboardPage() {
                 <div className="text-center mb-6">
                   <h3 className="text-base font-extrabold text-slate-800 flex items-center justify-center gap-2">
                     <Crown className="w-5 h-5 text-yellow-500 fill-yellow-400" />
-                    <span>Top 3 Vinh Danh</span>
+                    <span>{isEn ? "Top 3 Honorees" : "Top 3 Vinh Danh"}</span>
                   </h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Bảng vàng khen thưởng những học viên xuất sắc nhất</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{isEn ? "Hall of fame honoring top performing learners" : "Bảng vàng khen thưởng những học viên xuất sắc nhất"}</p>
                 </div>
 
                 <div className="flex justify-center items-end gap-3 md:gap-8 pt-8">
@@ -232,7 +235,7 @@ export function LeaderboardPage() {
 
                       {/* Podium Pedestal */}
                       <div className={`w-full mt-4 rounded-t-2xl bg-gradient-to-b border-t shadow-inner flex flex-col justify-center items-center text-center ${user.height} ${user.color}`}>
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider block opacity-75">Điểm</span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider block opacity-75">{isEn ? "Score" : "Điểm"}</span>
                         <span className="text-sm md:text-lg font-black mt-0.5 leading-none">{user.score.toLocaleString()}</span>
                       </div>
                     </div>
@@ -245,11 +248,11 @@ export function LeaderboardPage() {
             <div className="bg-white border border-slate-100 rounded-[2rem] shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-50 flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Xếp Hạng Người Học</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Bảng xếp hạng cập nhật thời gian thực</p>
+                  <h3 className="text-base font-bold text-slate-800">{isEn ? "Learner Rankings" : "Xếp Hạng Người Học"}</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">{isEn ? "Real-time updated leaderboard" : "Bảng xếp hạng cập nhật thời gian thực"}</p>
                 </div>
                 <span className="text-xs font-bold text-slate-400 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
-                  {rankings.length + top3.length} người học
+                  {rankings.length + top3.length} {isEn ? "learners" : "người học"}
                 </span>
               </div>
 
@@ -257,7 +260,7 @@ export function LeaderboardPage() {
                 {rankings.length === 0 && top3.length <= 3 && (
                   <div className="p-12 text-center text-slate-400">
                     <HelpCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="text-xs font-bold">Không có thêm thứ hạng nào khác ngoài Top 3.</p>
+                    <p className="text-xs font-bold">{isEn ? "No additional rankings outside Top 3." : "Không có thêm thứ hạng nào khác ngoài Top 3."}</p>
                   </div>
                 )}
                 
@@ -288,14 +291,14 @@ export function LeaderboardPage() {
                       {/* Display name & level badge */}
                       <div>
                         <span className={`text-xs font-bold block ${row.userId === user?.id ? 'text-blue-600' : 'text-slate-800'}`}>
-                          {row.displayName} {row.userId === user?.id && <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider bg-blue-100 px-1.5 py-0.5 rounded-md ml-1.5">BẠN</span>}
+                          {row.displayName} {row.userId === user?.id && <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider bg-blue-100 px-1.5 py-0.5 rounded-md ml-1.5">{isEn ? "YOU" : "BẠN"}</span>}
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[9px] bg-slate-50 border border-slate-100 text-slate-450 px-1.5 py-0.2 rounded-md font-bold uppercase tracking-wide">
                             Lvl {row.level}
                           </span>
                           <span className="text-[9px] text-slate-400 font-bold flex items-center gap-0.5">
-                            <Flame className="w-3 h-3 text-orange-500 fill-orange-500/20" /> {row.streak} ngày
+                            <Flame className="w-3 h-3 text-orange-500 fill-orange-500/20" /> {row.streak} {isEn ? "days" : "ngày"}
                           </span>
                         </div>
                       </div>
@@ -307,7 +310,7 @@ export function LeaderboardPage() {
                         {row.score.toLocaleString()}
                       </span>
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 block">
-                        {row.secondaryValue || 'Điểm'}
+                        {row.secondaryValue || (isEn ? 'Points' : 'Điểm')}
                       </span>
                     </div>
                   </div>
@@ -325,11 +328,11 @@ export function LeaderboardPage() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">Thứ hạng của bạn</span>
+                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">{isEn ? "Your Rank" : "Thứ hạng của bạn"}</span>
                     <div className="flex items-baseline gap-2 mt-1">
                       <span className="text-4xl font-black">#{currentUserCard.rank}</span>
                       <span className="text-xs font-bold text-white/80">
-                        (Cấp {currentUserCard.level})
+                        ({isEn ? `Level ${currentUserCard.level}` : `Cấp ${currentUserCard.level}`})
                       </span>
                     </div>
                   </div>
@@ -340,7 +343,7 @@ export function LeaderboardPage() {
 
                 <div className="space-y-2 border-t border-white/10 pt-3">
                   <div className="flex justify-between text-xs font-bold">
-                    <span className="text-white/75 uppercase tracking-wide">Điểm hiện tại</span>
+                    <span className="text-white/75 uppercase tracking-wide">{isEn ? "Current Score" : "Điểm hiện tại"}</span>
                     <span>{currentUserCard.score.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-yellow-250 mt-2 bg-yellow-450/20 px-3 py-1.5 rounded-xl border border-yellow-300/25">
@@ -356,9 +359,9 @@ export function LeaderboardPage() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">Thứ hạng của bạn</span>
+                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest block">{isEn ? "Your Rank" : "Thứ hạng của bạn"}</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-xl font-extrabold">Chưa xếp hạng</span>
+                      <span className="text-xl font-extrabold">{isEn ? "Unranked" : "Chưa xếp hạng"}</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/20 shadow-inner">
@@ -368,7 +371,9 @@ export function LeaderboardPage() {
 
                 <div className="space-y-2 border-t border-white/10 pt-3">
                   <p className="text-xs text-white/80 font-medium leading-relaxed">
-                    Bạn chưa có hoạt động học tập nào. Hãy bắt đầu học từ mới, làm bài kiểm tra hoặc đọc tài liệu để được xếp hạng nhé!
+                    {isEn 
+                      ? "You haven't logged any learning activities yet. Start learning words, taking quizzes, or reading documents to get ranked!" 
+                      : "Bạn chưa có hoạt động học tập nào. Hãy bắt đầu học từ mới, làm bài kiểm tra hoặc đọc tài liệu để được xếp hạng nhé!"}
                   </p>
                 </div>
               </div>
@@ -378,19 +383,19 @@ export function LeaderboardPage() {
             {hallOfFame && (
               <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-5">
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Đền Danh Vọng (Toàn thời gian)</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Những người học nổi bật hàng đầu hệ thống</p>
+                  <h3 className="text-base font-bold text-slate-800">{isEn ? "Hall of Fame (All Time)" : "Đền Danh Vọng (Toàn thời gian)"}</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">{isEn ? "Top outstanding learners across the entire platform" : "Những người học nổi bật hàng đầu hệ thống"}</p>
                 </div>
 
                 <div className="space-y-4">
                   
                   {/* Category Card helper */}
                   {[
-                    { winner: hallOfFame.vocabularyKing, title: 'Vua Từ Vựng', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50', unit: 'từ' },
-                    { winner: hallOfFame.practiceMaster, title: 'Trùm Luyện Tập', icon: Layers, color: 'text-sky-500 bg-sky-50', unit: 'bài test' },
-                    { winner: hallOfFame.readingChampion, title: 'Thủ Khoa Đọc Hiểu', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50', unit: 'bài đọc' },
-                    { winner: hallOfFame.pronunciationMaster, title: 'Chuyên Gia Phát Âm', icon: Mic, color: 'text-rose-500 bg-rose-50', unit: 'điểm trung bình' },
-                    { winner: hallOfFame.longestStreak, title: 'Chuỗi Dài Nhất', icon: Flame, color: 'text-orange-500 bg-orange-50', unit: 'ngày' }
+                    { winner: hallOfFame.vocabularyKing, title: isEn ? 'Vocabulary King' : 'Vua Từ Vựng', icon: BookMarked, color: 'text-indigo-500 bg-indigo-50', unit: isEn ? 'words' : 'từ' },
+                    { winner: hallOfFame.practiceMaster, title: isEn ? 'Practice Master' : 'Trùm Luyện Tập', icon: Layers, color: 'text-sky-500 bg-sky-50', unit: isEn ? 'tests' : 'bài test' },
+                    { winner: hallOfFame.readingChampion, title: isEn ? 'Reading Champion' : 'Thủ Khoa Đọc Hiểu', icon: BookOpen, color: 'text-emerald-500 bg-emerald-50', unit: isEn ? 'articles' : 'bài đọc' },
+                    { winner: hallOfFame.pronunciationMaster, title: isEn ? 'Pronunciation Master' : 'Chuyên Gia Phát Âm', icon: Mic, color: 'text-rose-500 bg-rose-50', unit: isEn ? 'avg score' : 'điểm trung bình' },
+                    { winner: hallOfFame.longestStreak, title: isEn ? 'Longest Streak' : 'Chuỗi Dài Nhất', icon: Flame, color: 'text-orange-500 bg-orange-50', unit: isEn ? 'days' : 'ngày' }
                   ].map((category, index) => {
                     const Icon = category.icon;
                     const w = category.winner;
@@ -436,8 +441,8 @@ export function LeaderboardPage() {
                     <Crown className="w-4 h-4 text-yellow-400 fill-yellow-400/20" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-extrabold uppercase tracking-wide">Giải Thưởng Hàng Tuần</h3>
-                    <p className="text-[10px] text-white/50 font-medium">Nhận thưởng mỗi 00:00 Thứ Hai</p>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wide">{isEn ? "Weekly Rewards" : "Giải Thưởng Hàng Tuần"}</h3>
+                    <p className="text-[10px] text-white/50 font-medium">{isEn ? "Rewarding every Monday at 00:00" : "Nhận thưởng mỗi 00:00 Thứ Hai"}</p>
                   </div>
                 </div>
 
@@ -445,18 +450,18 @@ export function LeaderboardPage() {
                   <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3.5">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">🥇</span>
-                      <span className="text-xs font-bold">Top 1 Hàng Tuần</span>
+                      <span className="text-xs font-bold">{isEn ? "Weekly Top 1" : "Top 1 Hàng Tuần"}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-black text-yellow-400 block">+1,000 XP</span>
-                      <span className="text-[9px] text-yellow-400/70 font-semibold tracking-tight uppercase">Huy hiệu Quán Quân</span>
+                      <span className="text-[9px] text-yellow-400/70 font-semibold tracking-tight uppercase">{isEn ? "Champion Badge" : "Huy hiệu Quán Quân"}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">🥈</span>
-                      <span className="text-xs font-semibold">Top 2 Hàng Tuần</span>
+                      <span className="text-xs font-semibold">{isEn ? "Weekly Top 2" : "Top 2 Hàng Tuần"}</span>
                     </div>
                     <span className="text-xs font-bold text-slate-300">+700 XP</span>
                   </div>
@@ -464,7 +469,7 @@ export function LeaderboardPage() {
                   <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">🥉</span>
-                      <span className="text-xs font-semibold">Top 3 Hàng Tuần</span>
+                      <span className="text-xs font-semibold">{isEn ? "Weekly Top 3" : "Top 3 Hàng Tuần"}</span>
                     </div>
                     <span className="text-xs font-bold text-amber-600">+500 XP</span>
                   </div>
@@ -472,7 +477,7 @@ export function LeaderboardPage() {
                   <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs">🎖️</span>
-                      <span className="text-xs font-semibold">Top 10 Hàng Tuần</span>
+                      <span className="text-xs font-semibold">{isEn ? "Weekly Top 10" : "Top 10 Hàng Tuần"}</span>
                     </div>
                     <span className="text-xs font-bold text-blue-400">+200 XP</span>
                   </div>

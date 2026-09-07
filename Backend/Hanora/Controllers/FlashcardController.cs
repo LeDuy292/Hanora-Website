@@ -20,13 +20,13 @@ public class FlashcardController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetUserFlashcards([FromQuery] long? deckId = null)
+    public async Task<IActionResult> GetUserFlashcards([FromQuery] long? deckId = null, [FromQuery] string language = "vi")
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null) return Unauthorized();
         
         long userId = long.Parse(userIdClaim.Value);
-        var flashcards = await _flashcardService.GetUserFlashcardsAsync(userId, deckId);
+        var flashcards = await _flashcardService.GetUserFlashcardsAsync(userId, deckId, language);
         return Ok(flashcards);
     }
 
@@ -196,13 +196,13 @@ public class FlashcardController : ControllerBase
     }
 
     [HttpGet("review")]
-    public async Task<IActionResult> GetReviewCards([FromQuery] long? deckId = null)
+    public async Task<IActionResult> GetReviewCards([FromQuery] long? deckId = null, [FromQuery] string language = "vi")
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null) return Unauthorized();
 
         long userId = long.Parse(userIdClaim.Value);
-        var cards = await _flashcardService.GetReviewCardsAsync(userId, deckId);
+        var cards = await _flashcardService.GetReviewCardsAsync(userId, deckId, language);
         return Ok(cards);
     }
 
@@ -219,13 +219,13 @@ public class FlashcardController : ControllerBase
     }
 
     [HttpGet("write")]
-    public async Task<IActionResult> GetWriteModeCards([FromQuery] long? deckId = null, [FromQuery] int count = 10)
+    public async Task<IActionResult> GetWriteModeCards([FromQuery] long? deckId = null, [FromQuery] int count = 10, [FromQuery] string language = "vi")
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null) return Unauthorized();
 
         long userId = long.Parse(userIdClaim.Value);
-        var cards = await _flashcardService.GetWriteModeCardsAsync(userId, deckId, count);
+        var cards = await _flashcardService.GetWriteModeCardsAsync(userId, deckId, count, language);
         return Ok(cards);
     }
 

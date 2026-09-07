@@ -6,20 +6,23 @@ import {
   TrendingUp,
   UserRound
 } from 'lucide-react';
-
-const navItems = [
-  { to: '/', label: 'Trang chủ', icon: LayoutDashboard, end: true },
-  { to: '/reader', label: 'Dịch thuật', icon: BookOpen },
-  { to: '/flashcards', label: 'Flashcard', icon: Layers },
-  { to: '/dashboard', label: 'Tiến trình', icon: TrendingUp },
-  { to: '/profile', label: 'Cá nhân', icon: UserRound }
-];
+import { useLanguageStore } from '../../store/languageStore';
 
 export function MobileBottomNav() {
+  const { t } = useLanguageStore();
+
+  const navItems = [
+    { to: '/', label: t('nav.home'), icon: LayoutDashboard, end: true },
+    { to: '/reader', label: t('nav.reader'), icon: BookOpen },
+    { to: '/flashcards', label: t('nav.flashcards'), icon: Layers },
+    { to: '/dashboard', label: t('nav.progress'), icon: TrendingUp },
+    { to: '/profile', label: t('nav.profile'), icon: UserRound }
+  ];
+
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/80 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:hidden"
-      aria-label="Điều hướng chính trên mobile"
+      aria-label="Mobile main navigation"
     >
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {navItems.map((item) => {

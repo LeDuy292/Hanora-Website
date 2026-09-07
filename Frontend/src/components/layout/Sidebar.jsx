@@ -13,23 +13,26 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
+import { useLanguageStore } from '../../store/languageStore';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 import logoImg from '../../assets/logo.png';
 
 export function Sidebar() {
   const { user } = useAuthStore();
+  const { t, language } = useLanguageStore();
 
   // Safe display helpers — backend users may not have every field.
-  const displayName = user?.name || user?.username || user?.email || 'Học viên';
+  const displayName = user?.name || user?.username || user?.email || (language === 'en' ? 'Student' : 'Học viên');
   const initial = displayName.charAt(0).toUpperCase();
 
   const navItems = [
-    { to: '/', label: 'Trang chủ', icon: LayoutDashboard, end: true },
-    { to: '/dashboard', label: 'Tiến trình', icon: TrendingUp },
-    { to: '/vocabulary', label: 'Từ vựng', icon: BookMarked },
-    { to: '/flashcards', label: 'Flashcard', icon: Layers },
-    { to: '/library', label: 'Thư viện HSK', icon: Library },
-    { to: '/reader', label: 'Dịch thuật', icon: BookOpen },
-    { to: '/pronunciation', label: 'Luyện phát âm', icon: Mic },
+    { to: '/', label: t('nav.home'), icon: LayoutDashboard, end: true },
+    { to: '/dashboard', label: t('nav.progress'), icon: TrendingUp },
+    { to: '/vocabulary', label: t('nav.vocabulary'), icon: BookMarked },
+    { to: '/flashcards', label: t('nav.flashcards'), icon: Layers },
+    { to: '/library', label: t('nav.library'), icon: Library },
+    { to: '/reader', label: t('nav.reader'), icon: BookOpen },
+    { to: '/pronunciation', label: t('nav.pronunciation'), icon: Mic },
   ];
 
   return (
@@ -50,7 +53,7 @@ export function Sidebar() {
         <NavLink
           to="/profile"
           className="p-4 mx-4 my-6 bg-slate-50/50 hover:bg-blue-55/5 border border-slate-100 hover:border-blue-200/50 rounded-2xl flex flex-col gap-3 transition-all group/card cursor-pointer"
-          title="Trang cá nhân & Thiết lập"
+          title={language === 'en' ? "Profile & Settings" : "Trang cá nhân & Thiết lập"}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-200 to-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-sm group-hover/card:from-blue-600 group-hover/card:to-sky-450 group-hover/card:text-white transition-all duration-300 overflow-hidden">
@@ -78,11 +81,11 @@ export function Sidebar() {
               <span className="text-[10px] text-slate-400 font-medium">Streak</span>
               <div className="flex items-center gap-1.5 text-xs font-bold text-orange-500">
                 <Flame className="w-4 h-4 fill-orange-500/10" />
-                {user.streak ?? 0} ngày
+                {user.streak ?? 0} {t('common.days')}
               </div>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-slate-400 font-medium">XP points</span>
+              <span className="text-[10px] text-slate-400 font-medium">XP</span>
               <div className="flex items-center gap-1 text-xs font-bold text-blue-600">
                 <Sparkles className="w-3.5 h-3.5 fill-blue-500/10" />
                 {user.xp ?? 0}
@@ -103,7 +106,7 @@ export function Sidebar() {
                 key={item.to}
                 onClick={(e) => {
                   e.preventDefault();
-                  useToastStore.getState().addToast('Tính năng hiện đang được phát triển!', 'info');
+                  useToastStore.getState().addToast(language === 'en' ? 'Feature is currently in development!' : 'Tính năng hiện đang được phát triển!', 'info');
                 }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 cursor-pointer"
               >
@@ -132,8 +135,13 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Language Switcher in Sidebar */}
+      <div className="px-4 py-2 border-t border-slate-100">
+        <LanguageSwitcher variant="sidebar" />
+      </div>
+
       {/* Footer / Copyright */}
-      <div className="p-6 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
+      <div className="p-4 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
         &copy; 2026 Hanora App
       </div>
     </aside>

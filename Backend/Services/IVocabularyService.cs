@@ -4,13 +4,13 @@ namespace Services;
 
 public interface IVocabularyService
 {
-    Task<Vocabulary?> LookupWordAsync(string word);
+    Task<Vocabulary?> LookupWordAsync(string word, string language = "vi");
     Task<VocabularySaveResult> SaveToNotebookAsync(long userId, string word, long? documentId, string? customDefinition = null, string? pinyin = null, string? hanViet = null, string? wordType = null, int? pageNumber = null, string? personalNote = null);
     Task<List<UserVocabulary>> GetUserVocabularyAsync(long userId);
     Task<VocabularyDeleteResult> DeleteFromNotebookAsync(long userId, IReadOnlyCollection<long> userVocabularyIds, bool deleteFlashcards = false);
-    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence);
-    Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText);
-    Task<string> AskAiAssistantAsync(string word, string question, string contextSentence);
+    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string language = "vi");
+    Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText, string language = "vi");
+    Task<string> AskAiAssistantAsync(string word, string question, string contextSentence, string language = "vi");
     Task<bool> ReportTranslationErrorAsync(long userId, string word, string currentTranslation, string proposedTranslation, string? notes = null);
 }
 

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { translateSentence, compareSentences, reportTranslationError } from '../lib/api';
 import { useToastStore } from '../store/toastStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
+import { useLanguageStore } from '../store/languageStore';
 import { toast } from '../store/notificationStore';
-import { CHINESE_DICTIONARY, extractPlainMeaning, cleanPinyin } from '../utils/chineseUtils';
+import { CHINESE_DICTIONARY, CHARACTER_DATABASE, extractPlainMeaning, cleanPinyin } from '../utils/chineseUtils';
 import { 
   Volume2, Bookmark, Award, HelpCircle,
   ArrowRight, BookOpen, Plus, Activity, RefreshCw, 
@@ -42,6 +43,7 @@ const getHskLevel = (w) => {
 };
 
 const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitle, documentText, pageNumber }) => {
+  const { t, language } = useLanguageStore();
   const addWord = useVocabularyStore(state => state.addWord);
   const updateServerStatus = useVocabularyStore(state => state.updateServerStatus);
   const fetchDecks = useVocabularyStore(state => state.fetchDecks);
@@ -92,7 +94,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         setCompareData(null);
         setModifiedSentence(word);
         try {
-          const res = await translateSentence(word);
+          const res = await translateSentence(word, language);
           setSentenceData(res);
         } catch (e) {
           console.error(e);
@@ -102,7 +104,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       };
       fetchSentenceData();
     }
-  }, [word, isSentence]);
+  }, [word, isSentence, language]);
 
   const playAudio = (textToPlay) => {
     const speechText = textToPlay || word;
@@ -128,12 +130,12 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         pageNumber: pageNumber
       });
       useToastStore.getState().addToast(
-        result?.message || 'Đã lưu vào sổ tay thành công.',
+        result?.message || (language === 'en' ? 'Saved to notebook successfully.' : 'Đã lưu vào sổ tay thành công.'),
         result?.alreadyExists ? 'warning' : 'success'
       );
     } catch (error) {
       console.error(error);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
+      useToastStore.getState().addToast(language === 'en' ? 'Error saving to notebook.' : 'Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -143,29 +145,29 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
     if (!modifiedSentence || modifiedSentence.trim() === word.trim()) return;
     setIsLoadingCompare(true);
     try {
-      const res = await compareSentences(word, modifiedSentence);
+      const res = await compareSentences(word, modifiedSentence, language);
       setCompareData(res);
     } catch (e) {
       console.error(e);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi so sánh câu.', 'error');
+      useToastStore.getState().addToast(language === 'en' ? 'Error comparing sentences.' : 'Có lỗi xảy ra khi so sánh câu.', 'error');
     } finally {
       setIsLoadingCompare(false);
     }
   };
 
-  // Map English wordType to Vietnamese label
+  // Map English wordType to localized label
   const WORD_TYPE_MAP = {
-    'Verb': 'Động từ',
-    'Noun': 'Danh từ',
-    'Adjective': 'Tính từ',
-    'Adverb': 'Trạng từ',
-    'Pronoun': 'Đại từ',
-    'Preposition': 'Giới từ',
-    'Conjunction': 'Liên từ',
-    'Particle': 'Trợ từ',
-    'MeasureWord': 'Lượng từ',
-    'Interjection': 'Thán từ',
-    'Other': 'Khác',
+    'Verb': t('wordTypes.Verb'),
+    'Noun': t('wordTypes.Noun'),
+    'Adjective': t('wordTypes.Adjective'),
+    'Adverb': t('wordTypes.Adverb'),
+    'Pronoun': t('wordTypes.Pronoun'),
+    'Preposition': t('wordTypes.Preposition'),
+    'Conjunction': t('wordTypes.Conjunction'),
+    'Particle': t('wordTypes.Particle'),
+    'MeasureWord': t('wordTypes.MeasureWord'),
+    'Interjection': t('wordTypes.Interjection'),
+    'Other': t('wordTypes.Other'),
   };
 
   const WORD_TYPE_STYLE = {
@@ -197,7 +199,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
           <div className="h-4 bg-gray-200 rounded w-5/6"></div>
           <div className="h-4 bg-gray-200 rounded w-4/6"></div>
         </div>
-        <p className="text-xs text-gray-400 italic text-center pt-4">AI đang tra từ điển & chuẩn bị ví dụ ngữ cảnh...</p>
+        <p className="text-xs text-gray-400 italic text-center pt-4">{t('reader.wordCard.aiLoading')}</p>
       </div>
     );
   }
@@ -211,7 +213,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
           <div className="h-6 bg-gray-200 rounded w-1/2"></div>
           <div className="h-20 bg-gray-200 rounded-2xl"></div>
           <div className="h-32 bg-gray-200 rounded-2xl"></div>
-          <p className="text-xs text-gray-400 italic text-center">AI đang dịch câu & phân tích ngữ pháp liên quan...</p>
+          <p className="text-xs text-gray-400 italic text-center">{t('reader.sentence.aiLoading')}</p>
         </div>
       );
     }
@@ -220,7 +222,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       return (
         <div className="mt-8 text-center text-gray-500 bg-red-50 p-6 rounded-2xl border border-red-100">
           <HelpCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          Không thể phân dịch câu được chọn.
+          {t('reader.sentence.failed')}
         </div>
       );
     }
@@ -229,35 +231,35 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       <div className="mt-4 space-y-6">
         <div className="border-b border-gray-100 pb-4">
           <span className="inline-block px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-md mb-3">
-            Dịch Câu AI
+            {t('reader.sentence.aiBadge')}
           </span>
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-2xl font-bold text-gray-900 leading-normal">{sentenceData.originalText}</h2>
             <button 
               onClick={() => playAudio(sentenceData.originalText)}
               className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors shrink-0"
-              title="Nghe câu gốc"
+              title={t('common.listenAudio')}
             >
               <Volume2 className="w-5 h-5" />
             </button>
           </div>
           <p className="text-sm text-blue-600 font-medium tracking-wide mt-1.5">{sentenceData.pinyin}</p>
           {sentenceData.hanViet && (
-            <p className="text-xs text-gray-500 font-semibold mt-1">Hán Việt: <span className="text-gray-700 uppercase text-[11px] font-bold">{sentenceData.hanViet}</span></p>
+            <p className="text-xs text-gray-500 font-semibold mt-1">{t('reader.wordCard.sinoVietnamese')}: <span className="text-gray-700 uppercase text-[11px] font-bold">{sentenceData.hanViet}</span></p>
           )}
         </div>
 
         {/* Translation Card */}
         <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100">
-          <h3 className="text-[11px] font-black text-blue-800 uppercase tracking-widest mb-1.5">Bản Dịch Nghĩa</h3>
-          <p className="text-base text-gray-800 font-bold leading-relaxed">{sentenceData.vietnamese}</p>
+          <h3 className="text-[11px] font-black text-blue-800 uppercase tracking-widest mb-1.5">{t('reader.sentence.translationTitle')}</h3>
+          <p className="text-base text-gray-800 font-bold leading-relaxed">{sentenceData.translation || sentenceData.vietnamese}</p>
         </div>
 
         {/* Grammar Analysis */}
         {sentenceData.grammarAnalysis && (
           <div className="bg-gray-50 rounded-2xl p-5 border border-gray-150">
             <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-blue-500" /> Giải Thích Ngữ Pháp AI
+              <Activity className="w-4 h-4 text-blue-500" /> {t('reader.sentence.grammarTitle')}
             </h3>
             <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line font-medium">
               {sentenceData.grammarAnalysis}
@@ -269,10 +271,10 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         <div className="border-t border-gray-100 pt-6">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500/10" />
-            <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Học Tương Tác AI</h4>
+            <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">{t('reader.sentence.interactiveTitle')}</h4>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed mb-4">
-            Hãy chỉnh sửa câu trên để thực hành. AI sẽ dịch lại và so sánh chi tiết sự khác nhau.
+            {t('reader.sentence.interactiveDesc')}
           </p>
           
           <div className="space-y-3">
@@ -281,7 +283,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
               onChange={(e) => setModifiedSentence(e.target.value)}
               className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 font-sans leading-relaxed resize-none"
               rows={2}
-              placeholder="Chỉnh sửa câu tiếng Trung tại đây..."
+              placeholder={t('reader.sentence.inputPlaceholder')}
             />
             
             <button
@@ -294,25 +296,25 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              So sánh & Phân tích
+              {isLoadingCompare ? t('reader.sentence.comparing') : t('reader.sentence.compareBtn')}
             </button>
           </div>
 
           {/* Comparison Results */}
           {compareData && (
             <div className="mt-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-100 animate-in space-y-3">
-              <div className="text-xs font-black text-amber-800 uppercase tracking-wider">KẾT QUẢ SO SÁNH:</div>
+              <div className="text-xs font-black text-amber-800 uppercase tracking-wider">{t('reader.sentence.comparisonResults')}</div>
               <div className="space-y-2 text-xs">
                 <div>
-                  <span className="font-bold text-gray-500">Câu gốc: </span>
+                  <span className="font-bold text-gray-500">{t('reader.sentence.originalText')} </span>
                   <span className="text-gray-700 italic">"{compareData.originalTranslation}"</span>
                 </div>
                 <div>
-                  <span className="font-bold text-gray-500">Câu mới: </span>
+                  <span className="font-bold text-gray-500">{t('reader.sentence.modifiedText')} </span>
                   <span className="text-blue-700 font-bold">"{compareData.modifiedTranslation}"</span>
                 </div>
                 <div className="border-t border-amber-100 pt-2 text-gray-600 leading-relaxed font-medium">
-                  <span className="font-black text-amber-800 block mb-1">Khác biệt ngữ nghĩa & cấu trúc:</span>
+                  <span className="font-black text-amber-800 block mb-1">{t('reader.sentence.differences')}</span>
                   {compareData.differences}
                 </div>
               </div>
@@ -327,12 +329,27 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
   if (!data) {
     return (
       <div className="mt-12 text-center text-gray-500">
-        Không tìm thấy thông tin chi tiết cho '{word}'
+        {t('reader.wordCard.notFound')}
       </div>
     );
   }
 
-  const cleanDefinition = () => extractPlainMeaning(data.definitions || data.translation || data.meaning);
+  const cleanDefinition = () => {
+    if (language === 'en') {
+      if (data.definitionEn) return data.definitionEn;
+      if (data.definition && !/[\u00C0-\u024F\u1EA0-\u1EF9]/.test(data.definition)) return data.definition;
+      if (CHINESE_DICTIONARY[data.word]?.translation) return CHINESE_DICTIONARY[data.word].translation;
+      if (CHARACTER_DATABASE[data.word]?.translation) return CHARACTER_DATABASE[data.word].translation;
+    }
+    const raw = data.definitions || data.translation || data.meaning || data.definition;
+    const extracted = extractPlainMeaning(raw, language, data.word);
+    if (language === 'en') {
+      if (data.definitionEn) return data.definitionEn;
+      if (CHINESE_DICTIONARY[data.word]?.translation) return CHINESE_DICTIONARY[data.word].translation;
+      if (CHARACTER_DATABASE[data.word]?.translation) return CHARACTER_DATABASE[data.word].translation;
+    }
+    return extracted;
+  };
 
   const handleSendFeedback = async () => {
     if (!feedbackProposed.trim()) return;
@@ -344,13 +361,13 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         feedbackProposed.trim(),
         feedbackNotes.trim()
       );
-      toast.success("Cảm ơn bạn đã góp ý! Ban quản trị sẽ kiểm duyệt phản hồi này.");
+      toast.success(language === 'en' ? "Thank you for your feedback! The team will review it." : "Cảm ơn bạn đã góp ý! Ban quản trị sẽ kiểm duyệt phản hồi này.");
       setShowFeedbackForm(false);
       setFeedbackProposed('');
       setFeedbackNotes('');
     } catch (error) {
       console.error(error);
-      toast.error(error.message || "Không thể gửi góp ý. Vui lòng thử lại sau.");
+      toast.error(error.message || (language === 'en' ? "Failed to send feedback. Please try again later." : "Không thể gửi góp ý. Vui lòng thử lại sau."));
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -365,7 +382,6 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       .filter(Boolean);
   };
   const wordTypes = parseWordTypes();
-
 
   const hskLevel = getHskLevel(data.word);
   const badgeConfig = HSK_BADGES[hskLevel] || { label: 'HSK Level', style: 'bg-gray-50 text-gray-600 border-gray-200' };
@@ -384,7 +400,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
           className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider active:scale-95 disabled:opacity-50"
         >
           <Bookmark className="w-4 h-4 text-blue-500" />
-          {isSaving ? 'Đang lưu...' : 'Lưu Sổ Tay'}
+          {isSaving ? t('reader.wordCard.saving') : t('reader.wordCard.saveNotebook')}
         </button>
         <button 
           onClick={handleOpenDeckModal}
@@ -392,7 +408,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
           className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-md text-xs uppercase tracking-wider active:scale-95"
         >
           <Plus className="w-4 h-4" />
-          <span>Thêm Flashcard</span>
+          <span>{t('reader.wordCard.addFlashcard')}</span>
         </button>
       </div>
 
@@ -400,7 +416,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       {isAlreadySavedInStore && (
         <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-amber-800 flex items-center gap-2 shadow-xs">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Từ vựng này đã được bạn lưu trước đây trong Sổ tay!</span>
+          <span>{t('reader.wordCard.savedBanner')}</span>
         </div>
       )}
 
@@ -417,7 +433,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
             <button 
               onClick={() => playAudio(data.word)}
               className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors shrink-0"
-              title="Nghe phát âm"
+              title={t('common.listenAudio')}
             >
               <Volume2 className="w-5.5 h-5.5" />
             </button>
@@ -426,7 +442,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
             <button
               onClick={() => setShowCardMenu(!showCardMenu)}
               className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
-              title="Tùy chọn khác"
+              title={t('reader.wordCard.otherOptions')}
             >
               <ChevronRight className="w-5 h-5 rotate-90" />
             </button>
@@ -436,12 +452,12 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                 <button
                   onClick={() => {
                     setShowCardMenu(false);
-                    useToastStore.getState().addToast(`Đang hiển thị vị trí từ "${data.word}" trong bài gốc`, 'info');
+                    useToastStore.getState().addToast(`${t('reader.wordCard.originalDoc')}: ${data.word}`, 'info');
                   }}
                   className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
                 >
                   <BookOpen className="w-4 h-4 text-blue-500" />
-                  <span>Tài liệu gốc</span>
+                  <span>{t('reader.wordCard.originalDoc')}</span>
                 </button>
               </div>
             )}
@@ -461,12 +477,12 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
           ))}
           {wordTypes.length === 0 && (
             <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-[10px] font-black uppercase tracking-wider rounded-md">
-              Từ loại khác
+              {t('wordTypes.Other')}
             </span>
           )}
           {data.hanViet && (
             <span className="px-2.5 py-0.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider rounded-md">
-              Hán Việt: {data.hanViet}
+              {t('reader.wordCard.sinoVietnamese')}: {data.hanViet}
             </span>
           )}
         </div>
@@ -475,34 +491,34 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       {/* Definitions — split by word type */}
       <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100 space-y-3">
         <div className="flex items-center justify-between border-b border-blue-100/50 pb-2 mb-1.5">
-          <h3 className="text-[11px] font-black text-blue-800 uppercase tracking-widest">Định Nghĩa Tiếng Việt</h3>
+          <h3 className="text-[11px] font-black text-blue-800 uppercase tracking-widest">{t('reader.wordCard.definitionTitle')}</h3>
           <button
             onClick={() => setShowFeedbackForm(!showFeedbackForm)}
             className="text-[10px] font-bold text-blue-650 hover:text-blue-800 hover:underline flex items-center gap-1 transition-colors"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>Dịch sai? Góp ý</span>
+            <span>{t('reader.wordCard.reportError')}</span>
           </button>
         </div>
 
         {showFeedbackForm && (
           <div className="p-3.5 bg-white rounded-xl border border-blue-100 shadow-sm space-y-3 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
-            <p className="font-bold text-slate-700">Góp ý sửa bản dịch cho từ "{data.word || word}"</p>
+            <p className="font-bold text-slate-700">{t('reader.wordCard.feedbackTitle', { word: data.word || word })}</p>
             <div className="space-y-2">
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Nghĩa đề xuất</label>
+                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{t('reader.wordCard.proposedMeaning')}</label>
                 <input
                   type="text"
-                  placeholder="Nhập nghĩa đúng của từ này..."
+                  placeholder={t('reader.wordCard.proposedPlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   value={feedbackProposed}
                   onChange={(e) => setFeedbackProposed(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Ghi chú thêm (Không bắt buộc)</label>
+                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{t('reader.wordCard.feedbackNotes')}</label>
                 <textarea
-                  placeholder="Giải thích thêm hoặc nguồn tham khảo..."
+                  placeholder={t('reader.wordCard.notesPlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 h-16 resize-none"
                   value={feedbackNotes}
                   onChange={(e) => setFeedbackNotes(e.target.value)}
@@ -519,7 +535,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                 }}
                 className="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-500 font-bold transition-colors"
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -530,10 +546,10 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                 {isSubmittingFeedback ? (
                   <>
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span>Đang gửi...</span>
+                    <span>{t('reader.wordCard.sending')}</span>
                   </>
                 ) : (
-                  <span>Gửi góp ý</span>
+                  <span>{t('reader.wordCard.sendFeedback')}</span>
                 )}
               </button>
             </div>
@@ -564,7 +580,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       {/* Usage Notes → Ngữ Cảnh */}
       {data.usageNotes && (
         <div className="bg-gray-50 rounded-2xl p-5 border border-gray-150">
-          <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-1.5">Ngữ Cảnh</h3>
+          <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-1.5">{t('reader.wordCard.usageNotes')}</h3>
           <p className="text-xs text-gray-600 font-medium leading-relaxed whitespace-pre-line">{data.usageNotes}</p>
         </div>
       )}
@@ -574,7 +590,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         <div className="space-y-4">
           {data.collocations && data.collocations.length > 0 && (
             <div>
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2">Từ thường đi cùng (Collocations)</h3>
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2">{t('reader.wordCard.collocations')}</h3>
               <div className="flex flex-wrap gap-2">
                 {data.collocations.map((col, idx) => (
                   <span 
@@ -592,7 +608,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
 
           {data.grammarPatterns && data.grammarPatterns.length > 0 && (
             <div>
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2">Cấu trúc ngữ pháp liên quan</h3>
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2">{t('reader.wordCard.grammarPatterns')}</h3>
               <ul className="space-y-1.5">
                 {data.grammarPatterns.map((pat, idx) => (
                   <li key={idx} className="flex items-center gap-2 bg-gray-50/50 p-2.5 rounded-xl border border-gray-100 text-xs font-bold text-gray-700">
@@ -606,17 +622,19 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         </div>
       )}
 
-      {/* Ví dụ câu mẫu (AI-generated) */}
+      {/* Example Sentences */}
       {data.examples && data.examples.length > 0 && (
         <div>
-          <h3 className="text-xs font-black text-gray-500 uppercase tracking-wider border-b pb-2 mb-3">Ví dụ câu mẫu</h3>
+          <h3 className="text-xs font-black text-gray-500 uppercase tracking-wider border-b pb-2 mb-3">{t('reader.wordCard.examples')}</h3>
           <div className="space-y-3.5">
             {data.examples.map((ex, idx) => (
               <div key={idx} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex justify-between items-start gap-4 hover:border-blue-200 transition-colors">
                 <div className="space-y-1 flex-1">
                   <p className="text-base text-gray-800 font-bold">{ex.zhText}</p>
                   {ex.pinyin && <p className="text-xs text-gray-500 leading-none">{ex.pinyin}</p>}
-                  {ex.viText && <p className="text-sm text-blue-700 font-medium pt-1">{ex.viText}</p>}
+                  <p className="text-sm text-blue-700 font-medium pt-1">
+                    {language === 'en' ? (ex.enText || ex.english || ex.viText) : (ex.viText || ex.vietnamese || ex.enText)}
+                  </p>
                 </div>
                 <button 
                   onClick={() => playAudio(ex.zhText)}
@@ -633,11 +651,11 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
       {/* Related Words */}
       {(data.synonyms?.length > 0 || data.antonyms?.length > 0 || data.compounds?.length > 0) && (
         <div className="bg-gray-50 rounded-2xl p-5 border border-gray-150 space-y-4">
-          <h3 className="text-xs font-black text-gray-700 uppercase tracking-widest border-b border-gray-200 pb-2">Từ liên quan</h3>
+          <h3 className="text-xs font-black text-gray-700 uppercase tracking-widest border-b border-gray-200 pb-2">{t('reader.wordCard.relatedWords')}</h3>
           
           {data.synonyms?.length > 0 && (
             <div>
-              <h4 className="text-[10px] text-gray-405 font-black uppercase tracking-wider mb-2">Từ đồng nghĩa</h4>
+              <h4 className="text-[10px] text-gray-405 font-black uppercase tracking-wider mb-2">{t('reader.wordCard.synonyms')}</h4>
               <div className="flex flex-wrap gap-2">
                 {data.synonyms.map((syn, idx) => (
                   <span 
@@ -654,7 +672,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
 
           {data.antonyms?.length > 0 && (
             <div>
-              <h4 className="text-[10px] text-gray-450 font-black uppercase tracking-wider mb-2">Từ trái nghĩa</h4>
+              <h4 className="text-[10px] text-gray-450 font-black uppercase tracking-wider mb-2">{t('reader.wordCard.antonyms')}</h4>
               <div className="flex flex-wrap gap-2">
                 {data.antonyms.map((ant, idx) => (
                   <span 
@@ -671,7 +689,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
 
           {data.compounds?.length > 0 && (
             <div>
-              <h4 className="text-[10px] text-gray-450 font-black uppercase tracking-wider mb-2">Từ ghép</h4>
+              <h4 className="text-[10px] text-gray-450 font-black uppercase tracking-wider mb-2">{t('reader.wordCard.compounds')}</h4>
               <div className="flex flex-wrap gap-2">
                 {data.compounds.map((comp, idx) => (
                   <span 
@@ -688,7 +706,6 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         </div>
       )}
 
-
       {showDeckModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
           <div 
@@ -698,7 +715,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
 
           <div className="relative bg-white/95 border border-slate-200/60 backdrop-blur-md max-w-sm w-full rounded-2xl p-6 shadow-2xl z-10 flex flex-col gap-4 text-slate-800 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-800">Thêm vào bộ Flashcard</h3>
+              <h3 className="text-sm font-bold text-slate-800">{language === 'en' ? 'Add to Flashcard Deck' : 'Thêm vào bộ Flashcard'}</h3>
               <button 
                 onClick={() => setShowDeckModal(false)}
                 className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-50 rounded-lg"
@@ -709,19 +726,19 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
 
             <div className="space-y-3.5 text-xs text-left">
               <div>
-                <span className="font-bold text-slate-500 block mb-1">Từ vựng:</span>
+                <span className="font-bold text-slate-500 block mb-1">{language === 'en' ? 'Vocabulary:' : 'Từ vựng:'}</span>
                 <span className="font-extrabold text-slate-850 text-base">{data.word}</span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-500 block mb-1">Nguồn tài liệu:</span>
+                <span className="font-bold text-slate-500 block mb-1">{language === 'en' ? 'Source document:' : 'Nguồn tài liệu:'}</span>
                 <span className="font-semibold text-slate-700 bg-slate-50 border border-slate-150 px-2.5 py-1.5 rounded-lg block">
-                  {documentTitle ? `Dịch thuật ${documentTitle}` : 'Tra cứu ngoài'}
+                  {documentTitle ? `${language === 'en' ? 'Translation ' : 'Dịch thuật '}${documentTitle}` : (language === 'en' ? 'External Lookup' : 'Tra cứu ngoài')}
                 </span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-500 block mb-1">Chọn bộ Flashcard:</span>
+                <span className="font-bold text-slate-500 block mb-1">{language === 'en' ? 'Select Flashcard Deck:' : 'Chọn bộ Flashcard:'}</span>
                 <select
                   value={selectedDeckId}
                   onChange={(e) => setSelectedDeckId(e.target.value)}
@@ -730,13 +747,13 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                   {decks.map(deck => (
                     <option key={deck.id} value={deck.id}>{deck.name}</option>
                   ))}
-                  <option value="new">+ Tạo bộ mới...</option>
+                  <option value="new">{language === 'en' ? '+ Create new deck...' : '+ Tạo bộ mới...'}</option>
                 </select>
               </div>
 
               {selectedDeckId === 'new' && (
                 <div className="space-y-1.5 animate-in fade-in duration-100">
-                  <span className="font-bold text-slate-500 block">Tên bộ Flashcard mới:</span>
+                  <span className="font-bold text-slate-500 block">{language === 'en' ? 'New Deck Name:' : 'Tên bộ Flashcard mới:'}</span>
                   <input
                     type="text"
                     value={newDeckName}
@@ -753,7 +770,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                 onClick={() => setShowDeckModal(false)}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 text-xs font-bold rounded-xl transition active:scale-97"
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 disabled={isAddingFlashcard || (selectedDeckId === 'new' && !newDeckName.trim())}
@@ -763,7 +780,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                     const payload = {
                       deckId: selectedDeckId === 'new' ? null : Number(selectedDeckId),
                       newDeckName: selectedDeckId === 'new' ? newDeckName.trim() : null,
-                      source: documentTitle ? `Dịch thuật ${documentTitle}` : 'Tra cứu ngoài',
+                      source: documentTitle ? `${language === 'en' ? 'Translation ' : 'Dịch thuật '}${documentTitle}` : (language === 'en' ? 'External Lookup' : 'Tra cứu ngoài'),
                       documentId: documentId || null,
                       words: [data.word]
                     };
@@ -771,22 +788,21 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
                     await fetchUserVocabulary();
                     await fetchDecks();
                     setShowDeckModal(false);
-                    toast.success("Đã thêm từ vào bộ Flashcard thành công!");
+                    toast.success(language === 'en' ? "Word added to Flashcard deck successfully!" : "Đã thêm từ vào bộ Flashcard thành công!");
                   } catch (e) {
-                    toast.error(e.message || "Lỗi khi lưu Flashcard.");
+                    toast.error(e.message || (language === 'en' ? "Failed to save flashcard." : "Lỗi khi lưu Flashcard."));
                   } finally {
                     setIsAddingFlashcard(false);
                   }
                 }}
                 className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition active:scale-97 shadow-md disabled:opacity-50"
               >
-                {isAddingFlashcard ? 'Đang tạo...' : 'Xác nhận'}
+                {isAddingFlashcard ? (language === 'en' ? 'Creating...' : 'Đang tạo...') : t('common.confirm')}
               </button>
             </div>
           </div>
         </div>
       )}
-
 
     </div>
   );

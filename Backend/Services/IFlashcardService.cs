@@ -6,7 +6,7 @@ namespace Services;
 
 public interface IFlashcardService
 {
-    Task<List<object>> GetUserFlashcardsAsync(long userId, long? deckId = null);
+    Task<List<object>> GetUserFlashcardsAsync(long userId, long? deckId = null, string language = "vi");
     Task<bool> UpdateStatusAsync(long userId, string word, string status, int masteryLevel);
     
     // Custom Decks
@@ -22,11 +22,11 @@ public interface IFlashcardService
     Task<object> GetDashboardStatsAsync(long userId);
 
     // Review Mode (SRS-based)
-    Task<List<object>> GetReviewCardsAsync(long userId, long? deckId = null);
+    Task<List<object>> GetReviewCardsAsync(long userId, long? deckId = null, string language = "vi");
     Task<bool> SubmitReviewAsync(long userId, long flashcardId, FlipResult result, int responseMs);
 
     // Write Mode
-    Task<List<object>> GetWriteModeCardsAsync(long userId, long? deckId = null, int count = 10);
+    Task<List<object>> GetWriteModeCardsAsync(long userId, long? deckId = null, int count = 10, string language = "vi");
     Task<bool> SubmitWriteAnswerAsync(long userId, long flashcardId, string userAnswer);
 
     // Match Mode
