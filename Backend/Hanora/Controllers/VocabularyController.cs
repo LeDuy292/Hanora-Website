@@ -23,37 +23,82 @@ public class VocabularyController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetNotebookVocabularies()
+    public async Task<IActionResult> GetNotebookVocabularies([FromQuery] string language = "vi")
     {
         try
         {
             var userId = GetCurrentUserId();
             var list = await _vocabularyService.GetUserVocabularyAsync(userId);
+            bool isEn = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
             
             return Ok(list.Select(uv => {
-                string translation = "";
+                string definitionVn = "";
+                string definitionEn = "";
+                string rawDefs = uv.Vocabulary?.Definitions ?? "";
+
                 try
                 {
-                    using (var doc = JsonDocument.Parse(uv.Vocabulary.Definitions))
+                    if (!string.IsNullOrWhiteSpace(rawDefs))
                     {
-                        var root = doc.RootElement;
-                        if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                        using (var doc = JsonDocument.Parse(rawDefs))
                         {
-                            if (root[0].TryGetProperty("meaning", out var meaningProp))
+                            var root = doc.RootElement;
+                            if (root.ValueKind == JsonValueKind.Array)
                             {
-                                translation = meaningProp.GetString() ?? "";
+                                foreach (var item in root.EnumerateArray())
+                                {
+                                    if (item.ValueKind == JsonValueKind.Object)
+                                    {
+                                        string lang = item.TryGetProperty("lang", out var lp) ? (lp.GetString() ?? "") : "";
+                                        string meaning = item.TryGetProperty("meaning", out var mp) ? (mp.GetString() ?? "") : "";
+
+                                        if (string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            definitionEn = meaning;
+                                        }
+                                        else if (string.Equals(lang, "vn", StringComparison.OrdinalIgnoreCase) || string.Equals(lang, "vi", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            definitionVn = meaning;
+                                        }
+                                        else if (string.IsNullOrEmpty(definitionVn))
+                                        {
+                                            definitionVn = meaning;
+                                        }
+                                    }
+                                }
+
+                                if (string.IsNullOrEmpty(definitionVn) && root.GetArrayLength() > 0)
+                                {
+                                    var first = root[0];
+                                    if (first.ValueKind == JsonValueKind.Object && first.TryGetProperty("meaning", out var mp))
+                                    {
+                                        definitionVn = mp.GetString() ?? "";
+                                    }
+                                }
+                            }
+                            else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("meaning", out var mp))
+                            {
+                                definitionVn = mp.GetString() ?? "";
                             }
                         }
                     }
                 }
                 catch { }
 
+                string chosenTranslation = isEn && !string.IsNullOrWhiteSpace(definitionEn) 
+                    ? definitionEn 
+                    : (!string.IsNullOrWhiteSpace(definitionVn) ? definitionVn : definitionEn);
+
                 return new {
                     id = uv.Id,
                     userVocabularyId = uv.Id,
                     text = uv.Vocabulary.Word,
                     pinyin = uv.Vocabulary.Pinyin,
-                    translation = translation,
+                    translation = chosenTranslation,
+                    definition = chosenTranslation,
+                    definitionEn = definitionEn,
+                    definitionVn = definitionVn,
+                    definitions = rawDefs,
                     wordType = uv.Vocabulary.WordType?.ToString() ?? "Other",
                     srsLevel = uv.MasteryLevel,
                     dateAdded = uv.SavedAt?.ToString("yyyy-MM-dd"),
@@ -66,6 +111,8 @@ public class VocabularyController : ControllerBase
                     examples = uv.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                         zhText = e.ZhText,
                         viText = e.ViText,
+                        enText = e.EnText,
+                        translation = (isEn && !string.IsNullOrWhiteSpace(e.EnText)) ? e.EnText : e.ViText,
                         pinyin = ""
                     }).ToList()
                 };
@@ -78,25 +125,51 @@ public class VocabularyController : ControllerBase
     }
 
     [HttpGet("{word}")]
-    public async Task<IActionResult> GetVocabulary(string word)
+    public async Task<IActionResult> GetVocabulary(string word, [FromQuery] string language = "vi")
     {
         if (string.IsNullOrWhiteSpace(word))
         {
             return BadRequest("Word is required.");
         }
 
-        var result = await _vocabularyService.LookupWordAsync(word);
+        var result = await _vocabularyService.LookupWordAsync(word, language);
 
         if (result == null)
         {
             return NotFound(new { Message = $"Could not find or generate definition for '{word}'." });
         }
 
+        string definitionVn = "";
+        string definitionEn = "";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(result.Definitions);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var elem in doc.RootElement.EnumerateArray())
+                {
+                    var l = elem.TryGetProperty("lang", out var lp) ? lp.GetString()?.ToLower() : "";
+                    var m = elem.TryGetProperty("meaning", out var mp) ? mp.GetString() : "";
+                    if (l == "vn" || l == "vi") definitionVn = m ?? "";
+                    if (l == "en") definitionEn = m ?? "";
+                }
+            }
+        }
+        catch { }
+
+        var isEn = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+        var resolvedDef = isEn && !string.IsNullOrWhiteSpace(definitionEn)
+            ? definitionEn
+            : (!string.IsNullOrWhiteSpace(definitionVn) ? definitionVn : result.Definitions);
+
         return Ok(new
         {
             result.Id,
             result.Word,
             result.Pinyin,
+            Definition = resolvedDef,
+            DefinitionEn = definitionEn,
+            DefinitionVn = definitionVn,
             result.Definitions,
             result.UsageNotes,
             WordType = result.WordType?.ToString() ?? "Other",
@@ -220,7 +293,7 @@ public class VocabularyController : ControllerBase
             return BadRequest("Text is required.");
         }
 
-        var result = await _vocabularyService.AnalyzeSentenceAsync(request.Text);
+        var result = await _vocabularyService.AnalyzeSentenceAsync(request.Text, request.Language ?? "vi");
         if (result == null)
         {
             return BadRequest("Failed to analyze sentence.");
@@ -237,7 +310,7 @@ public class VocabularyController : ControllerBase
             return BadRequest("OriginalText and ModifiedText are required.");
         }
 
-        var result = await _vocabularyService.CompareSentencesAsync(request.OriginalText, request.ModifiedText);
+        var result = await _vocabularyService.CompareSentencesAsync(request.OriginalText, request.ModifiedText, request.Language ?? "vi");
         if (result == null)
         {
             return BadRequest("Failed to compare sentences.");
@@ -254,7 +327,7 @@ public class VocabularyController : ControllerBase
             return BadRequest("Word and Question are required.");
         }
 
-        var reply = await _vocabularyService.AskAiAssistantAsync(request.Word, request.Question, request.ContextSentence ?? "");
+        var reply = await _vocabularyService.AskAiAssistantAsync(request.Word, request.Question, request.ContextSentence ?? "", request.Language ?? "vi");
         return Ok(new { Reply = reply });
     }
 
@@ -318,12 +391,14 @@ public class BulkDeleteVocabularyRequest
 public class TranslateSentenceRequest
 {
     public string Text { get; set; } = null!;
+    public string? Language { get; set; } = "vi";
 }
 
 public class CompareSentencesRequest
 {
     public string OriginalText { get; set; } = null!;
     public string ModifiedText { get; set; } = null!;
+    public string? Language { get; set; } = "vi";
 }
 
 public class AiChatRequest
@@ -331,4 +406,5 @@ public class AiChatRequest
     public string Word { get; set; } = null!;
     public string Question { get; set; } = null!;
     public string? ContextSentence { get; set; }
+    public string? Language { get; set; } = "vi";
 }

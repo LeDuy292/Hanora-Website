@@ -20,6 +20,7 @@ import { useVocabularyStore } from '../store/vocabularyStore';
 import { useDocumentStore } from '../store/documentStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { useLanguageStore } from '../store/languageStore';
 import { apiRequest } from '../services/apiClient';
 import {
   isStructureMarker, LINE_BREAK, PARAGRAPH_BREAK, joinDocumentSegments
@@ -217,6 +218,7 @@ const ReaderPage = () => {
   const showVisualReader = Boolean(visualDocumentType);
   const readerContainerRef = useRef(null);
   const navigate = useNavigate();
+  const { language, t } = useLanguageStore();
 
   // Document Store & Folder Management
   const { folders, addFolder, renameFolder, deleteFolder, moveDocumentToFolder, documents: storeDocs } = useDocumentStore();
@@ -640,11 +642,13 @@ const ReaderPage = () => {
         {
           id: 'welcome-doc',
           sender: 'ai',
-          text: `Chào bạn! Tôi là Trợ lý Học tập AI của Hanora. Bạn đang đọc tài liệu **"${document.title}"**.\nBạn cần tôi giải thích nội dung chung, tóm tắt đoạn văn hay hỗ trợ gì khác không?`
+          text: language === 'en'
+            ? `Hello! I am your Hanora AI Study Assistant. You are reading **"${document.title}"**.\nWould you like me to explain the context, summarize paragraphs, or assist with anything else?`
+            : `Chào bạn! Tôi là Trợ lý Học tập AI của Hanora. Bạn đang đọc tài liệu **"${document.title}"**.\nBạn cần tôi giải thích nội dung chung, tóm tắt đoạn văn hay hỗ trợ gì khác không?`
         }
       ]);
     }
-  }, [document]);
+  }, [document, language]);
 
   // Auto-scroll general document chat
   useEffect(() => {
@@ -1492,10 +1496,16 @@ const ReaderPage = () => {
     if (!bubbleMenu.text) return;
     try {
       await updateServerStatus(bubbleMenu.text, "learning", 0);
-      useToastStore.getState().addToast('Đã lưu vào danh sách Flashcard thành công!', 'success');
+      useToastStore.getState().addToast(
+        language === 'en' ? 'Saved to Flashcards successfully!' : 'Đã lưu vào danh sách Flashcard thành công!',
+        'success'
+      );
     } catch (error) {
       console.error(error);
-      useToastStore.getState().addToast('Có lỗi xảy ra khi lưu vào sổ tay.', 'error');
+      useToastStore.getState().addToast(
+        language === 'en' ? 'An error occurred while saving.' : 'Có lỗi xảy ra khi lưu vào sổ tay.',
+        'error'
+      );
     } finally {
       setBubbleMenu(prev => ({ ...prev, visible: false }));
     }
@@ -1518,20 +1528,20 @@ const ReaderPage = () => {
     setIsSendingDocChat(true);
 
     try {
-      const titleContext = document?.title || "Tài liệu tiếng Trung";
+      const titleContext = document?.title || (language === 'en' ? "Chinese Document" : "Tài liệu tiếng Trung");
       const snippetContext = joinDocumentSegments(segments.slice(0, 30));
-      const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext);
+      const res = await askAiAssistant(titleContext, queryText.trim(), snippetContext, language);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: res.reply || res.Reply || "Tôi xin lỗi, không có câu trả lời nào từ AI."
+        text: res.reply || res.Reply || (language === 'en' ? "Sorry, no response was returned by the AI." : "Tôi xin lỗi, không có câu trả lời nào từ AI.")
       }]);
     } catch (err) {
       console.error(err);
       setDocChatMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: "Không thể kết nối với AI vào lúc này. Vui lòng thử lại sau."
+        text: language === 'en' ? "Unable to connect to AI at the moment. Please try again later." : "Không thể kết nối với AI vào lúc này. Vui lòng thử lại sau."
       }]);
     } finally {
       setIsSendingDocChat(false);
@@ -1877,7 +1887,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <GraduationCap className="h-3.5 w-3.5" />
-              <span>+ Flashcard</span>
+              <span>{t('reader.bubbleMenu.saveFlashcard')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1885,7 +1895,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              <span>+ Sổ tay</span>
+              <span>{t('reader.bubbleMenu.saveNotebook')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1897,7 +1907,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Highlighter className="h-3.5 w-3.5" />
-              <span>Highlight</span>
+              <span>{t('reader.bubbleMenu.highlight')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1908,7 +1918,7 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <FileText className="h-3.5 w-3.5" />
-              <span>Ghi chú</span>
+              <span>{t('reader.bubbleMenu.addNote')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
@@ -1933,19 +1943,19 @@ const ReaderPage = () => {
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Search className="h-3.5 w-3.5 text-blue-300" />
-              <span>Dịch nhanh</span>
+              <span>{t('reader.bubbleMenu.quickTranslate')}</span>
             </button>
             <div className="h-4 w-px shrink-0 bg-white/20" />
             <button
               onClick={() => {
                 navigator.clipboard.writeText(bubbleMenu.text);
-                toast.success('Đã sao chép nội dung.');
+                toast.success(language === 'en' ? 'Content copied.' : 'Đã sao chép nội dung.');
                 setBubbleMenu(prev => ({ ...prev, visible: false }));
               }}
               className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-center font-bold transition-colors hover:bg-white/10"
             >
               <Copy className="h-3.5 w-3.5" />
-              <span>Sao chép</span>
+              <span>{t('reader.bubbleMenu.copy')}</span>
             </button>
             <div
               className="absolute top-full border-[6px] border-transparent border-t-gray-950"
@@ -3057,18 +3067,19 @@ const ReaderPage = () => {
                 <button
                   onClick={() => {
                     if (!selectedWord) {
-                      toast.info('Nhấp chọn chữ Hán hoặc câu trong tài liệu để xem giải nghĩa từ điển.');
+                      toast.info(language === 'en' ? 'Click on a Chinese character or sentence in the document to see dictionary definition.' : 'Nhấp chọn chữ Hán hoặc câu trong tài liệu để xem giải nghĩa từ điển.');
                       setSidebarTab('translate');
                     } else {
                       setSidebarTab('dict');
                     }
                   }}
-                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center ${sidebarTab === 'dict'
+                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center flex items-center justify-center gap-1 ${sidebarTab === 'dict'
                     ? 'bg-[#DCE9FF] text-blue-800 font-extrabold shadow-sm'
                     : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
                   }`}
                 >
-                  Từ điển
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>{t('reader.tabs.dict')}</span>
                 </button>
                 <button
                   onClick={() => setSidebarTab('translate')}
@@ -3077,16 +3088,17 @@ const ReaderPage = () => {
                     : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
                   }`}
                 >
-                  Dịch
+                  {language === 'en' ? 'Translate' : 'Dịch'}
                 </button>
                 <button
                   onClick={() => setSidebarTab('chat')}
-                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center ${sidebarTab === 'chat'
+                  className={`flex-grow py-2 text-xs font-black rounded-xl transition-all text-center flex items-center justify-center gap-1 ${sidebarTab === 'chat'
                     ? 'bg-[#DCE9FF] text-blue-800 font-extrabold shadow-sm'
                     : 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
                   }`}
                 >
-                  Trợ lý AI
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>{t('reader.tabs.chat')}</span>
                 </button>
               </div>
 
@@ -3101,9 +3113,11 @@ const ReaderPage = () => {
                         <div className="w-14 h-14 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-5">
                           <Search className="w-6 h-6" />
                         </div>
-                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">Tra cứu thông minh</h3>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">
+                          {t('reader.dict.emptyTitle')}
+                        </h3>
                         <p className="text-slate-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                          Nhấp chọn chữ Hán hoặc bôi đen câu văn trong tài liệu để tra cứu từ điển mở rộng và giải nghĩa ngữ cảnh AI ngay lập tức.
+                          {t('reader.dict.emptyDesc')}
                         </p>
                       </div>
                     ) : (
@@ -3111,7 +3125,7 @@ const ReaderPage = () => {
                         <button
                           onClick={closeWordCard}
                           className="absolute -top-1 right-0 p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-655 rounded-full transition-colors z-10"
-                          title="Đóng bảng tra từ"
+                          title={t('reader.dict.close')}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -3155,7 +3169,9 @@ const ReaderPage = () => {
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                          <span className="text-[10px] text-gray-400 font-bold ml-1">AI đang soạn câu trả lời...</span>
+                          <span className="text-[10px] text-gray-400 font-bold ml-1">
+                            {language === 'en' ? 'AI is generating answer...' : 'AI đang soạn câu trả lời...'}
+                          </span>
                         </div>
                       )}
                       <div ref={docChatBottomRef} />
@@ -3164,18 +3180,20 @@ const ReaderPage = () => {
                     {/* Suggestions triggers */}
                     {docChatMessages.length === 1 && (
                       <div className="flex flex-col gap-1.5 mb-4">
-                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Hỏi nhanh AI</span>
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                          {language === 'en' ? 'Quick AI prompts' : 'Hỏi nhanh AI'}
+                        </span>
                         <button
-                          onClick={(e) => handleSendDocChat(e, "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
+                          onClick={(e) => handleSendDocChat(e, language === 'en' ? "Please briefly summarize the main content of this document." : "Hãy tóm tắt ngắn gọn nội dung chính của tài liệu này.")}
                           className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
                         >
-                          📖 Tóm tắt nội dung chính tài liệu?
+                          {language === 'en' ? '📖 Summarize document content?' : '📖 Tóm tắt nội dung chính tài liệu?'}
                         </button>
                         <button
-                          onClick={(e) => handleSendDocChat(e, "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
+                          onClick={(e) => handleSendDocChat(e, language === 'en' ? "What is the main topic of this document and what difficult HSK words does it contain?" : "Tài liệu này nói về chủ đề gì và có những từ vựng HSK nào khó?")}
                           className="text-left px-3 py-2 bg-slate-50 hover:bg-blue-50/50 hover:text-blue-600 border border-slate-150 rounded-xl text-[11px] font-semibold text-slate-655 transition-colors"
                         >
-                          💡 Chủ đề & Từ vựng quan trọng?
+                          {language === 'en' ? '💡 Main topic & Key vocabulary?' : '💡 Chủ đề & Từ vựng quan trọng?'}
                         </button>
                       </div>
                     )}
@@ -3187,7 +3205,7 @@ const ReaderPage = () => {
                         value={docChatInput}
                         onChange={(e) => setDocChatInput(e.target.value)}
                         disabled={isSendingDocChat}
-                        placeholder="Hỏi AI về chủ đề hoặc tóm tắt..."
+                        placeholder={language === 'en' ? "Ask AI about topic or summary..." : "Hỏi AI về chủ đề hoặc tóm tắt..."}
                         className="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20"
                       />
                       <button
@@ -3225,7 +3243,7 @@ const ReaderPage = () => {
                             setTranslationError(null);
                           }
                         }}
-                        placeholder="Select text from the document or enter text here to translate."
+                        placeholder={language === 'en' ? "Select text from the document or enter text here to translate." : "Nhấp chọn văn bản trong tài liệu hoặc nhập văn bản vào đây để dịch."}
                         className="w-full h-[120px] min-h-[100px] p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-700/20 focus:border-amber-700/60 transition-all font-medium leading-relaxed resize-none shrink-0"
                       />
 
@@ -3233,16 +3251,16 @@ const ReaderPage = () => {
                       <button
                         onClick={handleSwapLanguages}
                         className="flex justify-center my-1.5 text-lg font-black text-amber-700 hover:scale-115 active:scale-95 transition-all cursor-pointer shrink-0"
-                        title="Chuyển đổi ngôn ngữ"
+                        title={language === 'en' ? "Swap languages" : "Chuyển đổi ngôn ngữ"}
                       >
                         ⇅
                       </button>
 
-                      {/* To Vietnamese */}
+                      {/* To Target Language */}
                       <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 hover:text-amber-800 cursor-pointer uppercase tracking-wider">
                         <span>To</span>
                         <span className="underline decoration-dotted decoration-2 underline-offset-4">
-                          {targetLang === 'zh' ? 'Chinese' : 'Vietnamese'}
+                          {targetLang === 'zh' ? 'Chinese' : (language === 'en' ? 'English' : 'Vietnamese')}
                         </span>
                         <span className="text-[8px] ml-0.5">▼</span>
                       </div>
@@ -3252,7 +3270,7 @@ const ReaderPage = () => {
                         {isTranslating ? (
                           <div className="flex-grow flex flex-col items-center justify-center gap-2 py-8">
                             <Loader2 className="w-5 h-5 text-amber-700 animate-spin" />
-                            <span className="text-[10px] text-slate-400 font-bold">đang phân tích và dịch...</span>
+                            <span className="text-[10px] text-slate-400 font-bold">{language === 'en' ? 'analyzing and translating...' : 'đang phân tích và dịch...'}</span>
                           </div>
                         ) : translationError ? (
                           <span className="text-red-500 font-bold">{translationError}</span>
@@ -3276,7 +3294,7 @@ const ReaderPage = () => {
                                       setTranslationResult(res);
                                       setTranslationType('sentence');
                                     } catch (fallbackErr) {
-                                      setTranslationError('Không thể tra cứu từ này.');
+                                      setTranslationError(language === 'en' ? 'Unable to look up this word.' : 'Không thể tra cứu từ này.');
                                     }
                                   } finally {
                                     setIsTranslating(false);
@@ -3289,8 +3307,8 @@ const ReaderPage = () => {
                             ) : (
                               <div className="space-y-4">
                                 <div>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Bản dịch</span>
-                                  <p className="text-xs font-bold text-emerald-600 leading-relaxed break-words">{translationResult.Vietnamese || translationResult.vietnamese}</p>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{language === 'en' ? 'Translation' : 'Bản dịch'}</span>
+                                  <p className="text-xs font-bold text-emerald-600 leading-relaxed break-words">{translationResult.Vietnamese || translationResult.vietnamese || translationResult.translatedText}</p>
                                 </div>
                                 {(translationResult.Pinyin || translationResult.pinyin) && (
                                   <div>
@@ -3300,13 +3318,13 @@ const ReaderPage = () => {
                                 )}
                                 {(translationResult.HanViet || translationResult.hanViet) && (
                                   <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-100/60 shadow-sm shadow-amber-900/5">
-                                    <span className="text-[11px] text-amber-800/70 font-black uppercase tracking-wider block mb-1">Hán Việt</span>
+                                    <span className="text-[11px] text-amber-800/70 font-black uppercase tracking-wider block mb-1">{language === 'en' ? 'Sino-Vietnamese' : 'Hán Việt'}</span>
                                     <span className="text-sm font-black text-amber-800 tracking-wide break-words leading-tight block">{translationResult.HanViet || translationResult.hanViet}</span>
                                   </div>
                                 )}
                                 {(translationResult.GrammarAnalysis || translationResult.grammarAnalysis) && (
                                   <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Phân tích chi tiết</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">{language === 'en' ? 'Detailed Analysis' : 'Phân tích chi tiết'}</span>
                                     <div className="text-xs text-slate-700 leading-relaxed font-medium space-y-2 prose prose-slate max-w-none">
                                       <FormattedMarkdownText content={translationResult.GrammarAnalysis || translationResult.grammarAnalysis} />
                                     </div>
@@ -3317,7 +3335,7 @@ const ReaderPage = () => {
                           </div>
                         ) : (
                           <span className="text-slate-400 italic font-normal leading-relaxed">
-                            Bản dịch và phân tích chi tiết của bạn sẽ hiển thị tại đây sau khi dịch...
+                            {language === 'en' ? 'Your translation and detailed analysis will appear here after translation...' : 'Bản dịch và phân tích chi tiết của bạn sẽ hiển thị tại đây sau khi dịch...'}
                           </span>
                         )}
                       </div>
@@ -3334,7 +3352,7 @@ const ReaderPage = () => {
                           }}
                           className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
                         >
-                          Xóa nội dung
+                          {language === 'en' ? 'Clear content' : 'Xóa nội dung'}
                         </button>
                       </div>
                     )}

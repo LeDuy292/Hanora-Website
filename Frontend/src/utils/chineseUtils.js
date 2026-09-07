@@ -360,11 +360,24 @@ export function splitSentences(text) {
 
 /**
  * Recursively unwraps any level of nested or escaped JSON strings
- * to extract only the clean Vietnamese meaning text.
+ * to extract clean definition text matching the target language.
  */
-export function extractPlainMeaning(val) {
+export function extractPlainMeaning(val, lang = 'vi', wordText = '') {
   if (!val) return "";
   let current = val;
+
+  const isEn = lang === 'en';
+
+  if (isEn && wordText) {
+    const cleanWord = String(wordText).trim();
+    if (CHINESE_DICTIONARY[cleanWord]?.translation) {
+      // If we have an exact dictionary entry, use it directly for English
+      return CHINESE_DICTIONARY[cleanWord].translation;
+    }
+    if (CHARACTER_DATABASE[cleanWord]?.translation) {
+      return CHARACTER_DATABASE[cleanWord].translation;
+    }
+  }
 
   for (let i = 0; i < 10; i++) {
     if (!current) break;
@@ -404,6 +417,17 @@ export function extractPlainMeaning(val) {
     // Array handling
     if (Array.isArray(current)) {
       if (current.length === 0) return "";
+      if (isEn) {
+        const enDef = current.find(d => d && typeof d === 'object' && (d.lang === 'en' || d.lang === 'english'));
+        if (enDef) {
+          current = enDef.meaning || enDef.translation || enDef;
+          continue;
+        }
+        // If English not present in array, check wordText fallback before falling back to Vietnamese
+        if (wordText && CHINESE_DICTIONARY[wordText]?.translation) {
+          return CHINESE_DICTIONARY[wordText].translation;
+        }
+      }
       const vnDef = current.find(d => d && typeof d === 'object' && (d.lang === 'vn' || d.lang === 'vi' || d.lang === 'vietnamese'));
       if (vnDef) {
         current = vnDef.meaning || vnDef.translation || vnDef;
@@ -416,7 +440,11 @@ export function extractPlainMeaning(val) {
 
     // Object handling
     if (typeof current === 'object') {
-      current = current.meaning || current.translation || "";
+      if (isEn && (current.en || current.english)) {
+        current = current.en || current.english;
+        continue;
+      }
+      current = current.meaning || current.translation || current.definitions || "";
       continue;
     }
 
@@ -435,6 +463,14 @@ export function extractPlainMeaning(val) {
       }
     }
     finalStr = finalStr.replace(/\\"/g, '"').replace(/^\[|\]$/g, '').trim();
+  }
+
+  // If in English mode and result is still Vietnamese or empty, try dictionary fallback
+  if (isEn && wordText) {
+    if (!finalStr || /[\u00C0-\u024F\u1EA0-\u1EF9]/.test(finalStr)) {
+      if (CHINESE_DICTIONARY[wordText]?.translation) return CHINESE_DICTIONARY[wordText].translation;
+      if (CHARACTER_DATABASE[wordText]?.translation) return CHARACTER_DATABASE[wordText].translation;
+    }
   }
 
   return finalStr;

@@ -5,6 +5,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useTimerStore } from '../../store/timerStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useTourStore } from '../../store/tourStore';
+import { useLanguageStore } from '../../store/languageStore';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 import logoImg from '../../assets/logo.png';
 import { isAllowedHskUser } from '../../utils/constants';
 
@@ -13,6 +15,7 @@ export function Header({ offsetTop }) {
   const toggleWidget = useTimerStore((s) => s.toggleWidget);
   const isTimerHidden = useTimerStore((s) => s.isHidden);
   const timerState = useTimerStore((s) => s.timerState);
+  const { t } = useLanguageStore();
 
   useEffect(() => {
     if (user) {
@@ -20,18 +23,18 @@ export function Header({ offsetTop }) {
     }
   }, [refreshProfile]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const displayName = user?.name || user?.username || user?.email || 'Học viên';
+  const displayName = user?.name || user?.username || user?.email || (useLanguageStore.getState().language === 'en' ? 'Student' : 'Học viên');
   const initial = displayName.charAt(0).toUpperCase();
 
   const navItems = [
-    { to: '/', label: 'Trang chủ', end: true },
-    { to: '/dashboard', label: 'Tiến trình' },
-    { to: '/vocabulary', label: 'Từ vựng' },
-    { to: '/flashcards', label: 'Flashcard' },
-    { to: '/reader', label: 'Dịch thuật' },
-    ...(isAllowedHskUser(user) ? [{ to: '/library', label: 'Thư viện HSK' }] : []),
-    { to: '/pronunciation', label: 'Luyện phát âm' },
-    ...(user?.role === 'Admin' ? [{ to: '/admin', label: 'Admin' }] : []),
+    { to: '/', label: t('nav.home'), end: true },
+    { to: '/dashboard', label: t('nav.progress') },
+    { to: '/vocabulary', label: t('nav.vocabulary') },
+    { to: '/flashcards', label: t('nav.flashcards') },
+    { to: '/reader', label: t('nav.reader') },
+    ...(isAllowedHskUser(user) ? [{ to: '/library', label: t('nav.library') }] : []),
+    { to: '/pronunciation', label: t('nav.pronunciation') },
+    ...(user?.role === 'Admin' ? [{ to: '/admin', label: t('nav.admin') }] : []),
   ];
 
   const handleLogout = () => {
@@ -79,12 +82,15 @@ export function Header({ offsetTop }) {
 
       {/* Right: Actions / CTA */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* Language Switcher */}
+        <LanguageSwitcher variant="default" className="hidden sm:inline-flex" />
+
         {user ? (
           <div className="flex items-center gap-3 md:gap-3.5">
             <div className="hidden xl:flex items-center gap-3.5 text-[10px] font-bold uppercase tracking-wider text-white/80">
               <div className="flex items-center gap-1 text-white">
                 <Flame className="w-3.5 h-3.5 fill-white/20" />
-                <span>{user.streak ?? 0} NGÀY</span>
+                <span>{user.streak ?? 0} {t('nav.streakSuffix')}</span>
               </div>
               <div className="flex items-center gap-1 text-white">
                 <Sparkles className="w-3 h-3 fill-white/20" />
@@ -101,10 +107,10 @@ export function Header({ offsetTop }) {
                   ? 'bg-white text-blue-600 border-white shadow-blue-500/20'
                   : 'bg-white/15 text-white border-white/20 hover:bg-white/25'
               }`}
-              title={isTimerHidden ? "Bật đồng hồ học tập nổi" : "Ẩn đồng hồ học tập nổi"}
+              title={isTimerHidden ? (useLanguageStore.getState().language === 'en' ? "Open study timer" : "Bật đồng hồ học tập nổi") : (useLanguageStore.getState().language === 'en' ? "Hide study timer" : "Ẩn đồng hồ học tập nổi")}
             >
               <Clock className={`w-3 h-3 ${timerState === 'running' ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
-              <span>Đồng hồ</span>
+              <span>{t('nav.focus')}</span>
             </button>
 
             <button
@@ -112,10 +118,10 @@ export function Header({ offsetTop }) {
                 useTourStore.getState().resetTour(window.location.pathname);
               }}
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/20 bg-white/15 hover:bg-white/25 text-white text-[11px] font-semibold transition-all shadow-sm cursor-pointer"
-              title="Xem hướng dẫn sử dụng website"
+              title={useLanguageStore.getState().language === 'en' ? "Website guide tour" : "Xem hướng dẫn sử dụng website"}
             >
               <HelpCircle className="w-3 h-3" />
-              <span>Hướng dẫn</span>
+              <span>{t('nav.help')}</span>
             </button>
 
             <NavLink
@@ -137,7 +143,7 @@ export function Header({ offsetTop }) {
             <button
               onClick={handleLogout}
               className="hidden sm:flex p-1.5 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-              title="Đăng xuất"
+              title={t('nav.logout')}
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -148,7 +154,7 @@ export function Header({ offsetTop }) {
             to="/login"
             className="px-5 py-1.5 text-xs font-display font-bold text-[#001C5B] bg-white hover:bg-slate-50 rounded-lg shadow-md active:scale-95 transition-all text-center uppercase tracking-wider"
           >
-            Đăng nhập
+            {t('nav.login')}
           </NavLink>
         )}
 
@@ -164,11 +170,15 @@ export function Header({ offsetTop }) {
       {/* Mobile Navigation Drawer */}
       {isMenuOpen && (
         <div className="absolute top-full left-0 w-full max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#001C5B] border-t border-white/20 p-5 sm:p-8 flex flex-col gap-3 z-50 xl:hidden shadow-2xl animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between pb-3 border-b border-white/20">
+            <span className="text-xs font-bold text-white uppercase tracking-wider">{t('langSwitch.label')}</span>
+            <LanguageSwitcher variant="compact" />
+          </div>
           {user && (
             <div className="flex items-center gap-6 pb-4 border-b border-white/20 text-xs font-black uppercase tracking-widest text-white/95">
               <div className="flex items-center gap-1.5">
                 <Flame className="w-5 h-5 fill-white/20 text-orange-400" />
-                <span>{user.streak ?? 0} NGÀY</span>
+                <span>{user.streak ?? 0} {t('nav.streakSuffix')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4.5 h-4.5 fill-white/20 text-yellow-300" />
@@ -195,7 +205,7 @@ export function Header({ offsetTop }) {
               onClick={() => { setIsMenuOpen(false); handleLogout(); }}
               className="text-white/90 font-black text-lg text-left mt-4 uppercase tracking-widest border-t border-white/20 pt-4"
             >
-              Đăng xuất
+              {t('nav.logout')}
             </button>
           )}
         </div>

@@ -32,22 +32,85 @@ public class VocabularyService : IVocabularyService
         _db = db;
     }
 
-    public async Task<Vocabulary?> LookupWordAsync(string word)
+    public async Task<Vocabulary?> LookupWordAsync(string word, string language = "vi")
     {
         var vocab = await _vocabularyRepo.GetByWordAsync(word);
         bool needsAiUpdate = false;
+        bool isEnRequest = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
         
         if (vocab != null)
         {
-            bool isOldEnglishFormat = vocab.Definitions.Contains("\"lang\":\"en\"") || vocab.Definitions.Contains("\"lang\": \"en\"");
             bool isPlaceholder = string.IsNullOrWhiteSpace(vocab.Definitions) || vocab.Definitions == "[]";
             bool missingExamples = !vocab.ExampleSentencesNavigation.Any();
+            bool hasEnDef = vocab.Definitions.Contains("\"lang\":\"en\"") || vocab.Definitions.Contains("\"lang\": \"en\"");
             
-            if (isOldEnglishFormat || isPlaceholder || missingExamples)
+            if (isPlaceholder || missingExamples)
             {
                 needsAiUpdate = true;
-                _logger.LogInformation("Word {Word} requires AI enrichment (isPlaceholder: {Placeholder}, missingExamples: {MissingExamples}, isOldEnglish: {OldEn})", 
-                    word, isPlaceholder, missingExamples, isOldEnglishFormat);
+                _logger.LogInformation("Word {Word} requires AI enrichment (isPlaceholder: {Placeholder}, missingExamples: {MissingExamples})", 
+                    word, isPlaceholder, missingExamples);
+            }
+            else if (isEnRequest && !hasEnDef)
+            {
+                _logger.LogInformation("Enriching English definition for word {Word}", word);
+                try
+                {
+                    string vnMeaning = "";
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(vocab.Definitions);
+                        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var el in doc.RootElement.EnumerateArray())
+                            {
+                                if (el.TryGetProperty("meaning", out var m))
+                                {
+                                    vnMeaning = m.GetString() ?? "";
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    if (string.IsNullOrWhiteSpace(vnMeaning)) vnMeaning = vocab.Definitions;
+
+                    var enMeaning = await _aiService.TranslateTextAsync(vnMeaning, "en");
+                    if (!string.IsNullOrWhiteSpace(enMeaning))
+                    {
+                        var defItems = new List<object>();
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(vocab.Definitions);
+                            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var el in doc.RootElement.EnumerateArray())
+                                {
+                                    var l = el.TryGetProperty("lang", out var lp) ? lp.GetString() : "vn";
+                                    var m = el.TryGetProperty("meaning", out var mp) ? mp.GetString() : "";
+                                    defItems.Add(new { lang = l, meaning = m });
+                                }
+                            }
+                        }
+                        catch { }
+
+                        if (!defItems.Any() && !string.IsNullOrWhiteSpace(vnMeaning))
+                        {
+                            defItems.Add(new { lang = "vn", meaning = vnMeaning });
+                        }
+                        defItems.Add(new { lang = "en", meaning = enMeaning });
+                        vocab.Definitions = JsonSerializer.Serialize(defItems);
+                        vocab.UpdatedAt = DateTime.UtcNow;
+                        await _vocabularyRepo.UpdateAsync(vocab);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to enrich English definition for word {Word}", word);
+                }
+
+                _ = ProcessRelationsAndExamplesBackgroundAsync(vocab.Word);
+                return vocab;
             }
             else
             {
@@ -86,7 +149,26 @@ public class VocabularyService : IVocabularyService
             var aiResponse = await _aiService.GetVocabularyInfoAsync(word);
             if (aiResponse == null) return vocab;
 
-            var newDefinitionsJson = JsonSerializer.Serialize(new[] { new { lang = "vn", meaning = aiResponse.Definitions } });
+            var enDef = aiResponse.DefinitionsEn;
+            if (string.IsNullOrWhiteSpace(enDef))
+            {
+                try
+                {
+                    enDef = await _aiService.TranslateTextAsync(aiResponse.Definitions, "en");
+                }
+                catch { }
+            }
+
+            var defItems = new List<object>
+            {
+                new { lang = "vn", meaning = aiResponse.Definitions }
+            };
+            if (!string.IsNullOrWhiteSpace(enDef))
+            {
+                defItems.Add(new { lang = "en", meaning = enDef });
+            }
+
+            var newDefinitionsJson = JsonSerializer.Serialize(defItems);
 
             if (vocab == null)
             {
@@ -109,6 +191,7 @@ public class VocabularyService : IVocabularyService
                     {
                         ZhText = e.ZhText,
                         ViText = e.ViText,
+                        EnText = e.EnText,
                         Source = "AI Generated",
                         CreatedAt = DateTime.UtcNow
                     }).ToList()
@@ -137,12 +220,12 @@ public class VocabularyService : IVocabularyService
                         {
                             ZhText = ex.ZhText,
                             ViText = ex.ViText,
+                            EnText = ex.EnText,
                             Source = "AI Generated",
                             CreatedAt = DateTime.UtcNow
                         });
                     }
                 }
-
 
                 await _vocabularyRepo.UpdateAsync(vocab);
             }
@@ -435,19 +518,24 @@ public class VocabularyService : IVocabularyService
         });
     }
 
+    public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string language = "vi")
+    {
+        return await _aiService.AnalyzeSentenceAsync(sentence, language);
+    }
+
     public async Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi")
     {
         return await _aiService.AnalyzeSentenceAsync(sentence, sourceLang, targetLang);
     }
 
-    public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText)
+    public async Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText, string language = "vi")
     {
-        return await _aiService.CompareSentencesAsync(originalText, modifiedText);
+        return await _aiService.CompareSentencesAsync(originalText, modifiedText, language);
     }
 
-    public async Task<string> AskAiAssistantAsync(string word, string question, string contextSentence)
+    public async Task<string> AskAiAssistantAsync(string word, string question, string contextSentence, string language = "vi")
     {
-        return await _aiService.AskAiAssistantAsync(word, question, contextSentence);
+        return await _aiService.AskAiAssistantAsync(word, question, contextSentence, language);
     }
 
     public async Task<bool> ReportTranslationErrorAsync(long userId, string word, string currentTranslation, string proposedTranslation, string? notes = null)

@@ -31,7 +31,7 @@ public class FlashcardService : IFlashcardService
         _srsService = srsService;
     }
 
-    public async Task<List<object>> GetUserFlashcardsAsync(long userId, long? deckId = null)
+    public async Task<List<object>> GetUserFlashcardsAsync(long userId, long? deckId = null, string language = "vi")
     {
         IQueryable<Flashcard> query = _db.Flashcards
             .Include(f => f.UserVocabulary)
@@ -46,9 +46,10 @@ public class FlashcardService : IFlashcardService
         }
 
         var flashcards = await query.ToListAsync();
+        bool isEn = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
 
         return flashcards.Select(f => {
-            string translation = CleanTranslation(f.UserVocabulary.Vocabulary.Definitions);
+            var (translation, defEn, defVn) = ParseDefinitions(f.UserVocabulary.Vocabulary.Definitions, language);
 
             return (object)new {
                 id = f.Id,
@@ -57,6 +58,10 @@ public class FlashcardService : IFlashcardService
                 text = f.UserVocabulary.Vocabulary.Word,
                 pinyin = f.UserVocabulary.Vocabulary.Pinyin,
                 translation = translation,
+                definition = translation,
+                definitionEn = defEn,
+                definitionVn = defVn,
+                definitions = f.UserVocabulary.Vocabulary.Definitions,
                 wordType = f.UserVocabulary.Vocabulary.WordType?.ToString() ?? "Other",
                 srsLevel = f.UserVocabulary.MasteryLevel,
                 nextReviewDate = f.UserVocabulary.LastReviewed?.AddDays(f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
@@ -69,6 +74,8 @@ public class FlashcardService : IFlashcardService
                 examples = f.UserVocabulary.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                     zhText = e.ZhText,
                     viText = e.ViText,
+                    enText = e.EnText,
+                    translation = (isEn && !string.IsNullOrWhiteSpace(e.EnText)) ? e.EnText : e.ViText,
                     pinyin = "" 
                 }).ToList()
             };
@@ -593,7 +600,7 @@ public class FlashcardService : IFlashcardService
         };
     }
 
-    public async Task<List<object>> GetReviewCardsAsync(long userId, long? deckId = null)
+    public async Task<List<object>> GetReviewCardsAsync(long userId, long? deckId = null, string language = "vi")
     {
         var dueFlashcardIds = await _srsService.GetDueFlashcardIdsAsync(userId, deckId);
 
@@ -604,8 +611,10 @@ public class FlashcardService : IFlashcardService
             .Where(f => dueFlashcardIds.Contains(f.Id))
             .ToListAsync();
 
+        bool isEn = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+
         return flashcards.Select(f => {
-            string translation = CleanTranslation(f.UserVocabulary.Vocabulary.Definitions);
+            var (translation, defEn, defVn) = ParseDefinitions(f.UserVocabulary.Vocabulary.Definitions, language);
 
             return (object)new {
                 id = f.Id,
@@ -614,6 +623,9 @@ public class FlashcardService : IFlashcardService
                 text = f.UserVocabulary.Vocabulary.Word,
                 pinyin = f.UserVocabulary.Vocabulary.Pinyin,
                 translation = translation,
+                definition = translation,
+                definitionEn = defEn,
+                definitionVn = defVn,
                 wordType = f.UserVocabulary.Vocabulary.WordType?.ToString() ?? "Other",
                 srsLevel = f.UserVocabulary.MasteryLevel,
                 nextReviewDate = f.UserVocabulary.LastReviewed?.AddDays(f.UserVocabulary.MasteryLevel > 0 ? f.UserVocabulary.MasteryLevel * 2 : 1).ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
@@ -624,6 +636,8 @@ public class FlashcardService : IFlashcardService
                 examples = f.UserVocabulary.Vocabulary.ExampleSentencesNavigation.Select(e => new {
                     zhText = e.ZhText,
                     viText = e.ViText,
+                    enText = e.EnText,
+                    translation = (isEn && !string.IsNullOrWhiteSpace(e.EnText)) ? e.EnText : e.ViText,
                     pinyin = ""
                 }).ToList()
             };
@@ -647,7 +661,7 @@ public class FlashcardService : IFlashcardService
         return true;
     }
 
-    public async Task<List<object>> GetWriteModeCardsAsync(long userId, long? deckId = null, int count = 10)
+    public async Task<List<object>> GetWriteModeCardsAsync(long userId, long? deckId = null, int count = 10, string language = "vi")
     {
         var query = _db.Flashcards
             .Include(f => f.UserVocabulary)
@@ -666,7 +680,7 @@ public class FlashcardService : IFlashcardService
         var flashcards = await query.Take(count).ToListAsync();
 
         return flashcards.Select(f => {
-            string translation = CleanTranslation(f.UserVocabulary.Vocabulary.Definitions);
+            var (translation, defEn, defVn) = ParseDefinitions(f.UserVocabulary.Vocabulary.Definitions, language);
 
             return (object)new {
                 id = f.Id,
@@ -675,6 +689,9 @@ public class FlashcardService : IFlashcardService
                 text = f.UserVocabulary.Vocabulary.Word,
                 pinyin = f.UserVocabulary.Vocabulary.Pinyin,
                 correctAnswer = translation,
+                translation = translation,
+                definitionEn = defEn,
+                definitionVn = defVn,
                 wordType = f.UserVocabulary.Vocabulary.WordType?.ToString() ?? "Other"
             };
         }).ToList();
@@ -829,14 +846,18 @@ public class FlashcardService : IFlashcardService
         return true;
     }
 
-    private static string CleanTranslation(string definitionsJson)
+    private static (string translation, string definitionEn, string definitionVn) ParseDefinitions(string definitionsJson, string language = "vi")
     {
         if (string.IsNullOrWhiteSpace(definitionsJson))
-            return "No meaning";
+            return ("No meaning", "", "");
+
+        bool isEn = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
+        string defVn = "";
+        string defEn = "";
 
         try
         {
-            string current = definitionsJson;
+            string current = definitionsJson.Trim();
             for (int i = 0; i < 5; i++)
             {
                 current = current.Trim();
@@ -846,33 +867,63 @@ public class FlashcardService : IFlashcardService
                 }
 
                 using var doc = JsonDocument.Parse(current);
-                if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
                 {
-                    var first = doc.RootElement[0];
-                    if (first.ValueKind == JsonValueKind.Object && first.TryGetProperty("meaning", out var meaningProp))
+                    foreach (var item in doc.RootElement.EnumerateArray())
                     {
-                        current = meaningProp.GetString() ?? "";
+                        if (item.ValueKind == JsonValueKind.Object)
+                        {
+                            string lang = item.TryGetProperty("lang", out var lp) ? (lp.GetString() ?? "") : "";
+                            string meaning = item.TryGetProperty("meaning", out var mp) ? (mp.GetString() ?? "") : "";
+
+                            if (string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase))
+                            {
+                                defEn = meaning;
+                            }
+                            else if (string.Equals(lang, "vn", StringComparison.OrdinalIgnoreCase) || string.Equals(lang, "vi", StringComparison.OrdinalIgnoreCase))
+                            {
+                                defVn = meaning;
+                            }
+                            else if (string.IsNullOrEmpty(defVn))
+                            {
+                                defVn = meaning;
+                            }
+                        }
                     }
-                    else
+
+                    if (string.IsNullOrEmpty(defVn) && doc.RootElement.GetArrayLength() > 0)
                     {
-                        break;
+                        var first = doc.RootElement[0];
+                        if (first.ValueKind == JsonValueKind.Object && first.TryGetProperty("meaning", out var mp))
+                        {
+                            defVn = mp.GetString() ?? "";
+                        }
                     }
+                    break;
                 }
                 else if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("meaning", out var meaningProp))
                 {
-                    current = meaningProp.GetString() ?? "";
+                    defVn = meaningProp.GetString() ?? "";
+                    break;
                 }
                 else
                 {
                     break;
                 }
             }
-            return string.IsNullOrWhiteSpace(current) ? "No meaning" : current;
         }
-        catch
-        {
-            return "No meaning";
-        }
+        catch { }
+
+        string chosen = isEn && !string.IsNullOrWhiteSpace(defEn) 
+            ? defEn 
+            : (!string.IsNullOrWhiteSpace(defVn) ? defVn : (string.IsNullOrWhiteSpace(defEn) ? "No meaning" : defEn));
+
+        return (chosen, defEn, defVn);
+    }
+
+    private static string CleanTranslation(string definitionsJson, string language = "vi")
+    {
+        return ParseDefinitions(definitionsJson, language).translation;
     }
 
     public async Task<LearnSessionResponse> StartLearnSessionAsync(long userId, long? deckId, bool learnAgainOnly)

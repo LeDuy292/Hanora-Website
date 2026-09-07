@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Languages, X, Loader2, Play } from 'lucide-react';
 import { aiService } from '../../services/aiService';
+import { useLanguageStore } from '../../store/languageStore';
 
 // A lightweight Markdown parser for simple formatting
 function parseMarkdown(mdText) {
@@ -34,12 +35,13 @@ function parseMarkdown(mdText) {
 }
 
 export function SentencePopup({ sentence, onClose }) {
+  const { t, language } = useLanguageStore();
   const [translation, setTranslation] = useState('');
   const [explanation, setExplanation] = useState('');
   const [isLoadingTranslation, setIsLoadingTranslation] = useState(false);
   const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
 
-  // Fetch translations and breakdowns when sentence changes
+  // Fetch translations and breakdowns when sentence changes or language changes
   useEffect(() => {
     if (!sentence) return;
 
@@ -52,30 +54,30 @@ export function SentencePopup({ sentence, onClose }) {
     });
 
     // Fetch translation
-    aiService.translateSentence(sentence)
+    aiService.translateSentence(sentence, language)
       .then(res => {
         setTranslation(res);
         setIsLoadingTranslation(false);
       })
       .catch(err => {
         console.error(err);
-        setTranslation("Dịch thuật thất bại.");
+        setTranslation(t('reader.popup.translationFailed'));
         setIsLoadingTranslation(false);
       });
 
     // Fetch grammar breakdown
-    aiService.explainGrammar(sentence)
+    aiService.explainGrammar(sentence, language)
       .then(res => {
         setExplanation(res);
         setIsLoadingExplanation(false);
       })
       .catch(err => {
         console.error(err);
-        setExplanation("Không thể phân tích ngữ pháp.");
+        setExplanation(t('reader.popup.grammarFailed'));
         setIsLoadingExplanation(false);
       });
 
-  }, [sentence]);
+  }, [sentence, language]);
 
   // TTS audio playback for full sentence
   const speakSentence = () => {
@@ -94,7 +96,7 @@ export function SentencePopup({ sentence, onClose }) {
       <div className="flex justify-between items-center border-b border-slate-100 pb-4">
         <div className="flex items-center gap-2">
           <Languages className="w-4 h-4 text-blue-500" />
-          <h3 className="text-sm font-bold text-slate-800">Phân tích câu</h3>
+          <h3 className="text-sm font-bold text-slate-800">{t('reader.popup.sentenceAnalysis')}</h3>
         </div>
         <button 
           onClick={onClose} 
@@ -107,12 +109,12 @@ export function SentencePopup({ sentence, onClose }) {
       {/* Actual Chinese Sentence */}
       <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div className="flex justify-between items-start">
-          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ngữ cảnh chữ Hán</span>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('reader.popup.chineseContext')}</span>
           <button 
             onClick={speakSentence}
             className="text-slate-500 hover:text-blue-600 flex items-center gap-1 text-[10px] font-bold bg-white hover:bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200 shadow-sm transition-colors"
           >
-            <Play className="w-3 h-3 fill-current" /> Đọc to
+            <Play className="w-3 h-3 fill-current" /> {t('common.readAloud')}
           </button>
         </div>
         <p className="text-lg font-bold text-slate-850 leading-relaxed font-sans select-text">
@@ -123,12 +125,12 @@ export function SentencePopup({ sentence, onClose }) {
       {/* Translation Pane */}
       <div className="space-y-2">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-          <Languages className="w-3 h-3" /> Bản dịch
+          <Languages className="w-3 h-3" /> {t('reader.popup.translation')}
         </span>
         {isLoadingTranslation ? (
           <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>AI đang dịch câu...</span>
+            <span>{t('reader.popup.translating')}</span>
           </div>
         ) : (
           <p className="text-sm font-semibold text-slate-700 italic select-text">
@@ -140,12 +142,12 @@ export function SentencePopup({ sentence, onClose }) {
       {/* AI Grammar Breakdown */}
       <div className="space-y-2 border-t border-slate-100 pt-4 flex-1 overflow-y-auto max-h-64 pr-2">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-amber-500" /> Phân tích Ngữ pháp AI
+          <Sparkles className="w-3 h-3 text-amber-500" /> {t('reader.popup.grammarBreakdown')}
         </span>
         {isLoadingExplanation ? (
           <div className="flex items-center gap-2 text-slate-400 text-xs py-4">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>AI đang phân tích cấu trúc...</span>
+            <span>{t('reader.popup.analyzingGrammar')}</span>
           </div>
         ) : (
           <div className="space-y-1 select-text">

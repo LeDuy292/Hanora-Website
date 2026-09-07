@@ -7,11 +7,12 @@ import {
 } from 'lucide-react';
 import { getLibraryDocuments } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { useLanguageStore } from '../store/languageStore';
 import { isAllowedHskUser } from '../utils/constants';
 
 // HSK level definitions
 const HSK_LEVELS = [
-  { key: 'all', label: 'Tất cả', gradient: 'from-slate-500 to-slate-700' },
+  { key: 'all', labelKey: 'library.all', defaultLabel: 'Tất cả', gradient: 'from-slate-500 to-slate-700' },
   { key: 'hsk1', label: 'HSK 1', gradient: 'from-emerald-400 to-teal-600' },
   { key: 'hsk2', label: 'HSK 2', gradient: 'from-sky-400 to-blue-600' },
   { key: 'hsk3', label: 'HSK 3', gradient: 'from-violet-400 to-purple-700' },
@@ -31,43 +32,43 @@ function detectHskLevel(doc) {
   return null;
 }
 
-function detectBookType(doc) {
+function detectBookType(doc, t) {
   const text = (doc.title + ' ' + doc.originalFilename).toLowerCase();
   if (text.includes('bài tập') || text.includes('bai tap') || text.includes('workbook')) {
-    return { label: 'Sách bài tập', icon: '📝' };
+    return { label: t('library.bookTypes.workbook'), icon: '📝' };
   }
   if (text.includes('giáo trình') || text.includes('giao trinh') || text.includes('textbook')) {
-    return { label: 'Giáo trình', icon: '📖' };
+    return { label: t('library.bookTypes.textbook'), icon: '📖' };
   }
-  return { label: 'Tài liệu', icon: '📄' };
+  return { label: t('library.bookTypes.document'), icon: '📄' };
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, t }) {
   if (status === 'Ready') {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-        <CheckCircle2 className="w-2.5 h-2.5" /> Sẵn sàng
+        <CheckCircle2 className="w-2.5 h-2.5" /> {t('library.ready')}
       </span>
     );
   }
   if (['Processing', 'RecognizingOcr', 'AnalyzingContent'].includes(status)) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-        <Hourglass className="w-2.5 h-2.5 animate-pulse" /> Đang xử lý
+        <Hourglass className="w-2.5 h-2.5 animate-pulse" /> {t('library.processing')}
       </span>
     );
   }
   if (status === 'Failed') {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-        <XCircle className="w-2.5 h-2.5" /> Lỗi
+        <XCircle className="w-2.5 h-2.5" /> {t('library.error')}
       </span>
     );
   }
   return null;
 }
 
-function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedClick }) {
+function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedClick, t }) {
   const gradient = levelInfo?.gradient || 'from-slate-400 to-slate-600';
   const isReady = doc.status === 'Ready';
   const isProcessing = ['Processing', 'RecognizingOcr', 'AnalyzingContent'].includes(doc.status);
@@ -105,7 +106,7 @@ function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedCli
         {/* Lock Overlay Badge if not allowed */}
         {!isAllowed && (
           <span className="absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200/90 backdrop-blur-sm border border-amber-300 px-2 py-0.5 rounded-full shadow-sm">
-            <Lock className="w-2.5 h-2.5" /> Giới hạn
+            <Lock className="w-2.5 h-2.5" /> {t('library.restricted')}
           </span>
         )}
 
@@ -117,7 +118,7 @@ function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedCli
         {isProcessing && (
           <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1">
             <Loader2 className="w-6 h-6 text-white animate-spin" />
-            <span className="text-[10px] font-bold text-white/90">Đang xử lý...</span>
+            <span className="text-[10px] font-bold text-white/90">{t('library.processing')}...</span>
           </div>
         )}
       </div>
@@ -131,7 +132,7 @@ function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedCli
           <span>{bookType.label}</span>
         </div>
         <div className="mt-auto pt-2 flex items-center justify-between">
-          <StatusBadge status={doc.status} />
+          <StatusBadge status={doc.status} t={t} />
           {doc.fileSizeBytes && (
             <span className="text-[10px] text-slate-400 font-medium">
               {(doc.fileSizeBytes / 1024 / 1024).toFixed(0)} MB
@@ -141,12 +142,12 @@ function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedCli
         {isReady && (
           isAllowed ? (
             <div className="mt-1 w-full py-1.5 rounded-xl bg-blue-50 text-blue-600 text-[11px] font-bold text-center group-hover:bg-blue-600 group-hover:text-white transition-all duration-200">
-              Mở đọc →
+              {t('library.readNow')}
             </div>
           ) : (
             <div className="mt-1 w-full py-1.5 rounded-xl bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center gap-1.5 group-hover:bg-amber-100 group-hover:text-amber-800 transition-all duration-200">
               <Lock className="w-3 h-3 text-slate-400 group-hover:text-amber-700" />
-              Khóa quyền đọc
+              {t('library.readLocked')}
             </div>
           )
         )}
@@ -155,7 +156,7 @@ function BookCard({ doc, levelInfo, bookType, isAllowed, onOpen, onRestrictedCli
   );
 }
 
-function AccessDeniedModal({ isOpen, onClose, userEmail }) {
+function AccessDeniedModal({ isOpen, onClose, userEmail, t }) {
   if (!isOpen) return null;
 
   return (
@@ -174,21 +175,21 @@ function AccessDeniedModal({ isOpen, onClose, userEmail }) {
           </div>
 
           <h3 className="text-lg font-black text-slate-900 mb-1.5">
-            Tính năng đọc sách đang bị khóa
+            {t('library.accessDeniedTitle')}
           </h3>
 
           <p className="text-xs text-slate-500 leading-relaxed mb-4">
-            Hiện tại tính năng mở và đọc sách trong <strong>Thư viện HSK</strong> đang trong giai đoạn thử nghiệm có giới hạn và chỉ khả dụng cho các tài khoản được ủy quyền.
+            {t('library.accessDeniedDesc')}
           </p>
 
           <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-left mb-5">
-            <div className="text-[11px] text-slate-400 font-semibold mb-1">Tài khoản hiện tại của bạn:</div>
+            <div className="text-[11px] text-slate-400 font-semibold mb-1">{t('library.currentAccount')}</div>
             <div className="text-xs font-bold text-slate-800 break-all flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
-              {userEmail || 'Chưa đăng nhập'}
+              {userEmail || t('library.notLoggedIn')}
             </div>
             <div className="text-[10px] text-amber-700 font-medium mt-1">
-              (Chưa nằm trong danh sách mở khóa)
+              {t('library.notInWhitelist')}
             </div>
           </div>
 
@@ -196,7 +197,7 @@ function AccessDeniedModal({ isOpen, onClose, userEmail }) {
             onClick={onClose}
             className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md"
           >
-            Đã hiểu
+            {t('library.gotIt')}
           </button>
         </div>
       </div>
@@ -221,6 +222,7 @@ export function LibraryPage() {
 
   const user = useAuthStore((s) => s.user);
   const isAllowed = isAllowedHskUser(user);
+  const { t, language } = useLanguageStore();
 
   const fetchDocs = useCallback(async (isSilent = false) => {
     try {
@@ -240,12 +242,12 @@ export function LibraryPage() {
       setDocuments(hskDocs);
     } catch (err) {
       if (!cachedHskLibraryDocs) {
-        setError('Không thể tải danh sách sách. Vui lòng thử lại.');
+        setError(language === 'en' ? 'Unable to load books. Please try again.' : 'Không thể tải danh sách sách. Vui lòng thử lại.');
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     fetchDocs(Boolean(cachedHskLibraryDocs));
@@ -273,6 +275,7 @@ export function LibraryPage() {
         isOpen={isAccessModalOpen}
         onClose={() => setIsAccessModalOpen(false)}
         userEmail={user?.email}
+        t={t}
       />
 
       {/* Page Header */}
@@ -284,15 +287,15 @@ export function LibraryPage() {
                 <BookMarked className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">Thư viện HSK</h1>
-                <p className="text-xs text-slate-500 font-medium">Sách giáo trình &amp; bài tập từ HSK 1 đến HSK 6</p>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">{t('library.title')}</h1>
+                <p className="text-xs text-slate-500 font-medium">{t('library.subtitle')}</p>
               </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Tìm kiếm sách..."
+                placeholder={t('library.searchPlaceholder')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all w-64"
@@ -305,6 +308,7 @@ export function LibraryPage() {
             {HSK_LEVELS.map(level => {
               const isActive = activeLevel === level.key;
               const count = levelCounts[level.key] || 0;
+              const label = level.labelKey ? t(level.labelKey) : level.label;
               return (
                 <button
                   key={level.key}
@@ -316,7 +320,7 @@ export function LibraryPage() {
                     }`}
                 >
                   {level.key !== 'all' && <GraduationCap className="w-3.5 h-3.5" />}
-                  {level.label}
+                  {label}
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/25 text-white' : 'bg-white text-slate-500'}`}>
                     {count}
                   </span>
@@ -332,14 +336,14 @@ export function LibraryPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-            <p className="text-sm text-slate-500 font-medium">Đang tải thư viện sách...</p>
+            <p className="text-sm text-slate-500 font-medium">{t('library.loading')}</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <AlertCircle className="w-10 h-10 text-red-400" />
             <p className="text-sm text-red-600 font-medium">{error}</p>
             <button onClick={fetchDocs} className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
-              Thử lại
+              {t('library.retry')}
             </button>
           </div>
         ) : filteredDocs.length === 0 ? (
@@ -347,10 +351,10 @@ export function LibraryPage() {
             <BookOpen className="w-12 h-12 text-slate-300" />
             <div className="text-center">
               <p className="text-sm font-bold text-slate-500">
-                {documents.length === 0 ? 'Chưa có sách nào trong thư viện' : `Không tìm thấy sách ${activeLevel !== 'all' ? activeLevelInfo?.label : ''} nào`}
+                {documents.length === 0 ? t('library.emptyTitle') : `${language === 'en' ? 'No' : 'Không tìm thấy sách'} ${activeLevel !== 'all' ? (activeLevelInfo?.labelKey ? t(activeLevelInfo.labelKey) : activeLevelInfo?.label) : ''} ${language === 'en' ? 'books found' : 'nào'}`}
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                {documents.length === 0 ? 'Sách HSK sẽ xuất hiện ở đây sau khi được tải lên.' : 'Thử chọn cấp độ khác hoặc xóa từ khóa tìm kiếm.'}
+                {documents.length === 0 ? t('library.emptyDesc') : (language === 'en' ? 'Try selecting a different level or clearing the search query.' : 'Thử chọn cấp độ khác hoặc xóa từ khóa tìm kiếm.')}
               </p>
             </div>
           </div>
@@ -358,15 +362,15 @@ export function LibraryPage() {
           <>
             <div className="flex items-center justify-between mb-6">
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                {activeLevelInfo?.key === 'all' ? 'Tất cả sách' : activeLevelInfo?.label}
-                <span className="ml-1.5">({filteredDocs.length} cuốn)</span>
+                {activeLevelInfo?.key === 'all' ? t('library.allBooks') : activeLevelInfo?.label}
+                <span className="ml-1.5">({filteredDocs.length} {t('library.booksCount')})</span>
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {filteredDocs.map(doc => {
                 const level = detectHskLevel(doc);
                 const levelInfo = HSK_LEVELS.find(l => l.key === level);
-                const bookType = detectBookType(doc);
+                const bookType = detectBookType(doc, t);
                 return (
                   <BookCard
                     key={doc.id}
@@ -376,6 +380,7 @@ export function LibraryPage() {
                     isAllowed={isAllowed}
                     onOpen={() => navigate(`/reader/${doc.id}`)}
                     onRestrictedClick={() => setIsAccessModalOpen(true)}
+                    t={t}
                   />
                 );
               })}

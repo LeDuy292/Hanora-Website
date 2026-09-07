@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Volume2, ChevronRight, AlertCircle, RefreshCw, Award, Smile, Info, Languages, Heart, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuthStore } from '../store/authStore';
+import { useLanguageStore } from '../store/languageStore';
 import { PRONUNCIATION_SAMPLES } from '../utils/constants';
 import { statsApi } from '../services/statsService';
 
@@ -12,6 +13,8 @@ export function PronunciationPracticePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addXp, updateProfile } = useAuthStore();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   
   const [activeLesson, setActiveLesson] = useState(null);
   const [currentSentenceIdx, setCurrentSentenceIdx] = useState(0);
@@ -110,7 +113,7 @@ export function PronunciationPracticePage() {
     };
 
     rec.onerror = (event) => {
-      if (event.error === 'not-allowed') setErrorMessage('Không có quyền micro.');
+      if (event.error === 'not-allowed') setErrorMessage(isEn ? 'Microphone permission denied.' : 'Không có quyền micro.');
       setIsRecording(false);
     };
 
@@ -118,7 +121,7 @@ export function PronunciationPracticePage() {
     recognitionRef.current = rec;
 
     return () => recognitionRef.current?.abort();
-  }, [activeSentence, gradePronunciation]);
+  }, [activeSentence, gradePronunciation, isEn]);
 
   const handlePlaySample = () => {
     if (!window.speechSynthesis || !activeSentence) return;
@@ -166,7 +169,7 @@ export function PronunciationPracticePage() {
               {activeLesson.category}
            </span>
            <h1 className="text-sm font-bold text-slate-500">
-              Bài {id.split('-')[1]}: {activeLesson.title}
+              {isEn ? `Lesson ${id.split('-')[1]}` : `Bài ${id.split('-')[1]}`}: {activeLesson.title}
            </h1>
         </div>
         <div className="flex items-center gap-5 text-slate-400">
@@ -220,19 +223,19 @@ export function PronunciationPracticePage() {
                     onClick={() => setMode('single')}
                     className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${mode === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
                  >
-                    Từng câu
+                    {isEn ? "Sentence" : "Từng câu"}
                  </button>
                  <button 
                     onClick={() => setMode('full')}
                     className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${mode === 'full' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
                  >
-                    Cả bài
+                    {isEn ? "Full lesson" : "Cả bài"}
                  </button>
               </div>
 
               <div className="flex justify-between items-center">
                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-350">Điểm phát âm</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-350">{isEn ? "Pronunciation Score" : "Điểm phát âm"}</p>
                     <div className="flex items-baseline gap-1">
                        <span className="text-4xl font-black text-slate-800">{score !== null ? score : '--'}</span>
                        <span className="text-slate-300 font-bold text-lg">/100</span>
@@ -266,7 +269,7 @@ export function PronunciationPracticePage() {
                     ))}
                  </div>
                  <p className="text-[11px] font-bold text-slate-400">
-                    {isRecording ? 'Đang phân tích âm điệu của bạn...' : 'Sẵn sàng ghi âm'}
+                    {isRecording ? (isEn ? 'Analyzing your pronunciation...' : 'Đang phân tích âm điệu của bạn...') : (isEn ? 'Ready to record' : 'Sẵn sàng ghi âm')}
                  </p>
               </div>
 
@@ -276,7 +279,7 @@ export function PronunciationPracticePage() {
                    className="flex flex-col items-center gap-3 py-6 rounded-3xl bg-[#F1F5F9] text-slate-500 hover:bg-[#E2E8F0] transition-all font-black text-[10px] uppercase tracking-widest"
                  >
                     <PlayCircle className="w-8 h-8 opacity-60" />
-                    Nghe mẫu
+                    {isEn ? "Listen Sample" : "Nghe mẫu"}
                  </button>
                  <button 
                    onClick={handleMicToggle}
@@ -285,7 +288,7 @@ export function PronunciationPracticePage() {
                    }`}
                  >
                     {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-                    Ghi âm
+                    {isEn ? "Record" : "Ghi âm"}
                  </button>
               </div>
 
@@ -297,7 +300,7 @@ export function PronunciationPracticePage() {
                  >
                     <div className="flex items-center gap-3">
                        <ArrowRight className="w-4 h-4" />
-                       Câu tiếp theo
+                       {isEn ? "Next Sentence" : "Câu tiếp theo"}
                     </div>
                     <span className="text-slate-300 group-hover:text-blue-300">{currentSentenceIdx + 1}/{activeLesson.sentences.length}</span>
                  </button>
@@ -308,7 +311,7 @@ export function PronunciationPracticePage() {
                        className="flex-1 py-4 bg-[#F8FAFC] border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
                     >
                        <RefreshCw className="w-3.5 h-3.5" />
-                       Thử lại
+                       {isEn ? "Retry" : "Thử lại"}
                     </button>
                     <button className="p-4 bg-[#F8FAFC] border-2 border-slate-50 rounded-2xl text-slate-300 hover:text-rose-400 transition-all">
                        <Heart className="w-5 h-5" />
@@ -326,7 +329,7 @@ export function PronunciationPracticePage() {
               />
               <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
                  <p className="text-white text-[10px] font-black uppercase tracking-widest opacity-90">
-                    Bối cảnh: {activeLesson.context}
+                    {isEn ? "Context:" : "Bối cảnh:"} {activeLesson.context}
                  </p>
               </div>
            </div>
@@ -338,12 +341,12 @@ export function PronunciationPracticePage() {
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-3 shadow-[0_-10px_25px_rgba(0,0,0,0.05)] z-50 flex items-center justify-between lg:hidden transition-all duration-300 animate-slide-up">
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">ĐIỂM</span>
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isEn ? "SCORE" : "ĐIỂM"}</span>
             <span className="text-base font-black text-slate-800 leading-none">{score !== null ? score : '--'}</span>
           </div>
           <div className="h-6 w-[1px] bg-slate-200" />
           <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">TIẾN TRÌNH</span>
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isEn ? "PROGRESS" : "TIẾN TRÌNH"}</span>
             <span className="text-xs font-bold text-slate-650 leading-none">{currentSentenceIdx + 1}/{activeLesson.sentences.length}</span>
           </div>
         </div>
@@ -353,7 +356,7 @@ export function PronunciationPracticePage() {
           <button 
             onClick={handlePlaySample}
             className={`p-2.5 rounded-full ${isSynthesizing ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'} transition-all`}
-            title="Nghe mẫu"
+            title={isEn ? "Listen sample" : "Nghe mẫu"}
           >
             <PlayCircle className="w-5 h-5 opacity-80" />
           </button>
@@ -365,7 +368,7 @@ export function PronunciationPracticePage() {
                 ? 'bg-rose-500 animate-pulse shadow-rose-500/20' 
                 : 'bg-[#005BAC] shadow-blue-500/20'
             }`}
-            title="Ghi âm"
+            title={isEn ? "Record" : "Ghi âm"}
           >
             {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
@@ -373,7 +376,7 @@ export function PronunciationPracticePage() {
           <button 
             onClick={() => { setScore(null); setTranscript(''); }}
             className="p-2.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"
-            title="Thử lại"
+            title={isEn ? "Retry" : "Thử lại"}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -385,7 +388,7 @@ export function PronunciationPracticePage() {
           disabled={currentSentenceIdx >= activeLesson.sentences.length - 1}
           className="flex items-center gap-1 px-3 py-2 rounded-full bg-[#32A0F4] text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
-          Tiếp
+          {isEn ? "Next" : "Tiếp"}
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
