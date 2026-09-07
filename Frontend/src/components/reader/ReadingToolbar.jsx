@@ -1,10 +1,12 @@
 import { Eye, EyeOff, Upload } from 'lucide-react';
 import { useReaderStore } from '../../store/readerStore';
 import { useDocumentStore } from '../../store/documentStore';
+import { useLanguageStore } from '../../store/languageStore';
 
 export function ReadingToolbar({ onUploadClick }) {
   const { fontSize, setFontSize, showPinyin, togglePinyin, clearSelection } = useReaderStore();
   const { documents, activeDocumentId, setActiveDocument } = useDocumentStore();
+  const { t, language } = useLanguageStore();
 
   const handleDocumentChange = (e) => {
     setActiveDocument(e.target.value);
@@ -15,7 +17,9 @@ export function ReadingToolbar({ onUploadClick }) {
     <div className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-4 bg-white/95 backdrop-blur-md border border-slate-200/80 p-4 rounded-2xl shadow-sm page-transition">
       {/* File selector dropdown */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">Văn bản đọc:</span>
+        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">
+          {language === 'en' ? 'Reading Document:' : 'Văn bản đọc:'}
+        </span>
         <div className="flex items-center gap-1.5">
           <select
             value={activeDocumentId || ''}
@@ -31,10 +35,10 @@ export function ReadingToolbar({ onUploadClick }) {
           <button
             onClick={onUploadClick}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100/70 text-xs font-bold transition-all shadow-sm"
-            title="Tải lên tài liệu mới"
+            title={language === 'en' ? 'Upload new document' : 'Tải lên tài liệu mới'}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tải file mới</span>
+            <span className="hidden sm:inline">{language === 'en' ? 'Upload file' : 'Tải file mới'}</span>
           </button>
         </div>
       </div>
@@ -50,7 +54,7 @@ export function ReadingToolbar({ onUploadClick }) {
               : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800'
           }`}
           style={{ color: showPinyin ? '#2563eb' : '' }}
-          title={showPinyin ? "Ẩn Pinyin" : "Hiện Pinyin"}
+          title={showPinyin ? (language === 'en' ? 'Hide Pinyin' : 'Ẩn Pinyin') : (language === 'en' ? 'Show Pinyin' : 'Hiện Pinyin')}
         >
           {showPinyin ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
           <span>Pinyin</span>
@@ -62,7 +66,7 @@ export function ReadingToolbar({ onUploadClick }) {
             onClick={() => setFontSize(fontSize - 2)}
             disabled={fontSize <= 14}
             className="px-2.5 py-1 text-slate-500 hover:text-slate-800 disabled:opacity-30 text-xs font-bold transition-colors"
-            title="Giảm cỡ chữ"
+            title={language === 'en' ? 'Decrease font size' : 'Giảm cỡ chữ'}
           >
             A-
           </button>
@@ -73,7 +77,7 @@ export function ReadingToolbar({ onUploadClick }) {
             onClick={() => setFontSize(fontSize + 2)}
             disabled={fontSize >= 36}
             className="px-2.5 py-1 text-slate-500 hover:text-slate-800 disabled:opacity-30 text-xs font-bold transition-colors"
-            title="Tăng cỡ chữ"
+            title={language === 'en' ? 'Increase font size' : 'Tăng cỡ chữ'}
           >
             A+
           </button>

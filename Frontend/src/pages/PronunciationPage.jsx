@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Search, Plus, Clock, Star, Info, PlayCircle, PlusCircle, Award, TrendingUp } from 'lucide-react';
 import { PRONUNCIATION_SAMPLES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
+import { useLanguageStore } from '../store/languageStore';
 
 // Image assets
 import heroTabletImg from '../assets/pronunciation_hero_tablet_1780674163687.png';
@@ -11,6 +12,9 @@ import calligraphyImg from '../assets/calligraphy_challenge_1780674185129.png';
 export function PronunciationPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { t, language } = useLanguageStore();
+  const isEn = language === 'en';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showComingSoon, setShowComingSoon] = useState(false);
 
@@ -31,20 +35,22 @@ export function PronunciationPage() {
         <div className="flex-1 space-y-4 relative z-10 text-white">
           <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100 opacity-80">
-              LUYỆN NÓI TIẾNG TRUNG AI
+              {t('pronunciation.heroTag')}
             </span>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-              Luyện Phát Âm Chuẩn AI
+              {t('pronunciation.heroTitle')}
             </h1>
             <p className="text-sm text-blue-50 font-medium max-w-md leading-relaxed opacity-90 pt-1">
-              Cải thiện ngữ điệu và độ chính xác của bạn với hệ thống phân tích giọng nói thông minh. 
-              Chọn từ thư viện mẫu hoặc tự thêm nội dung của riêng bạn.
+              {t('pronunciation.heroDesc')}
             </p>
           </div>
           
-          <button className="flex items-center gap-3 px-5 py-3 bg-[#011C3A] text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-[#002B5B] transition-all shadow-md active:scale-95">
+          <button 
+            onClick={() => setShowComingSoon(true)}
+            className="flex items-center gap-3 px-5 py-3 bg-[#011C3A] text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-[#002B5B] transition-all shadow-md active:scale-95"
+          >
             <PlusCircle className="w-5 h-5 text-blue-400" />
-            Tự thêm bài luyện tập
+            {t('pronunciation.addCustom')}
           </button>
         </div>
 
@@ -67,7 +73,7 @@ export function PronunciationPage() {
             <Award className="w-5.5 h-5.5 text-blue-600" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Điểm TB phát âm</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">{t('pronunciation.avgScore')}</span>
             <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.averagePronunciationScore ?? 0} / 100</h4>
           </div>
         </div>
@@ -78,8 +84,8 @@ export function PronunciationPage() {
             <Mic className="w-5.5 h-5.5 text-indigo-600" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Lượt ghi âm</span>
-            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.totalPronunciationAttempts ?? 0} lượt</h4>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">{isEn ? 'Recordings' : 'Lượt ghi âm'}</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.totalPronunciationAttempts ?? 0} {isEn ? 'takes' : 'lượt'}</h4>
           </div>
         </div>
 
@@ -89,8 +95,8 @@ export function PronunciationPage() {
             <Clock className="w-5.5 h-5.5 text-emerald-600" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Thời gian học today</span>
-            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.todayMinutes ?? 0} phút</h4>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">{isEn ? "Today's Study Time" : "Thời gian học hôm nay"}</span>
+            <h4 className="text-base font-extrabold text-slate-800 mt-0.5">{user?.todayMinutes ?? 0} {isEn ? 'min' : 'phút'}</h4>
           </div>
         </div>
 
@@ -100,9 +106,13 @@ export function PronunciationPage() {
             <TrendingUp className="w-5.5 h-5.5 text-amber-500" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block">Xu hướng tuần</span>
+            <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block">{isEn ? 'Weekly Trend' : 'Xu hướng tuần'}</span>
             <h4 className="text-base font-extrabold text-slate-800 mt-0.5 font-display">
-              {(user?.averagePronunciationScore ?? 0) >= 80 ? 'Rất Tốt' : (user?.averagePronunciationScore ?? 0) >= 60 ? 'Tiến Bộ' : 'Cần cố gắng'}
+              {(user?.averagePronunciationScore ?? 0) >= 80 
+                ? (isEn ? 'Excellent' : 'Rất Tốt') 
+                : (user?.averagePronunciationScore ?? 0) >= 60 
+                  ? (isEn ? 'Improving' : 'Tiến Bộ') 
+                  : (isEn ? 'Needs Practice' : 'Cần cố gắng')}
             </h4>
           </div>
         </div>
@@ -111,14 +121,14 @@ export function PronunciationPage() {
       {/* List Header & Search */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-           Danh sách Văn mẫu Có sẵn
+          {t('pronunciation.sampleLibrary')}
         </h2>
         
         <div className="relative w-full md:w-[320px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
           <input 
             type="text" 
-            placeholder="Tìm kiếm văn mẫu..."
+            placeholder={isEn ? "Search sample lessons..." : "Tìm kiếm văn mẫu..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-full focus:outline-none focus:border-blue-400 transition-all text-xs font-bold text-slate-600 placeholder:text-slate-300 shadow-sm"
@@ -150,14 +160,14 @@ export function PronunciationPage() {
               {lesson.sentences[0].pinyin}
             </p>
             <p className="text-slate-500 mb-6 text-[15px]">
-              "{lesson.sentences[0].vietnamese}"
+              "{isEn ? (lesson.sentences[0].english || lesson.sentences[0].vietnamese) : lesson.sentences[0].vietnamese}"
             </p>
             <button 
               onClick={() => handleStartPractice(lesson.id)}
               className="w-full py-2.5 bg-slate-50 text-[#2088E2] font-black rounded-full hover:bg-[#2088E2] hover:text-white transition-all flex items-center justify-center gap-2 text-[15px] active:scale-95 shadow-sm"
             >
               <span className="material-symbols-outlined notranslate text-[20px]" translate="no">record_voice_over</span>
-              Luyện tập ngay
+              {isEn ? 'Practice Now' : 'Luyện tập ngay'}
             </button>
           </div>
         ))}
@@ -168,7 +178,7 @@ export function PronunciationPage() {
             <div className="flex-1 w-full">
               <div className="flex items-center gap-3 mb-4">
                 <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-[11px] font-bold scale-90 origin-left uppercase tracking-wider">
-                  {challenge.level} - Thử thách
+                  {challenge.level} - {isEn ? 'Challenge' : 'Thử thách'}
                 </span>
                 <span className="text-slate-400 flex items-center gap-1 font-bold text-[13px]">
                   <span className="material-symbols-outlined notranslate text-[16px]" translate="no">wb_sunny</span> 
@@ -182,13 +192,13 @@ export function PronunciationPage() {
                 {challenge.sentences[0].pinyin}
               </p>
               <p className="text-slate-500 mb-6 text-[16px] leading-relaxed">
-                "{challenge.sentences[0].vietnamese}"
+                "{isEn ? (challenge.sentences[0].english || challenge.sentences[0].vietnamese) : challenge.sentences[0].vietnamese}"
               </p>
               <button 
                 onClick={() => handleStartPractice(challenge.id)}
                 className="px-8 py-3 bg-[#005BAC] text-white font-bold rounded-xl hover:bg-[#004A8C] transition-all text-[15px] active:scale-95 shadow-md"
               >
-                Bắt đầu thử thách
+                {isEn ? 'Start Challenge' : 'Bắt đầu thử thách'}
               </button>
             </div>
             <div className="w-full md:w-[40%] aspect-[4/3] rounded-xl overflow-hidden shadow-sm">
@@ -202,13 +212,16 @@ export function PronunciationPage() {
         ))}
 
         {/* Custom Card based on User Snippet 100% */}
-        <button className="border-2 border-dashed border-slate-200 p-6 rounded-[24px] flex flex-col items-center justify-center gap-4 hover:border-[#2088E2] hover:bg-white transition-all min-h-[250px] group shadow-sm active:scale-95 bg-white/50">
+        <button 
+          onClick={() => setShowComingSoon(true)}
+          className="border-2 border-dashed border-slate-200 p-6 rounded-[24px] flex flex-col items-center justify-center gap-4 hover:border-[#2088E2] hover:bg-white transition-all min-h-[250px] group shadow-sm active:scale-95 bg-white/50"
+        >
           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 group-hover:bg-blue-100 group-hover:text-[#2088E2] transition-colors">
             <span className="material-symbols-outlined notranslate text-[28px]" translate="no">add</span>
           </div>
           <div className="text-center">
-            <p className="font-bold text-slate-700 text-[16px] mb-1">Thêm nội dung riêng</p>
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">Dán văn bản bất kỳ để luyện tập</p>
+            <p className="font-bold text-slate-700 text-[16px] mb-1">{isEn ? 'Add Custom Content' : 'Thêm nội dung riêng'}</p>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">{isEn ? 'Paste any Chinese text to practice' : 'Dán văn bản bất kỳ để luyện tập'}</p>
           </div>
         </button>
       </div>
@@ -220,15 +233,15 @@ export function PronunciationPage() {
             <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-[16px] flex items-center justify-center mb-5 border border-blue-100">
               <span className="material-symbols-outlined notranslate text-[32px]" translate="no">construction</span>
             </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2 font-display">Đang Phát Triển</h3>
+            <h3 className="text-xl font-black text-slate-800 mb-2 font-display">{isEn ? 'In Development' : 'Đang Phát Triển'}</h3>
             <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-              Tính năng luyện phát âm AI đang được đội ngũ hoàn thiện. Vui lòng quay lại trải nghiệm sau nhé!
+              {isEn ? 'AI pronunciation practice is currently in active development. Please check back soon!' : 'Tính năng luyện phát âm AI đang được đội ngũ hoàn thiện. Vui lòng quay lại trải nghiệm sau nhé!'}
             </p>
             <button 
               onClick={() => setShowComingSoon(false)}
               className="w-full py-3 bg-[#2088E2] text-white font-black rounded-xl hover:bg-[#1b75c4] transition-all shadow-md active:scale-95"
             >
-              Đã hiểu
+              {isEn ? 'Got it' : 'Đã hiểu'}
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { apiRequest } from '../services/apiClient';
 import { extractPlainMeaning } from '../utils/chineseUtils';
+import { useLanguageStore } from './languageStore';
 
 const INITIAL_VOCABULARY = [];
 
@@ -348,10 +349,11 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchUserVocabulary: async () => {
+      fetchUserVocabulary: async (lang = null) => {
         set({ isLoading: true });
         try {
-          const data = await apiRequest('/vocabulary', { auth: true });
+          const currentLang = lang || useLanguageStore.getState().language || 'vi';
+          const data = await apiRequest(`/vocabulary?language=${currentLang}`, { auth: true });
           if (data) {
             set({ 
               vocabList: data,
@@ -364,10 +366,14 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchUserFlashcards: async (deckId = null) => {
+      fetchUserFlashcards: async (deckId = null, lang = null) => {
         set({ quizLoading: true });
         try {
-          const path = deckId ? `/flashcard?deckId=${deckId}` : '/flashcard';
+          const currentLang = lang || useLanguageStore.getState().language || 'vi';
+          const params = new URLSearchParams();
+          if (deckId) params.append('deckId', deckId);
+          if (currentLang) params.append('language', currentLang);
+          const path = `/flashcard?${params.toString()}`;
           const data = await apiRequest(path, { auth: true });
           if (data) {
             set({ 
@@ -508,9 +514,13 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchReviewCards: async (deckId = null) => {
+      fetchReviewCards: async (deckId = null, lang = null) => {
         try {
-          const path = deckId ? `/flashcard/review?deckId=${deckId}` : '/flashcard/review';
+          const currentLang = lang || useLanguageStore.getState().language || 'vi';
+          const params = new URLSearchParams();
+          if (deckId) params.append('deckId', deckId);
+          if (currentLang) params.append('language', currentLang);
+          const path = `/flashcard/review?${params.toString()}`;
           return await apiRequest(path, { auth: true });
         } catch (error) {
           console.error("Error fetching review cards:", error);
@@ -531,9 +541,14 @@ export const useVocabularyStore = create(
         }
       },
 
-      fetchWriteCards: async (deckId = null, count = 10) => {
+      fetchWriteCards: async (deckId = null, count = 10, lang = null) => {
         try {
-          const path = deckId ? `/flashcard/write?deckId=${deckId}&count=${count}` : `/flashcard/write?count=${count}`;
+          const currentLang = lang || useLanguageStore.getState().language || 'vi';
+          const params = new URLSearchParams();
+          if (deckId) params.append('deckId', deckId);
+          params.append('count', count);
+          if (currentLang) params.append('language', currentLang);
+          const path = `/flashcard/write?${params.toString()}`;
           return await apiRequest(path, { auth: true });
         } catch (error) {
           console.error("Error fetching write cards:", error);

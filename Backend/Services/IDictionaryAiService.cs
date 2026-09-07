@@ -4,6 +4,7 @@ public class ExampleDto
 {
     public string ZhText { get; set; } = string.Empty;
     public string ViText { get; set; } = string.Empty;
+    public string EnText { get; set; } = string.Empty;
 }
 
 public class VocabularyAiResponse
@@ -12,6 +13,7 @@ public class VocabularyAiResponse
     public string Pinyin { get; set; } = string.Empty;
     public string HanViet { get; set; } = string.Empty;
     public string Definitions { get; set; } = string.Empty;
+    public string DefinitionsEn { get; set; } = string.Empty;
     public string UsageNotes { get; set; } = string.Empty;
     public string WordType { get; set; } = "Other";
     public List<string> Collocations { get; set; } = new();
@@ -32,6 +34,7 @@ public class SentenceAnalysisResponse
     public string Pinyin { get; set; } = string.Empty;
     public string HanViet { get; set; } = string.Empty;
     public string Vietnamese { get; set; } = string.Empty;
+    public string Translation { get; set; } = string.Empty;
     public string GrammarAnalysis { get; set; } = string.Empty;
 }
 
@@ -48,8 +51,10 @@ public interface IDictionaryAiService
 {
     Task<VocabularyAiResponse?> GetVocabularyInfoAsync(string word);
     Task<List<string>?> TranslateSentencesAsync(List<string> englishSentences);
+    Task<string?> TranslateTextAsync(string text, string targetLanguage = "en");
     Task<RelationsDto?> GetRelationsAsync(string word);
-    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang = "auto", string targetLang = "vi");
-    Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText);
-    Task<string> AskAiAssistantAsync(string word, string question, string contextSentence);
+    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string language = "vi");
+    Task<SentenceAnalysisResponse?> AnalyzeSentenceAsync(string sentence, string sourceLang, string targetLang);
+    Task<SentenceComparisonResponse?> CompareSentencesAsync(string originalText, string modifiedText, string language = "vi");
+    Task<string> AskAiAssistantAsync(string word, string question, string contextSentence, string language = "vi");
 }

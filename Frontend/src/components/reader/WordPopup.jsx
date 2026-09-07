@@ -3,11 +3,11 @@ import { Bookmark, BookmarkCheck, Volume2, Sparkles, X, Loader2, MoreVertical, F
 import { aiService } from '../../services/aiService';
 import { useVocabularyStore } from '../../store/vocabularyStore';
 import { useToastStore } from '../../store/toastStore';
+import { useLanguageStore } from '../../store/languageStore';
 import { extractPlainMeaning } from '../../utils/chineseUtils';
 
-const getCleanTranslation = (item) => extractPlainMeaning(item?.translation || item?.definitions || item?.meaning);
-
 export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewOriginalDoc }) {
+  const { t, language } = useLanguageStore();
   const [examples, setExamples] = useState([]);
   const [isLoadingExamples, setIsLoadingExamples] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
@@ -31,7 +31,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
     if (showExamples && examples.length === 0) {
       Promise.resolve().then(() => {
         setIsLoadingExamples(true);
-        return aiService.getWordExamples(word.text || word.word);
+        return aiService.getWordExamples(word.text || word.word, language);
       })
       .then((data) => {
         setExamples(data || []);
@@ -43,7 +43,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
         setIsLoadingExamples(false);
       });
     }
-  }, [showExamples, word, examples.length]);
+  }, [showExamples, word, examples.length, language]);
 
   // TTS audio trigger using browser API
   const handlePlayAudio = () => {
@@ -56,13 +56,20 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
 
   const handleSaveWord = () => {
     if (isSaved) {
-      useToastStore.getState().addToast('Từ vựng này đã được lưu trước đây trong sổ tay của bạn!', 'info');
+      useToastStore.getState().addToast(t('reader.popup.alreadySaved'), 'info');
       return;
     }
     onSave(word);
   };
 
-  const displayTranslation = getCleanTranslation(word);
+  const displayTranslation = (() => {
+    const wordText = word?.text || word?.word || '';
+    if (language === 'en') {
+      if (word?.definitionEn) return word.definitionEn;
+      if (word?.translationEn) return word.translationEn;
+    }
+    return extractPlainMeaning(word?.translation || word?.definitions || word?.meaning || word?.definition, language, wordText);
+  })();
 
   return (
     <div className="w-full bg-white border border-slate-100 rounded-2xl p-5 shadow-md flex flex-col gap-4 animate-scale-in relative">
@@ -70,7 +77,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
       {isSaved && (
         <div className="bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-amber-800 flex items-center gap-2 shadow-xs">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>Từ vựng này đã được bạn lưu trước đây trong Sổ tay!</span>
+          <span>{t('reader.wordCard.savedBanner')}</span>
         </div>
       )}
 
@@ -83,7 +90,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
           <button 
             onClick={handlePlayAudio}
             className="text-slate-400 hover:text-blue-600 p-1 rounded-lg hover:bg-slate-50 transition-colors"
-            title="Nghe phát âm"
+            title={t('common.listenAudio')}
           >
             <Volume2 className="w-4 h-4" />
           </button>
@@ -94,7 +101,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-            title="Tùy chọn khác"
+            title={t('reader.wordCard.otherOptions')}
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -105,18 +112,18 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
                 onClick={() => {
                   setShowMenu(false);
                   if (onViewOriginalDoc) onViewOriginalDoc(word);
-                  else useToastStore.getState().addToast(`Đang xem vị trí từ "${word.text || word.word}" trong bài gốc`, 'info');
+                  else useToastStore.getState().addToast(`${t('reader.wordCard.originalDoc')}: ${word.text || word.word}`, 'info');
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
               >
                 <FileText className="w-3.5 h-3.5 text-blue-500" />
-                <span>Tài liệu gốc</span>
+                <span>{t('reader.wordCard.originalDoc')}</span>
               </button>
             </div>
           )}
 
           <button 
-            onClick={onClose}
+            onClick={onClose} 
             className="text-slate-400 hover:text-slate-650 p-1 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
@@ -153,12 +160,12 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
           {isSaved ? (
             <>
               <BookmarkCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Đã lưu Sổ tay</span>
+              <span>{language === 'en' ? 'Saved' : 'Đã lưu Sổ tay'}</span>
             </>
           ) : (
             <>
               <Bookmark className="w-3.5 h-3.5" />
-              <span>Lưu vào Sổ tay</span>
+              <span>{t('reader.wordCard.saveNotebook')}</span>
             </>
           )}
         </button>
@@ -173,7 +180,7 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Mẫu câu AI</span>
+          <span>{language === 'en' ? 'AI Examples' : 'Mẫu câu AI'}</span>
         </button>
       </div>
 
@@ -182,12 +189,12 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 mt-1 space-y-3">
           <div className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 uppercase tracking-widest">
             <Sparkles className="w-3 h-3 fill-amber-500/5 animate-spin" style={{ animationDuration: '3s' }} />
-            Ngữ cảnh sử dụng
+            {t('reader.wordCard.usageNotes')}
           </div>
           {isLoadingExamples ? (
             <div className="flex items-center justify-center py-4 gap-2 text-slate-400 text-xs">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>AI đang soạn mẫu câu...</span>
+              <span>{t('reader.popup.examplesLoading')}</span>
             </div>
           ) : (
             <div className="space-y-3">
@@ -195,7 +202,9 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
                 <div key={idx} className="space-y-0.5 text-left border-l-2 border-slate-200 pl-2">
                   <p className="text-xs font-semibold text-slate-800 select-text">{ex.chinese}</p>
                   <p className="text-[10px] text-blue-650 font-bold select-text">{ex.pinyin}</p>
-                  <p className="text-[10px] text-slate-500 italic select-text">"{ex.english}"</p>
+                  <p className="text-[10px] text-slate-500 italic select-text">
+                    "{language === 'en' ? ex.english : (ex.vietnamese || ex.english)}"
+                  </p>
                 </div>
               ))}
             </div>
@@ -205,4 +214,5 @@ export function WordPopup({ word, onSave, isSaved: propIsSaved, onClose, onViewO
     </div>
   );
 }
+
 export default WordPopup;

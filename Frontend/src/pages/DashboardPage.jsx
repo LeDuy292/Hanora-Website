@@ -23,6 +23,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useTimerStore } from '../store/timerStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
+import { useLanguageStore } from '../store/languageStore';
 import { progressApi } from '../services/progressService';
 import { leaderboardApi } from '../services/leaderboardService';
 import { toast } from '../store/notificationStore';
@@ -181,12 +182,23 @@ export function DashboardPage() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
+  const { t, language } = useLanguageStore();
+  const isEn = language === 'en';
+
   // Consistency Calendar days matching current week
   const today = new Date();
   const currentDay = today.getDay(); 
   const todayIdx = currentDay === 0 ? 6 : currentDay - 1; 
 
-  const weekDays = [
+  const weekDays = isEn ? [
+    { name: 'Mon', label: 'Monday' },
+    { name: 'Tue', label: 'Tuesday' },
+    { name: 'Wed', label: 'Wednesday' },
+    { name: 'Thu', label: 'Thursday' },
+    { name: 'Fri', label: 'Friday' },
+    { name: 'Sat', label: 'Saturday' },
+    { name: 'Sun', label: 'Sunday' }
+  ] : [
     { name: 'T2', label: 'Thứ 2' },
     { name: 'T3', label: 'Thứ 3' },
     { name: 'T4', label: 'Thứ 4' },
@@ -195,6 +207,8 @@ export function DashboardPage() {
     { name: 'T7', label: 'Thứ 7' },
     { name: 'CN', label: 'Chủ nhật' }
   ];
+
+  const weekdayLabels = isEn ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
   // Monday of the current week in local time
   const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
@@ -222,8 +236,8 @@ export function DashboardPage() {
   // Growth chart points derived from the backend's 7-day series.
   const graphPoints = growthChart.map((p) => {
     const d = new Date(p.date);
-    const label = Number.isNaN(d.getTime()) ? '' : WEEKDAY_LABELS[d.getDay()];
-    const dateStr = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    const label = Number.isNaN(d.getTime()) ? '' : weekdayLabels[d.getDay()];
+    const dateStr = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(isEn ? 'en-US' : 'vi-VN', { day: '2-digit', month: '2-digit' });
     return { day: label, count: p.count ?? 0, date: dateStr };
   });
 
@@ -290,7 +304,7 @@ export function DashboardPage() {
             <div className="lg:col-span-7 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-2xl sm:text-3xl font-black font-display text-slate-850 tracking-tight flex items-center gap-2">
-                  <span>Chào mừng trở lại, {user.name}!</span>
+                  <span>{t('dashboard.welcome', { name: user.name || user.displayName || 'User' })}</span>
                   <span className="text-xl animate-bounce">👋</span>
                 </h2>
                 <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-600 font-black px-3.5 py-1.5 rounded-2xl text-xs shrink-0 shadow-2xs">
@@ -304,7 +318,7 @@ export function DashboardPage() {
                 <div className="flex justify-between items-center text-xs text-slate-600 font-bold">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                    Tiến trình lên Level {level + 1}
+                    {t('dashboard.levelProgress', { nextLevel: level + 1 })}
                   </span>
                   <span className="font-extrabold text-blue-600">{xp.toLocaleString()} / {nextLevelXp.toLocaleString()} XP</span>
                 </div>
@@ -327,7 +341,7 @@ export function DashboardPage() {
                     <Target className="w-4 h-4 text-white" />
                   </div>
                   <span className="text-[11px] font-black uppercase tracking-widest text-blue-100">
-                    Mục Tiêu Học Hôm Nay
+                    {t('dashboard.todayGoalTitle')}
                   </span>
                 </div>
                 <button
@@ -336,13 +350,13 @@ export function DashboardPage() {
                   className="px-3 py-1 bg-white/15 hover:bg-white text-white hover:text-blue-600 border border-white/20 rounded-xl text-xs font-bold transition-all backdrop-blur-md shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <Target className="w-3.5 h-3.5" />
-                  <span>{isEditingGoal ? 'Hủy' : 'Sửa mục tiêu'}</span>
+                  <span>{isEditingGoal ? t('dashboard.cancelGoal') : t('dashboard.editGoal')}</span>
                 </button>
               </div>
 
               {isEditingGoal ? (
                 <div className="relative z-10 pt-3 space-y-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[11px] font-extrabold text-blue-100 uppercase tracking-wider block">Chọn số phút học mỗi ngày</span>
+                  <span className="text-[11px] font-extrabold text-blue-100 uppercase tracking-wider block">{t('dashboard.chooseGoalMinutes')}</span>
                   <div id="study-duration" data-tour="goal-presets" className="grid grid-cols-4 gap-2">
                     {[30, 60, 90, 120].map((mins) => (
                       <button
@@ -354,7 +368,7 @@ export function DashboardPage() {
                             : 'bg-white/10 hover:bg-white/20 text-white border border-white/15'
                         }`}
                       >
-                        {mins}P
+                        {mins}{t('dashboard.minutesUnitShort')}
                       </button>
                     ))}
                   </div>
@@ -370,14 +384,14 @@ export function DashboardPage() {
                           useTimerStore.getState().resetTimer();
                           useTimerStore.getState().setCountdownTargetSeconds(tempGoal * 60);
                           showWidget();
-                          toast.success(`Đã đặt lại mục tiêu mới ${tempGoal} phút/ngày!`);
+                          toast.success(isEn ? `Study goal reset to ${tempGoal} min/day!` : `Đã đặt lại mục tiêu mới ${tempGoal} phút/ngày!`);
                         } catch (err) {
                           toast.error(err.message);
                         }
                       }}
                       className="w-full py-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-xs shadow-md transition cursor-pointer"
                     >
-                      Lưu mục tiêu mới
+                      {t('dashboard.saveGoal')}
                     </button>
                   </div>
                 </div>
@@ -385,7 +399,7 @@ export function DashboardPage() {
                 <div className="relative z-10 space-y-2 pt-2">
                   <div className="flex items-baseline justify-between">
                     <div className="text-2xl font-black font-display tracking-tight text-white">
-                      {Math.round(totalMinsTodayCalculated)} <span className="text-xs font-bold text-blue-100">/ {targetMinutes} phút</span>
+                      {Math.round(totalMinsTodayCalculated)} <span className="text-xs font-bold text-blue-100">/ {targetMinutes} {t('dashboard.minutesUnit')}</span>
                     </div>
                     <span className="text-xs font-black text-blue-100 bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20">
                       {Math.min(100, Math.round((totalMinsTodayCalculated / Math.max(1, targetMinutes)) * 100))}%
@@ -421,7 +435,7 @@ export function DashboardPage() {
             <div className="flex flex-col xl:flex-row justify-between items-start gap-6 relative z-10">
               <div className="max-w-xl">
                 <span className="text-[10px] uppercase tracking-[0.35em] text-sky-100/80 font-bold">
-                  Chuỗi ngày học liên tiếp
+                  {t('dashboard.streakTitle')}
                 </span>
                 <div className="flex items-center gap-6 mt-2">
                   <div className="flex flex-col">
@@ -429,7 +443,7 @@ export function DashboardPage() {
                       {streak}
                     </h3>
                     <p className="text-xs font-bold uppercase tracking-wider text-blue-100/90 mt-1">
-                      NGÀY LIÊN TIẾP
+                      {t('dashboard.daysStreak')}
                     </p>
                   </div>
                   <div className="rounded-[2rem] bg-white/10 p-3.5 border border-white/20 shadow-inner flex items-center justify-center backdrop-blur-md">
@@ -449,12 +463,12 @@ export function DashboardPage() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-white">
-                    TUẦN NÀY
+                    {t('dashboard.thisWeek')}
                   </p>
-                  <p className="text-[11px] text-blue-100 mt-0.5 font-medium">Hoàn thành mỗi ngày để giữ streak tiếp tục.</p>
+                  <p className="text-[11px] text-blue-100 mt-0.5 font-medium">{t('dashboard.weekHint')}</p>
                 </div>
                 <div className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white border border-white/20 shadow-sm">
-                  {streak} NGÀY
+                  {streak} {isEn ? 'DAYS' : 'NGÀY'}
                 </div>
               </div>
 
@@ -490,16 +504,16 @@ export function DashboardPage() {
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
               <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-blue-600" />
-                Tăng Trưởng Từ Vựng
+                {t('dashboard.vocabGrowth')}
               </h3>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">7 ngày qua</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg">{t('dashboard.last7Days')}</span>
             </div>
 
             <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-4 border border-slate-100/80 shadow-sm overflow-hidden select-none min-h-[160px] flex items-center">
               {activePoint && (
                 <div className="absolute bg-slate-900 border border-slate-800/80 text-white px-2 py-1 rounded-xl shadow-xl pointer-events-none z-20 flex flex-col items-center text-center leading-none" style={{ left: `${(activePoint.x / 500) * 100}%`, top: `${(activePoint.y / 130) * 100 - 15}%`, transform: 'translate(-50%, -100%)' }}>
                   <span className="text-[7px] text-slate-400 font-extrabold tracking-widest">{activePoint.day} ({activePoint.date})</span>
-                  <span className="text-[10px] text-yellow-300 font-black mt-1">+{activePoint.count} từ</span>
+                  <span className="text-[10px] text-yellow-300 font-black mt-1">+{activePoint.count} {isEn ? 'words' : 'từ'}</span>
                 </div>
               )}
               <svg viewBox="0 0 500 130" className="w-full overflow-visible">
@@ -539,16 +553,16 @@ export function DashboardPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                   <Trophy className="w-4.5 h-4.5 text-yellow-500 fill-yellow-500/10" />
-                  Bảng Xếp Hạng
+                  {t('dashboard.leaderboardTitle')}
                 </h3>
               </div>
 
               <div className="flex bg-slate-50 border border-slate-150 rounded-2xl p-1 justify-between">
                 {[
-                  { id: 'today', label: 'Hôm nay' },
-                  { id: 'weekly', label: 'Tuần này' },
-                  { id: 'monthly', label: 'Tháng này' },
-                  { id: 'global', label: 'Tất cả' }
+                  { id: 'today', label: t('dashboard.periodToday') },
+                  { id: 'weekly', label: t('dashboard.periodWeekly') },
+                  { id: 'monthly', label: t('dashboard.periodMonthly') },
+                  { id: 'global', label: t('dashboard.periodGlobal') }
                 ].map((p) => (
                   <button
                     key={p.id}
@@ -569,7 +583,7 @@ export function DashboardPage() {
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
               {leaderboardLoading ? (
                 <div className="text-center py-10 text-slate-400 text-xs font-bold animate-pulse">
-                  Đang cập nhật xếp hạng...
+                  {t('dashboard.updatingRank')}
                 </div>
               ) : (
                 <>
@@ -616,7 +630,7 @@ export function DashboardPage() {
                           {/* Display Name & Details */}
                           <div className="min-w-0">
                             <span className={`text-xs font-extrabold block truncate ${isCurrentUser ? 'text-blue-600' : 'text-slate-800'}`}>
-                              {row.displayName} {isCurrentUser && <span className="text-[8px] font-black uppercase text-blue-600 bg-blue-100 px-1.5 py-0.2 rounded-md ml-1">BẠN</span>}
+                              {row.displayName} {isCurrentUser && <span className="text-[8px] font-black uppercase text-blue-600 bg-blue-100 px-1.5 py-0.2 rounded-md ml-1">{t('dashboard.youBadge')}</span>}
                             </span>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded-md">
@@ -657,16 +671,16 @@ export function DashboardPage() {
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-850">
-                Phòng Danh Hiệu (Achievements)
+                {t('dashboard.trophyRoomTitle')}
               </h3>
               <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                Huy hiệu vinh danh cá nhân và các cột mốc học tập đã chinh phục
+                {t('dashboard.trophyRoomSubtitle')}
               </p>
             </div>
           </div>
           <span className="text-xs font-black text-amber-700 bg-amber-50/80 border border-amber-200/80 px-3.5 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-xs shrink-0">
             <Award className="w-4 h-4 text-amber-600" />
-            {unlockedCount} / {achievements.length} Huy hiệu đạt được
+            {t('dashboard.unlockedBadges', { unlocked: unlockedCount, total: achievements.length })}
           </span>
         </div>
 
@@ -697,7 +711,7 @@ export function DashboardPage() {
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
                       : 'bg-slate-100 border-slate-200 text-slate-400'
                   }`}>
-                    {achievement.unlocked ? 'ĐÃ ĐẠT' : 'CHƯA ĐẠT'}
+                    {achievement.unlocked ? t('dashboard.unlocked') : t('dashboard.locked')}
                   </span>
                 </div>
 
