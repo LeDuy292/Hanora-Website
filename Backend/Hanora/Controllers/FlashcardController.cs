@@ -108,32 +108,43 @@ public class FlashcardController : ControllerBase
     [HttpPost("/api/flashcards")]
     public async Task<IActionResult> CreateFlashcardSet([FromBody] CreateFlashcardSetRequest request)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) return Unauthorized();
-        
-        long userId = long.Parse(userIdClaim.Value);
-        
-        if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 1)
+        try
         {
-            return BadRequest(new {
-                success = false,
-                message = "Bạn cần chọn ít nhất 1 từ vựng để tạo Flashcard."
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized();
+            
+            long userId = long.Parse(userIdClaim.Value);
+            
+            if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 1)
+            {
+                return BadRequest(new {
+                    success = false,
+                    message = "Bạn cần chọn ít nhất 1 từ vựng để tạo Flashcard."
+                });
+            }
+            
+            var result = await _flashcardService.CreateFlashcardSetAsync(userId, request);
+            if (!result)
+            {
+                return BadRequest(new {
+                    success = false,
+                    message = "Không thể tạo bộ Flashcard."
+                });
+            }
+            
+            return StatusCode(201, new {
+                success = true,
+                message = "Tạo Flashcard thành công."
             });
         }
-        
-        var result = await _flashcardService.CreateFlashcardSetAsync(userId, request);
-        if (!result)
+        catch (Exception ex)
         {
-            return BadRequest(new {
+            return StatusCode(500, new {
                 success = false,
-                message = "Không thể tạo bộ Flashcard."
+                message = ex.Message,
+                stackTrace = ex.StackTrace
             });
         }
-        
-        return StatusCode(201, new {
-            success = true,
-            message = "Tạo Flashcard thành công."
-        });
     }
 
     [HttpPut("decks/{id}")]

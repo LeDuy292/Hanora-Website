@@ -265,28 +265,66 @@ public class FlashcardService : IFlashcardService
             return false;
         }
 
-        foreach (var word in request.Words)
+        var distinctWords = request.Words
+            .Where(w => !string.IsNullOrWhiteSpace(w))
+            .Select(w => w.Trim())
+            .Distinct()
+            .ToList();
+
+        if (distinctWords.Count == 0) return true;
+
+        var vocabsByWord = await _db.Vocabularies
+            .Where(v => distinctWords.Contains(v.Word))
+            .ToDictionaryAsync(v => v.Word);
+
+        foreach (var word in distinctWords)
         {
-            if (string.IsNullOrWhiteSpace(word)) continue;
-
-            var vocab = await _vocabRepo.GetByWordAsync(word);
-            if (vocab == null)
+            if (!vocabsByWord.ContainsKey(word))
             {
-                vocab = new Vocabulary
+                var existing = await _vocabRepo.GetByWordAsync(word);
+                if (existing != null)
                 {
-                    Word = word,
-                    Pinyin = "",
-                    Definitions = "[]",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _vocabRepo.CreateAsync(vocab);
+                    vocabsByWord[word] = existing;
+                }
+                else
+                {
+                    var newVocab = new Vocabulary
+                    {
+                        Word = word,
+                        Pinyin = "",
+                        Definitions = "[]",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _vocabRepo.CreateAsync(newVocab);
+                    vocabsByWord[word] = newVocab;
+                }
             }
+        }
 
-            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id && x.IsDeleted != true);
-            if (uv == null)
+        var vocabIds = vocabsByWord.Values.Select(v => v.Id).Distinct().ToList();
+        var existingUserVocabs = await _db.UserVocabularies
+            .Where(uv => uv.UserId == userId && vocabIds.Contains(uv.VocabularyId))
+            .ToDictionaryAsync(uv => uv.VocabularyId);
+
+        int newWordsSavedCount = 0;
+        var userVocabsToUse = new List<UserVocabulary>();
+
+        foreach (var vocab in vocabsByWord.Values)
+        {
+            if (existingUserVocabs.TryGetValue(vocab.Id, out var uv))
             {
-                uv = new UserVocabulary
+                if (uv.IsDeleted == true)
+                {
+                    uv.IsDeleted = false;
+                    uv.SavedAt = DateTime.UtcNow;
+                    _db.UserVocabularies.Update(uv);
+                }
+                userVocabsToUse.Add(uv);
+            }
+            else
+            {
+                var newUv = new UserVocabulary
                 {
                     UserId = userId,
                     VocabularyId = vocab.Id,
@@ -297,31 +335,46 @@ public class FlashcardService : IFlashcardService
                     CorrectCount = 0,
                     WrongCount = 0
                 };
-                _db.UserVocabularies.Add(uv);
-                await _db.SaveChangesAsync();
+                _db.UserVocabularies.Add(newUv);
+                userVocabsToUse.Add(newUv);
+                newWordsSavedCount++;
+            }
+        }
 
-                var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
-                if (stats != null)
-                {
-                    stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + 1;
-                    stats.UpdatedAt = DateTime.UtcNow;
-                    _db.UserStats.Update(stats);
-                }
+        await _db.SaveChangesAsync();
 
-                var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
-                var progress = await _db.LearningProgresses
-                    .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
-                if (progress != null)
-                {
-                    progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + 1;
-                    progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + 1;
-                    _db.LearningProgresses.Update(progress);
-                }
-                await _db.SaveChangesAsync();
+        if (newWordsSavedCount > 0)
+        {
+            var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (stats != null)
+            {
+                stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + newWordsSavedCount;
+                stats.UpdatedAt = DateTime.UtcNow;
+                _db.UserStats.Update(stats);
             }
 
-            var existingFlashcard = await _db.Flashcards.FirstOrDefaultAsync(f => f.UserVocabularyId == uv.Id && f.DeckId == deckId);
-            if (existingFlashcard == null)
+            var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
+            var progress = await _db.LearningProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
+            if (progress != null)
+            {
+                progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + newWordsSavedCount;
+                progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + newWordsSavedCount;
+                _db.LearningProgresses.Update(progress);
+            }
+            await _db.SaveChangesAsync();
+        }
+
+        var uvIds = userVocabsToUse.Select(uv => uv.Id).ToList();
+        var existingFlashcardsUvIds = (await _db.Flashcards
+            .Where(f => f.DeckId == deckId && uvIds.Contains(f.UserVocabularyId))
+            .Select(f => f.UserVocabularyId)
+            .ToListAsync()).ToHashSet();
+
+        int cardsAdded = 0;
+        foreach (var uv in userVocabsToUse)
+        {
+            if (!existingFlashcardsUvIds.Contains(uv.Id))
             {
                 var flashcard = new Flashcard
                 {
@@ -333,10 +386,14 @@ public class FlashcardService : IFlashcardService
                     LastStudiedAt = DateTime.UtcNow
                 };
                 _db.Flashcards.Add(flashcard);
-                await _db.SaveChangesAsync();
-
-                await _statsService.AwardXpAsync(userId, 5, "Thêm từ vào Flashcard");
+                cardsAdded++;
             }
+        }
+
+        if (cardsAdded > 0)
+        {
+            await _db.SaveChangesAsync();
+            await _statsService.AwardXpAsync(userId, cardsAdded * 5, $"Thêm {cardsAdded} từ vào Flashcard");
         }
 
         return true;
@@ -432,36 +489,105 @@ public class FlashcardService : IFlashcardService
         _db.FlashcardDecks.Add(deck);
         await _db.SaveChangesAsync();
 
-        foreach (var idOrWord in request.ListVocabularyIds)
+        var distinctItems = request.ListVocabularyIds
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct()
+            .ToList();
+
+        if (distinctItems.Count == 0) return true;
+
+        var numericIds = new List<long>();
+        var wordStrings = new List<string>();
+        foreach (var item in distinctItems)
         {
-            if (string.IsNullOrWhiteSpace(idOrWord)) continue;
+            if (long.TryParse(item, out long id)) numericIds.Add(id);
+            else wordStrings.Add(item);
+        }
 
-            Vocabulary? vocab = null;
-            if (long.TryParse(idOrWord, out long vocabId))
+        var userVocabsById = numericIds.Count > 0
+            ? await _db.UserVocabularies
+                .Include(uv => uv.Vocabulary)
+                .Where(uv => uv.UserId == userId && numericIds.Contains(uv.Id))
+                .ToDictionaryAsync(uv => uv.Id)
+            : new Dictionary<long, UserVocabulary>();
+
+        var vocabsById = numericIds.Count > 0
+            ? await _db.Vocabularies
+                .Where(v => numericIds.Contains(v.Id))
+                .ToDictionaryAsync(v => v.Id)
+            : new Dictionary<long, Vocabulary>();
+
+        var vocabsByWord = wordStrings.Count > 0
+            ? await _db.Vocabularies
+                .Where(v => wordStrings.Contains(v.Word))
+                .ToDictionaryAsync(v => v.Word)
+            : new Dictionary<string, Vocabulary>();
+
+        foreach (var word in wordStrings)
+        {
+            if (!vocabsByWord.ContainsKey(word))
             {
-                vocab = await _db.Vocabularies.FindAsync(vocabId);
-            }
-            if (vocab == null)
-            {
-                vocab = await _vocabRepo.GetByWordAsync(idOrWord);
-            }
-            if (vocab == null)
-            {
-                vocab = new Vocabulary
+                var existing = await _vocabRepo.GetByWordAsync(word);
+                if (existing != null)
                 {
-                    Word = idOrWord,
-                    Pinyin = "",
-                    Definitions = "[]",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _vocabRepo.CreateAsync(vocab);
+                    vocabsByWord[word] = existing;
+                }
+                else
+                {
+                    var newVocab = new Vocabulary
+                    {
+                        Word = word,
+                        Pinyin = "",
+                        Definitions = "[]",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _vocabRepo.CreateAsync(newVocab);
+                    vocabsByWord[word] = newVocab;
+                }
             }
+        }
 
-            var uv = await _db.UserVocabularies.FirstOrDefaultAsync(x => x.UserId == userId && x.VocabularyId == vocab.Id && x.IsDeleted != true);
-            if (uv == null)
+        var allVocabularies = new List<Vocabulary>();
+        foreach (var item in distinctItems)
+        {
+            if (long.TryParse(item, out long id))
             {
-                uv = new UserVocabulary
+                if (userVocabsById.TryGetValue(id, out var uv)) allVocabularies.Add(uv.Vocabulary);
+                else if (vocabsById.TryGetValue(id, out var v)) allVocabularies.Add(v);
+            }
+            else if (vocabsByWord.TryGetValue(item, out var v))
+            {
+                allVocabularies.Add(v);
+            }
+        }
+
+        var distinctVocabs = allVocabularies.DistinctBy(v => v.Id).ToList();
+        var vocabIds = distinctVocabs.Select(v => v.Id).ToList();
+
+        var existingUserVocabs = await _db.UserVocabularies
+            .Where(uv => uv.UserId == userId && vocabIds.Contains(uv.VocabularyId))
+            .ToDictionaryAsync(uv => uv.VocabularyId);
+
+        int newWordsSavedCount = 0;
+        var userVocabsToUse = new List<UserVocabulary>();
+
+        foreach (var vocab in distinctVocabs)
+        {
+            if (existingUserVocabs.TryGetValue(vocab.Id, out var uv))
+            {
+                if (uv.IsDeleted == true)
+                {
+                    uv.IsDeleted = false;
+                    uv.SavedAt = DateTime.UtcNow;
+                    _db.UserVocabularies.Update(uv);
+                }
+                userVocabsToUse.Add(uv);
+            }
+            else
+            {
+                var newUv = new UserVocabulary
                 {
                     UserId = userId,
                     VocabularyId = vocab.Id,
@@ -472,31 +598,46 @@ public class FlashcardService : IFlashcardService
                     CorrectCount = 0,
                     WrongCount = 0
                 };
-                _db.UserVocabularies.Add(uv);
-                await _db.SaveChangesAsync();
+                _db.UserVocabularies.Add(newUv);
+                userVocabsToUse.Add(newUv);
+                newWordsSavedCount++;
+            }
+        }
 
-                var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
-                if (stats != null)
-                {
-                    stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + 1;
-                    stats.UpdatedAt = DateTime.UtcNow;
-                    _db.UserStats.Update(stats);
-                }
+        await _db.SaveChangesAsync();
 
-                var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
-                var progress = await _db.LearningProgresses
-                    .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
-                if (progress != null)
-                {
-                    progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + 1;
-                    progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + 1;
-                    _db.LearningProgresses.Update(progress);
-                }
-                await _db.SaveChangesAsync();
+        if (newWordsSavedCount > 0)
+        {
+            var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (stats != null)
+            {
+                stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + newWordsSavedCount;
+                stats.UpdatedAt = DateTime.UtcNow;
+                _db.UserStats.Update(stats);
             }
 
-            var existingFlashcard = await _db.Flashcards.FirstOrDefaultAsync(f => f.UserVocabularyId == uv.Id && f.DeckId == deck.Id);
-            if (existingFlashcard == null)
+            var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
+            var progress = await _db.LearningProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
+            if (progress != null)
+            {
+                progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + newWordsSavedCount;
+                progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + newWordsSavedCount;
+                _db.LearningProgresses.Update(progress);
+            }
+            await _db.SaveChangesAsync();
+        }
+
+        var uvIds = userVocabsToUse.Select(uv => uv.Id).ToList();
+        var existingFlashcardsUvIds = (await _db.Flashcards
+            .Where(f => f.DeckId == deck.Id && uvIds.Contains(f.UserVocabularyId))
+            .Select(f => f.UserVocabularyId)
+            .ToListAsync()).ToHashSet();
+
+        int cardsAdded = 0;
+        foreach (var uv in userVocabsToUse)
+        {
+            if (!existingFlashcardsUvIds.Contains(uv.Id))
             {
                 var flashcard = new Flashcard
                 {
@@ -508,10 +649,14 @@ public class FlashcardService : IFlashcardService
                     LastStudiedAt = DateTime.UtcNow
                 };
                 _db.Flashcards.Add(flashcard);
-                await _db.SaveChangesAsync();
-
-                await _statsService.AwardXpAsync(userId, 5, "Thêm từ vào Flashcard");
+                cardsAdded++;
             }
+        }
+
+        if (cardsAdded > 0)
+        {
+            await _db.SaveChangesAsync();
+            await _statsService.AwardXpAsync(userId, cardsAdded * 5, $"Tạo bộ Flashcard ({cardsAdded} từ)");
         }
 
         return true;

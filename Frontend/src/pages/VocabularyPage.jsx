@@ -239,13 +239,21 @@ export function VocabularyPage() {
         selectedWordsList
       );
 
-      useToastStore.getState().addToast(isEn ? 'Created Flashcard deck successfully!' : 'Đã tạo bộ Flashcard thành công!', 'success');
+      useToastStore.getState().addToast(
+        isEn 
+          ? `Created Flashcard deck with ${selectedWordsList.length} cards successfully!` 
+          : `Đã tạo bộ Flashcard với ${selectedWordsList.length} thẻ thành công!`, 
+        'success'
+      );
       setShowCreateDeckModal(false);
       setSelectedRows([]);
       navigate('/flashcards');
     } catch (err) {
       console.error(err);
-      useToastStore.getState().addToast(isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
+      useToastStore.getState().addToast(
+        err?.message || (isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.'), 
+        'error'
+      );
     } finally {
       setIsSavingDeck(false);
     }
@@ -435,13 +443,30 @@ export function VocabularyPage() {
     }));
   };
 
+  const isAllFilteredSelected = filteredVocabulary.length > 0 && filteredVocabulary.every(row => selectedRows.includes(row.selectionKey));
+  const isAllCurrentPageSelected = paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.selectionKey));
+  const isSomeSelected = selectedRows.length > 0;
+
   // Checkbox multi-select helpers
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(paginatedData.map(row => row.selectionKey));
+      setSelectedRows(filteredVocabulary.map(row => row.selectionKey));
     } else {
       setSelectedRows([]);
     }
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectedRows(filteredVocabulary.map(row => row.selectionKey));
+  };
+
+  const handleSelectCurrentPage = () => {
+    const pageKeys = paginatedData.map(row => row.selectionKey);
+    setSelectedRows(prev => [...new Set([...prev, ...pageKeys])]);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows([]);
   };
 
   const handleSelectRow = (rowKey) => {
@@ -687,19 +712,40 @@ export function VocabularyPage() {
 
           {/* Total Row Count Indicator & Bulk Action Buttons */}
           <div data-tour="vocab-actions" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs font-bold text-slate-500 px-1 font-sans">
-            <span>{isEn ? "Total:" : "Tổng số:"} <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> {isEn ? "words" : "từ vựng"}</span>
-            
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
+              <span>{isEn ? "Total:" : "Tổng số:"} <span className="text-slate-800 font-extrabold">{filteredVocabulary.length}</span> {isEn ? "words" : "từ vựng"}</span>
+              
               {selectedRows.length > 0 ? (
-                <span className="text-blue-600 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-lg">
-                  {isEn ? `Selected: ${selectedRows.length} words` : `Đang chọn: ${selectedRows.length} từ`}
-                </span>
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-blue-600 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-lg">
+                    {isEn ? `Selected: ${selectedRows.length} words` : `Đang chọn: ${selectedRows.length} từ`}
+                  </span>
+                  <button
+                    onClick={handleClearSelection}
+                    className="text-xs font-semibold text-rose-500 hover:text-rose-600 underline hover:no-underline transition-colors px-1"
+                  >
+                    {isEn ? "Deselect" : "Bỏ chọn"}
+                  </button>
+                </>
               ) : (
                 <span className="text-slate-400 font-bold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
                   {isEn ? "No words selected" : "Chưa chọn từ vựng"}
                 </span>
               )}
-              
+
+              {filteredVocabulary.length > 0 && !isAllFilteredSelected && (
+                <button
+                  onClick={handleSelectAllFiltered}
+                  className="px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors"
+                  title={isEn ? `Select all ${filteredVocabulary.length} words in this list` : `Chọn toàn bộ ${filteredVocabulary.length} từ trong danh sách`}
+                >
+                  {isEn ? `Select all (${filteredVocabulary.length})` : `Chọn tất cả (${filteredVocabulary.length})`}
+                </button>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 disabled={selectedRows.length === 0}
                 onClick={() => {
@@ -758,6 +804,19 @@ export function VocabularyPage() {
             </div>
           </div>
 
+          {/* Banner when page is selected but full list has more pages */}
+          {totalPages > 1 && isAllCurrentPageSelected && !isAllFilteredSelected && (
+            <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-2.5 text-center text-xs text-blue-800 font-medium flex items-center justify-center gap-1.5">
+              <span>{isEn ? `Selected all ${paginatedData.length} words on page ${currentPage}.` : `Đã chọn tất cả ${paginatedData.length} từ trên trang ${currentPage}.`}</span>
+              <button
+                onClick={handleSelectAllFiltered}
+                className="font-bold underline hover:text-blue-900 transition-colors cursor-pointer"
+              >
+                {isEn ? `Select all ${filteredVocabulary.length} words in list` : `Chọn toàn bộ ${filteredVocabulary.length} từ trong danh sách`}
+              </button>
+            </div>
+          )}
+
           {/* MAIN VOCABULARY DATATABLE */}
           <div id="vocabulary-table" className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden lg:overflow-visible shadow-sm font-sans">
             <div className="overflow-x-auto lg:overflow-x-visible">
@@ -767,9 +826,13 @@ export function VocabularyPage() {
                     <th className="py-4.5 px-4 w-12 text-center select-none rounded-tl-2xl">
                       <input 
                         type="checkbox"
-                        checked={paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.selectionKey))}
+                        checked={isAllFilteredSelected}
+                        ref={el => {
+                          if (el) el.indeterminate = isSomeSelected && !isAllFilteredSelected;
+                        }}
                         onChange={handleSelectAll}
                         className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4 shadow-sm"
+                        title={isAllFilteredSelected ? (isEn ? "Deselect all" : "Bỏ chọn tất cả") : (isEn ? `Select all ${filteredVocabulary.length} words` : `Chọn tất cả ${filteredVocabulary.length} từ`)}
                       />
                     </th>
                     <th className="py-4.5 px-4 font-black w-[22%]">{isEn ? "Word" : "Từ vựng"}</th>
@@ -985,12 +1048,17 @@ export function VocabularyPage() {
                 <div className="relative">
                   <select
                     value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
                     className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-350 text-xs font-bold text-slate-600 pl-3.5 pr-8 h-9 rounded-xl focus:outline-none transition-colors cursor-pointer shadow-sm"
                   >
                     <option value={10}>{isEn ? "10 / page" : "10 / trang"}</option>
                     <option value={20}>{isEn ? "20 / page" : "20 / trang"}</option>
                     <option value={50}>{isEn ? "50 / page" : "50 / trang"}</option>
+                    <option value={100}>{isEn ? "100 / page" : "100 / trang"}</option>
+                    <option value={9999}>{isEn ? "All words" : "Tất cả từ"}</option>
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
