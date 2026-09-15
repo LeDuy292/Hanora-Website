@@ -123,8 +123,8 @@ public class FlashcardController : ControllerBase
                 });
             }
             
-            var result = await _flashcardService.CreateFlashcardSetAsync(userId, request);
-            if (!result)
+            var deck = await _flashcardService.CreateFlashcardSetAsync(userId, request);
+            if (deck == null)
             {
                 return BadRequest(new {
                     success = false,
@@ -134,7 +134,12 @@ public class FlashcardController : ControllerBase
             
             return StatusCode(201, new {
                 success = true,
-                message = "Tạo Flashcard thành công."
+                message = "Tạo Flashcard thành công.",
+                data = new {
+                    id = deck.Id,
+                    name = deck.Name,
+                    description = deck.Description
+                }
             });
         }
         catch (Exception ex)

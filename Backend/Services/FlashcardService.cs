@@ -459,11 +459,11 @@ public class FlashcardService : IFlashcardService
         return true;
     }
 
-    public async Task<bool> CreateFlashcardSetAsync(long userId, CreateFlashcardSetRequest request)
+    public async Task<FlashcardDeck?> CreateFlashcardSetAsync(long userId, CreateFlashcardSetRequest request)
     {
         if (request.ListVocabularyIds == null || request.ListVocabularyIds.Count < 1)
         {
-            return false;
+            return null;
         }
 
         string source = "Tự học";
@@ -495,7 +495,7 @@ public class FlashcardService : IFlashcardService
             .Distinct()
             .ToList();
 
-        if (distinctItems.Count == 0) return true;
+        if (distinctItems.Count == 0) return deck;
 
         var numericIds = new List<long>();
         var wordStrings = new List<string>();
@@ -505,12 +505,15 @@ public class FlashcardService : IFlashcardService
             else wordStrings.Add(item);
         }
 
-        var userVocabsById = numericIds.Count > 0
+        var userVocabsList = numericIds.Count > 0
             ? await _db.UserVocabularies
                 .Include(uv => uv.Vocabulary)
-                .Where(uv => uv.UserId == userId && numericIds.Contains(uv.Id))
-                .ToDictionaryAsync(uv => uv.Id)
-            : new Dictionary<long, UserVocabulary>();
+                .Where(uv => uv.UserId == userId && (numericIds.Contains(uv.Id) || numericIds.Contains(uv.VocabularyId)))
+                .ToListAsync()
+            : new List<UserVocabulary>();
+
+        var userVocabsById = userVocabsList.ToDictionary(uv => uv.Id);
+        var userVocabsByVocabId = userVocabsList.ToDictionary(uv => uv.VocabularyId);
 
         var vocabsById = numericIds.Count > 0
             ? await _db.Vocabularies
@@ -555,6 +558,7 @@ public class FlashcardService : IFlashcardService
             if (long.TryParse(item, out long id))
             {
                 if (userVocabsById.TryGetValue(id, out var uv)) allVocabularies.Add(uv.Vocabulary);
+                else if (userVocabsByVocabId.TryGetValue(id, out var uv2)) allVocabularies.Add(uv2.Vocabulary);
                 else if (vocabsById.TryGetValue(id, out var v)) allVocabularies.Add(v);
             }
             else if (vocabsByWord.TryGetValue(item, out var v))
@@ -659,7 +663,7 @@ public class FlashcardService : IFlashcardService
             await _statsService.AwardXpAsync(userId, cardsAdded * 5, $"Tạo bộ Flashcard ({cardsAdded} từ)");
         }
 
-        return true;
+        return deck;
     }
 
     public async Task<FlashcardDeck?> DuplicateDeckAsync(long userId, long deckId)
@@ -1003,17 +1007,37 @@ public class FlashcardService : IFlashcardService
         try
         {
             string current = definitionsJson.Trim();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 10; i++)
             {
                 current = current.Trim();
+
+                // If wrapped in string quotes e.g. "\"[...]"\"
+                if (current.StartsWith("\"") && current.EndsWith("\"") && current.Length > 1)
+                {
+                    try
+                    {
+                        using var stringDoc = JsonDocument.Parse(current);
+                        if (stringDoc.RootElement.ValueKind == JsonValueKind.String)
+                        {
+                            current = stringDoc.RootElement.GetString() ?? "";
+                            continue;
+                        }
+                    }
+                    catch { }
+                }
+
                 if (!(current.StartsWith("[") && current.EndsWith("]")) && !(current.StartsWith("{") && current.EndsWith("}")))
                 {
+                    if (string.IsNullOrEmpty(defVn)) defVn = current;
                     break;
                 }
 
                 using var doc = JsonDocument.Parse(current);
                 if (doc.RootElement.ValueKind == JsonValueKind.Array)
                 {
+                    string candidateVn = "";
+                    string candidateEn = "";
+
                     foreach (var item in doc.RootElement.EnumerateArray())
                     {
                         if (item.ValueKind == JsonValueKind.Object)
@@ -1023,32 +1047,62 @@ public class FlashcardService : IFlashcardService
 
                             if (string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase))
                             {
-                                defEn = meaning;
+                                candidateEn = meaning;
                             }
                             else if (string.Equals(lang, "vn", StringComparison.OrdinalIgnoreCase) || string.Equals(lang, "vi", StringComparison.OrdinalIgnoreCase))
                             {
-                                defVn = meaning;
+                                candidateVn = meaning;
                             }
-                            else if (string.IsNullOrEmpty(defVn))
+                            else if (string.IsNullOrEmpty(candidateVn))
                             {
-                                defVn = meaning;
+                                candidateVn = meaning;
                             }
+                        }
+                        else if (item.ValueKind == JsonValueKind.String)
+                        {
+                            candidateVn = item.GetString() ?? "";
                         }
                     }
 
-                    if (string.IsNullOrEmpty(defVn) && doc.RootElement.GetArrayLength() > 0)
+                    if (string.IsNullOrEmpty(candidateVn) && doc.RootElement.GetArrayLength() > 0)
                     {
                         var first = doc.RootElement[0];
                         if (first.ValueKind == JsonValueKind.Object && first.TryGetProperty("meaning", out var mp))
                         {
-                            defVn = mp.GetString() ?? "";
+                            candidateVn = mp.GetString() ?? "";
                         }
+                        else if (first.ValueKind == JsonValueKind.String)
+                        {
+                            candidateVn = first.GetString() ?? "";
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(candidateEn)) defEn = candidateEn;
+                    if (!string.IsNullOrEmpty(candidateVn))
+                    {
+                        string trimmedCand = candidateVn.Trim();
+                        if ((trimmedCand.StartsWith("[") && trimmedCand.EndsWith("]")) || (trimmedCand.StartsWith("{") && trimmedCand.EndsWith("}")) || (trimmedCand.StartsWith("\"") && trimmedCand.EndsWith("\"")))
+                        {
+                            current = trimmedCand;
+                            continue;
+                        }
+                        defVn = candidateVn;
                     }
                     break;
                 }
-                else if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("meaning", out var meaningProp))
+                else if (doc.RootElement.ValueKind == JsonValueKind.Object)
                 {
-                    defVn = meaningProp.GetString() ?? "";
+                    if (doc.RootElement.TryGetProperty("meaning", out var meaningProp))
+                    {
+                        string val = meaningProp.GetString() ?? "";
+                        string trimmedVal = val.Trim();
+                        if ((trimmedVal.StartsWith("[") && trimmedVal.EndsWith("]")) || (trimmedVal.StartsWith("{") && trimmedVal.EndsWith("}")) || (trimmedVal.StartsWith("\"") && trimmedVal.EndsWith("\"")))
+                        {
+                            current = trimmedVal;
+                            continue;
+                        }
+                        defVn = val;
+                    }
                     break;
                 }
                 else
@@ -1058,6 +1112,16 @@ public class FlashcardService : IFlashcardService
             }
         }
         catch { }
+
+        // Unescape unicode sequences if present e.g. \u1EAD
+        if (!string.IsNullOrEmpty(defVn) && defVn.Contains(@"\u"))
+        {
+            try { defVn = System.Text.RegularExpressions.Regex.Unescape(defVn); } catch { }
+        }
+        if (!string.IsNullOrEmpty(defEn) && defEn.Contains(@"\u"))
+        {
+            try { defEn = System.Text.RegularExpressions.Regex.Unescape(defEn); } catch { }
+        }
 
         string chosen = isEn && !string.IsNullOrWhiteSpace(defEn) 
             ? defEn 
