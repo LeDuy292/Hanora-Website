@@ -237,7 +237,26 @@ export const saveDocumentAnnotations = async (id, annotationsJson) => {
   return await response.json();
 };
 
-export const translateSentence = async (text, language = getLanguage()) => {
+export const translateSentence = async (text, targetLangOrSrc = null, targetLang = null) => {
+  let src = 'auto';
+  let tgt = 'vi';
+
+  if (targetLang) {
+    // Signature: translateSentence(text, src, tgt)
+    src = targetLangOrSrc || 'auto';
+    tgt = targetLang || getLanguage() || 'vi';
+  } else if (targetLangOrSrc) {
+    // Signature: translateSentence(text, tgt)
+    if (targetLangOrSrc === 'zh' || targetLangOrSrc === 'auto') {
+      src = targetLangOrSrc;
+      tgt = getLanguage() || 'vi';
+    } else {
+      tgt = targetLangOrSrc;
+    }
+  } else {
+    tgt = getLanguage() || 'vi';
+  }
+
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/translation`, {
     method: 'POST',
@@ -245,7 +264,12 @@ export const translateSentence = async (text, language = getLanguage()) => {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
-    body: JSON.stringify({ text, sourceLanguage: 'auto', targetLanguage: language || 'vi', language })
+    body: JSON.stringify({ 
+      text, 
+      sourceLanguage: src, 
+      targetLanguage: tgt, 
+      language: tgt 
+    })
   });
   if (!response.ok) {
     throw new Error('Failed to translate sentence');

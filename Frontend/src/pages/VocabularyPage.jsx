@@ -228,11 +228,17 @@ export function VocabularyPage() {
     }
     setIsSavingDeck(true);
     try {
-      const selectedWordsList = fullVocabularyDataset
-        .filter(w => selectedRows.includes(w.selectionKey))
-        .map(w => w.text.split('_')[0]);
+      const selectedWords = fullVocabularyDataset.filter(w => selectedRows.includes(w.selectionKey));
+      const selectedWordsList = selectedWords.flatMap(w => {
+        const identifiers = [];
+        if (w.userVocabularyId) identifiers.push(String(w.userVocabularyId));
+        if (w.id && String(w.id) !== String(w.userVocabularyId)) identifiers.push(String(w.id));
+        const wordText = w.text?.split('_')[0]?.trim();
+        if (wordText) identifiers.push(wordText);
+        return identifiers;
+      });
 
-      await createFlashcardSet(
+      const res = await createFlashcardSet(
         newDeckName.trim(),
         deckDescription.trim() || null,
         deckDocumentId,
@@ -241,13 +247,19 @@ export function VocabularyPage() {
 
       useToastStore.getState().addToast(
         isEn 
-          ? `Created Flashcard deck with ${selectedWordsList.length} cards successfully!` 
-          : `Đã tạo bộ Flashcard với ${selectedWordsList.length} thẻ thành công!`, 
+          ? `Created Flashcard deck with ${selectedWords.length} cards successfully!` 
+          : `Đã tạo bộ Flashcard với ${selectedWords.length} thẻ thành công!`, 
         'success'
       );
       setShowCreateDeckModal(false);
       setSelectedRows([]);
-      navigate('/flashcards');
+
+      const createdDeckId = res?.data?.id || res?.id;
+      if (createdDeckId) {
+        navigate(`/flashcards?deckId=${createdDeckId}`);
+      } else {
+        navigate('/flashcards');
+      }
     } catch (err) {
       console.error(err);
       useToastStore.getState().addToast(
