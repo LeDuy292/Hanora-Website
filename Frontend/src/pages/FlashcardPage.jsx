@@ -38,7 +38,10 @@ import { toast } from '../store/notificationStore';
 import { apiRequest } from '../services/apiClient';
 import { Flashcard } from '../components/vocabulary/Flashcard';
 import { Button } from '../components/common/Button';
+import { extractPlainMeaning } from '../utils/chineseUtils';
 import '../styles/FlashcardRedesign.css';
+
+const cleanTranslation = (val, word = '', lang = 'vi') => extractPlainMeaning(val, lang, word);
 
 export function FlashcardPage() {
   const navigate = useNavigate();
@@ -653,8 +656,10 @@ export function FlashcardPage() {
     const modeParam = params.get('mode');
 
     if (deckIdParam) {
-      setActiveDeck({ id: deckIdParam, title: isEn ? '⚡ Recently Saved Deck' : '⚡ Bộ từ vựng vừa lưu' });
-      setStudyMode('review');
+      const foundDeck = customDecks.find(d => String(d.id) === String(deckIdParam));
+      const deckTitle = foundDeck ? foundDeck.name : (isEn ? '⚡ Flashcard Deck' : '⚡ Bộ thẻ Flashcard');
+      setActiveDeck({ id: deckIdParam, name: deckTitle, title: deckTitle });
+      setStudyMode(modeParam || 'flashcard');
       store.fetchUserFlashcards(deckIdParam, language);
     } else if (modeParam === 'quick' && !activeDeck) {
       const count = store.sessionSavedCount || 10;
@@ -664,7 +669,7 @@ export function FlashcardPage() {
         setStudyMode('review');
       }
     }
-  }, [location.search, vocabList, isEn, language]);
+  }, [location.search, vocabList, customDecks, isEn, language]);
 
   // Switch tabs
   useEffect(() => {
@@ -1184,7 +1189,7 @@ export function FlashcardPage() {
                       id="select-deck"
                       data-tour="select-deck-btn"
                       onClick={() => {
-                        setActiveDeck(deck);
+                        setActiveDeck({ ...deck, title: deck.name || deck.title });
                         setStudyMode('flashcard');
                       }}
                       className="flex-1 min-h-[44px] bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-600 font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 text-xs group/btn border border-slate-200/60"
@@ -1196,7 +1201,7 @@ export function FlashcardPage() {
                     
                     <button 
                       onClick={() => {
-                        setActiveDeck(deck);
+                        setActiveDeck({ ...deck, title: deck.name || deck.title });
                         setStudyMode('learn');
                       }}
                       className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 text-xs shadow-sm active:scale-95"
@@ -1384,7 +1389,7 @@ export function FlashcardPage() {
             <span>{isEn ? 'Decks List' : 'Danh sách bộ thẻ'}</span>
           </button>
         <div className="text-right">
-          <h2 className="text-base font-extrabold text-slate-800 line-clamp-1">{activeDeck?.title}</h2>
+          <h2 className="text-base font-extrabold text-slate-800 line-clamp-1">{activeDeck?.title || activeDeck?.name}</h2>
           <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider">{isEn ? 'Mode: ' : 'Chế độ: '}{studyMode.toUpperCase()}</span>
         </div>
       </div>
@@ -1397,7 +1402,7 @@ export function FlashcardPage() {
               <Sparkles className="w-3.5 h-3.5" />
               <span>{isEn ? 'Smart SRS Review Session' : 'Phiên ôn tập thông minh (Smart SRS)'}</span>
             </div>
-            <h3 className="text-base sm:text-lg font-black">{activeDeck?.title || selectedDeck?.title || (isEn ? 'Vocabulary Deck' : 'Bộ từ vựng')}</h3>
+            <h3 className="text-base sm:text-lg font-black">{activeDeck?.title || activeDeck?.name || selectedDeck?.title || (isEn ? 'Vocabulary Deck' : 'Bộ từ vựng')}</h3>
             <p className="text-xs text-white/80 font-medium">
               {isEn ? 'Automatically spaced repetition scheduling to maximize long-term memory retention.' : 'Tự động sắp xếp khoảng cách lặp lại ngắt quãng (Spaced Repetition) để tối ưu khả năng ghi nhớ dài hạn.'}
             </p>
@@ -1551,7 +1556,7 @@ export function FlashcardPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-black text-slate-800">{card.word}</span>
                           <span className="text-slate-400">[{card.pinyin}]</span>
-                          <span className="text-slate-500">- {card.translation}</span>
+                          <span className="text-slate-500">- {cleanTranslation(card.translation, card.word, language)}</span>
                         </div>
                         <span className="bg-rose-50 text-rose-600 font-extrabold px-2 py-0.5 rounded-full text-[10px] shrink-0">
                           {card.wrongCount} {isEn ? 'wrong' : 'lần sai'}
@@ -1705,7 +1710,7 @@ export function FlashcardPage() {
                             <span className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 text-slate-450 flex items-center justify-center font-black text-xs shrink-0 group-hover:bg-blue-50 group-hover:text-blue-500 group-hover:border-blue-200 transition">
                               {oi === 0 ? 'A' : oi === 1 ? 'B' : oi === 2 ? 'C' : 'D'}
                             </span>
-                            <span className="text-sm text-slate-700 font-extrabold line-clamp-2">{opt}</span>
+                            <span className="text-sm text-slate-700 font-extrabold line-clamp-2">{cleanTranslation(opt, learnQuestion.word, language)}</span>
                           </span>
                           {rightNode}
                         </button>
@@ -1764,7 +1769,7 @@ export function FlashcardPage() {
                           <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-0.5">
                             {isEn ? 'Definition' : 'Nghĩa tiếng Việt'}
                           </span>
-                          <p className="text-slate-800 text-sm font-black">• {learnQuestion.translation}</p>
+                          <p className="text-slate-800 text-sm font-black">• {cleanTranslation(learnQuestion.translation, learnQuestion.word, language)}</p>
                         </div>
                         {learnQuestion.hanViet && (
                           <div>

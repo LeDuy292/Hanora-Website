@@ -279,50 +279,63 @@ Do NOT output any markdown blocks like ```json or anything else.";
     {
         if (string.IsNullOrEmpty(_apiKey)) return null;
 
+        var serializedInput = JsonSerializer.Serialize(sentence);
+        bool isLong = sentence.Length > 80;
+
         string prompt;
         if (targetLang == "zh")
         {
             prompt = $@"
-Translate this text into standard Chinese (Simplified): '{sentence}'.
+Translate the following text into standard Chinese (Simplified):
+{serializedInput}
+
 Return ONLY a valid JSON object matching exactly this schema:
 {{
-  ""originalText"": ""{sentence}"",
+  ""originalText"": {serializedInput},
   ""pinyin"": ""Full pinyin of the translated Chinese text with tone marks"",
   ""hanViet"": """",
   ""vietnamese"": ""The translated Chinese text"",
   ""translation"": ""The translated Chinese text"",
-  ""grammarAnalysis"": ""Detailed explanation of the translated Chinese sentence structure and key words (in Vietnamese)""
+  ""grammarAnalysis"": ""Explanation of the translated Chinese sentence structure and key words (in Vietnamese)""
 }}
-Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
+Do NOT output any markdown fences, just the raw JSON object.";
         }
         else
         {
             var isEnglish = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
 
+            string hanVietReq = isLong 
+                ? @"""Sino-Vietnamese (Hán Việt) of key keywords only, separated by space"""
+                : @"""Sino-Vietnamese equivalent (Hán Việt) of each character/word in the sentence, separated by spaces""";
+
             prompt = isEnglish ? $@"
-Analyze this Chinese sentence: '{sentence}'.
+Analyze and translate the following Chinese text into natural English:
+{serializedInput}
+
 Return ONLY a valid JSON object matching exactly this schema:
 {{
-  ""originalText"": ""{sentence}"",
-  ""pinyin"": ""Full pinyin of the sentence with tone marks"",
-  ""hanViet"": ""Sino-Vietnamese equivalent (Hán Việt) of each character/word in the sentence, separated by spaces"",
-  ""vietnamese"": ""Natural English translation of the sentence"",
-  ""translation"": ""Natural English translation of the sentence"",
-  ""grammarAnalysis"": ""Detailed explanation of grammar, identifying Subject, Verb, Object, complements, and key structures (in English)""
+  ""originalText"": {serializedInput},
+  ""pinyin"": ""Full pinyin with tone marks"",
+  ""hanViet"": ""Key vocabulary equivalents (optional)"",
+  ""vietnamese"": ""Natural English translation of the text"",
+  ""translation"": ""Natural English translation of the text"",
+  ""grammarAnalysis"": ""Concise explanation of grammar, structure and key words (in English)""
 }}
-Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object."
+Do NOT output any markdown fences, just the raw JSON object."
 : $@"
-Analyze this Chinese sentence: '{sentence}'.
+Phân tích và dịch đoạn văn bản tiếng Trung sau sang tiếng Việt tự nhiên, đúng ngữ cảnh:
+{serializedInput}
+
 Return ONLY a valid JSON object matching exactly this schema:
 {{
-  ""originalText"": ""{sentence}"",
-  ""pinyin"": ""Full pinyin of the sentence with tone marks"",
-  ""hanViet"": ""Sino-Vietnamese equivalent (Hán Việt) of each character/word in the sentence, separated by spaces"",
-  ""vietnamese"": ""Natural Vietnamese translation of the sentence"",
-  ""translation"": ""Natural Vietnamese translation of the sentence"",
-  ""grammarAnalysis"": ""Detailed explanation of grammar, identifying Subject, Verb, Object, complements, and key structures (in Vietnamese)""
+  ""originalText"": {serializedInput},
+  ""pinyin"": ""Phiên âm Pinyin đầy đủ có dấu thanh"",
+  ""hanViet"": {hanVietReq},
+  ""vietnamese"": ""Bản dịch tiếng Việt tự nhiên, chuẩn xác ngữ cảnh"",
+  ""translation"": ""Bản dịch tiếng Việt tự nhiên, chuẩn xác ngữ cảnh"",
+  ""grammarAnalysis"": ""Giải thích ngắn gọn cấu trúc ngữ pháp và các từ quan trọng (bằng tiếng Việt)""
 }}
-Do NOT output any markdown blocks like ```json or anything else, just the raw JSON object.";
+Do NOT output any markdown fences, just the raw JSON object.";
         }
 
         var url = "https://api.deepseek.com/chat/completions";
@@ -330,7 +343,8 @@ Do NOT output any markdown blocks like ```json or anything else, just the raw JS
         { 
             model = "deepseek-chat",
             messages = new[] { new { role = "user", content = prompt } }, 
-            response_format = new { type = "json_object" } 
+            response_format = new { type = "json_object" },
+            max_tokens = 4096
         };
 
         try
@@ -354,11 +368,28 @@ Do NOT output any markdown blocks like ```json or anything else, just the raw JS
 
             if (string.IsNullOrEmpty(textResponse)) return null;
 
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var result = JsonSerializer.Deserialize<SentenceAnalysisResponse>(textResponse, options);
-            if (result != null && string.IsNullOrEmpty(result.Translation))
+            var cleanJson = textResponse.Trim();
+            if (cleanJson.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
             {
-                result.Translation = result.Vietnamese;
+                cleanJson = cleanJson.Substring(7);
+            }
+            else if (cleanJson.StartsWith("```"))
+            {
+                cleanJson = cleanJson.Substring(3);
+            }
+            if (cleanJson.EndsWith("```"))
+            {
+                cleanJson = cleanJson.Substring(0, cleanJson.Length - 3);
+            }
+            cleanJson = cleanJson.Trim();
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var result = JsonSerializer.Deserialize<SentenceAnalysisResponse>(cleanJson, options);
+            if (result != null)
+            {
+                if (string.IsNullOrEmpty(result.OriginalText)) result.OriginalText = sentence;
+                if (string.IsNullOrEmpty(result.Translation)) result.Translation = result.Vietnamese;
+                if (string.IsNullOrEmpty(result.Vietnamese)) result.Vietnamese = result.Translation;
             }
             return result;
         }

@@ -138,6 +138,7 @@ public class FlashcardController : ControllerBase
                 message = "Tạo Flashcard thành công.",
                 deckId = deck.Id,
                 data = deck
+
             });
         }
         catch (Exception ex)

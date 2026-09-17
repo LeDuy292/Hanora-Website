@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Languages, X, Loader2, Play } from 'lucide-react';
 import { aiService } from '../../services/aiService';
+import { translateSentence } from '../../lib/api';
 import { useLanguageStore } from '../../store/languageStore';
 
 // A lightweight Markdown parser for simple formatting
@@ -53,28 +54,47 @@ export function SentencePopup({ sentence, onClose }) {
       setExplanation('');
     });
 
-    // Fetch translation
-    aiService.translateSentence(sentence, language)
+    // Fetch translation using real API
+    translateSentence(sentence, language)
       .then(res => {
-        setTranslation(res);
+        const text = res?.translatedText || res?.translation || (typeof res === 'string' ? res : '');
+        setTranslation(text || t('reader.popup.translationFailed'));
         setIsLoadingTranslation(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setTranslation(t('reader.popup.translationFailed'));
-        setIsLoadingTranslation(false);
-      });
 
-    // Fetch grammar breakdown
-    aiService.explainGrammar(sentence, language)
-      .then(res => {
-        setExplanation(res);
-        setIsLoadingExplanation(false);
+        if (res?.grammarAnalysis) {
+          setExplanation(res.grammarAnalysis);
+          setIsLoadingExplanation(false);
+        } else {
+          // Fallback grammar breakdown
+          aiService.explainGrammar(sentence, language)
+            .then(exp => {
+              setExplanation(exp);
+              setIsLoadingExplanation(false);
+            })
+            .catch(() => setIsLoadingExplanation(false));
+        }
       })
       .catch(err => {
-        console.error(err);
-        setExplanation(t('reader.popup.grammarFailed'));
-        setIsLoadingExplanation(false);
+        console.error("Translation API error, falling back to local:", err);
+        aiService.translateSentence(sentence, language)
+          .then(fallbackRes => {
+            setTranslation(fallbackRes);
+            setIsLoadingTranslation(false);
+          })
+          .catch(() => {
+            setTranslation(t('reader.popup.translationFailed'));
+            setIsLoadingTranslation(false);
+          });
+
+        aiService.explainGrammar(sentence, language)
+          .then(res => {
+            setExplanation(res);
+            setIsLoadingExplanation(false);
+          })
+          .catch(() => {
+            setExplanation(t('reader.popup.grammarFailed'));
+            setIsLoadingExplanation(false);
+          });
       });
 
   }, [sentence, language]);
