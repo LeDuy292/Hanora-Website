@@ -231,8 +231,14 @@ export function VocabularyPage() {
       const selectedWordsObjects = fullVocabularyDataset
         .filter(w => selectedRows.includes(w.selectionKey));
 
-      const selectedWordsList = selectedWordsObjects
-        .map(w => w.text.split('_')[0]);
+      const selectedWordsList = selectedWordsObjects.flatMap(w => {
+        const identifiers = [];
+        if (w.userVocabularyId) identifiers.push(String(w.userVocabularyId));
+        if (w.id && String(w.id) !== String(w.userVocabularyId)) identifiers.push(String(w.id));
+        const wordText = w.text?.split('_')[0]?.trim();
+        if (wordText && !identifiers.includes(wordText)) identifiers.push(wordText);
+        return identifiers.length > 0 ? identifiers : [w.text];
+      });
 
       const res = await createFlashcardSet(
         newDeckName.trim(),
@@ -241,11 +247,16 @@ export function VocabularyPage() {
         selectedWordsList
       );
 
-      useToastStore.getState().addToast(isEn ? 'Created Flashcard deck successfully!' : 'Đã tạo bộ Flashcard thành công!', 'success');
+      useToastStore.getState().addToast(
+        isEn 
+          ? `Created Flashcard deck with ${selectedWordsObjects.length} cards successfully!` 
+          : `Đã tạo bộ Flashcard với ${selectedWordsObjects.length} thẻ thành công!`, 
+        'success'
+      );
       setShowCreateDeckModal(false);
       setSelectedRows([]);
 
-      const newDeckId = res?.deckId || res?.data?.id;
+      const newDeckId = res?.deckId || res?.data?.id || res?.id;
       const preloadedCards = selectedWordsObjects.map((w, idx) => ({
         id: w.flashcardId || w.id || (idx + 1),
         deckId: newDeckId,
@@ -261,7 +272,7 @@ export function VocabularyPage() {
         examples: w.examples || []
       }));
 
-      navigate(newDeckId ? '/flashcards?deckId=' + newDeckId : '/flashcards', {
+      navigate(newDeckId ? `/flashcards?deckId=${newDeckId}` : '/flashcards', {
         state: {
           targetDeckId: newDeckId,
           targetDeckTitle: newDeckName.trim(),
@@ -270,7 +281,10 @@ export function VocabularyPage() {
       });
     } catch (err) {
       console.error(err);
-      useToastStore.getState().addToast(isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');
+      useToastStore.getState().addToast(
+        err?.message || (isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.'), 
+        'error'
+      );
     } finally {
       setIsSavingDeck(false);
     }
