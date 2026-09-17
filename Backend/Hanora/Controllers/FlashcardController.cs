@@ -2,6 +2,7 @@ using BusinessObjects.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -135,11 +136,10 @@ public class FlashcardController : ControllerBase
             return StatusCode(201, new {
                 success = true,
                 message = "Tạo Flashcard thành công.",
-                data = new {
-                    id = deck.Id,
-                    name = deck.Name,
-                    description = deck.Description
-                }
+                deckId = deck.Id,
+                data = deck
+
+
             });
         }
         catch (Exception ex)

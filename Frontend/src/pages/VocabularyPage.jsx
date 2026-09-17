@@ -228,14 +228,20 @@ export function VocabularyPage() {
     }
     setIsSavingDeck(true);
     try {
-      const selectedWords = fullVocabularyDataset.filter(w => selectedRows.includes(w.selectionKey));
-      const selectedWordsList = selectedWords.flatMap(w => {
+      const selectedWordsObjects = fullVocabularyDataset
+        .filter(w => selectedRows.includes(w.selectionKey));
+
+      const selectedWordsList = selectedWordsObjects.flatMap(w => {
+
+
         const identifiers = [];
         if (w.userVocabularyId) identifiers.push(String(w.userVocabularyId));
         if (w.id && String(w.id) !== String(w.userVocabularyId)) identifiers.push(String(w.id));
         const wordText = w.text?.split('_')[0]?.trim();
-        if (wordText) identifiers.push(wordText);
-        return identifiers;
+        if (wordText && !identifiers.includes(wordText)) identifiers.push(wordText);
+        return identifiers.length > 0 ? identifiers : [w.text];
+
+
       });
 
       const res = await createFlashcardSet(
@@ -247,19 +253,39 @@ export function VocabularyPage() {
 
       useToastStore.getState().addToast(
         isEn 
-          ? `Created Flashcard deck with ${selectedWords.length} cards successfully!` 
-          : `Đã tạo bộ Flashcard với ${selectedWords.length} thẻ thành công!`, 
+          ? `Created Flashcard deck with ${selectedWordsObjects.length} cards successfully!` 
+          : `Đã tạo bộ Flashcard với ${selectedWordsObjects.length} thẻ thành công!`, 
+
+
         'success'
       );
       setShowCreateDeckModal(false);
       setSelectedRows([]);
 
-      const createdDeckId = res?.data?.id || res?.id;
-      if (createdDeckId) {
-        navigate(`/flashcards?deckId=${createdDeckId}`);
-      } else {
-        navigate('/flashcards');
-      }
+      const newDeckId = res?.deckId || res?.data?.id || res?.id;
+      const preloadedCards = selectedWordsObjects.map((w, idx) => ({
+        id: w.flashcardId || w.id || (idx + 1),
+        deckId: newDeckId,
+        text: w.text,
+        pinyin: w.pinyin,
+        translation: w.translation || w.definition,
+        definition: w.definition || w.translation,
+        definitionEn: w.definitionEn,
+        definitionVn: w.definitionVn,
+        hanViet: w.hanViet,
+        wordType: w.wordType || 'Other',
+        srsLevel: w.srsLevel || 0,
+        examples: w.examples || []
+      }));
+
+      navigate(newDeckId ? `/flashcards?deckId=${newDeckId}` : '/flashcards', {
+        state: {
+          targetDeckId: newDeckId,
+          targetDeckTitle: newDeckName.trim(),
+          preloadedCards: preloadedCards
+        }
+      });
+
     } catch (err) {
       console.error(err);
       useToastStore.getState().addToast(
