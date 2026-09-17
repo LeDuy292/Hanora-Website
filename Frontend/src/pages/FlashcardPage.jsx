@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Layers, 
+  Layers,
+  RefreshCw, 
   ChevronLeft, 
   ChevronRight, 
   Play, 
@@ -166,8 +167,10 @@ export function FlashcardPage() {
     const initPageData = async () => {
       setIsLoadingDecks(true);
       try {
-        await store.fetchUserFlashcards(); // Initial sync of vocabList
-        await loadCustomDecks();
+        await Promise.all([
+          store.fetchUserFlashcards(null, language),
+          loadCustomDecks()
+        ]);
       } catch (err) {
         console.error(err);
       } finally {
@@ -177,14 +180,20 @@ export function FlashcardPage() {
     initPageData();
   }, []);
 
-  // Listen for selectedWords passed from the Vocabulary page
+  // Listen for preloadedCards or selectedWords passed from Vocabulary page
   useEffect(() => {
-    if (location.state?.selectedWords && location.state.selectedWords.length > 0) {
+    if (location.state?.preloadedCards && location.state.preloadedCards.length > 0) {
+      const targetId = location.state.targetDeckId || 'temp_selected';
+      const targetTitle = location.state.targetDeckTitle || (isEn ? 'Custom Deck' : 'Bộ thẻ vừa tạo');
+      setActiveDeckCards(location.state.preloadedCards);
+      setActiveDeck({ id: targetId, title: targetTitle });
+      setStudyMode('flashcard');
+    } else if (location.state?.selectedWords && location.state.selectedWords.length > 0) {
       setActiveDeck({
         id: 'temp_selected',
         title: isEn 
-          ? `⚡ Review ${location.state.selectedWords.length} selected words` 
-          : `⚡ Ôn tập ${location.state.selectedWords.length} từ đã chọn`
+          ? ('Review ' + location.state.selectedWords.length + ' selected words')
+          : ('Ôn tập ' + location.state.selectedWords.length + ' từ đã chọn')
       });
       setStudyMode('flashcard');
     }
@@ -203,26 +212,40 @@ export function FlashcardPage() {
 
       if (activeDeck === null) {
         setActiveDeckCards([]);
-        await store.fetchUserFlashcards(null, language); // Restore entire vocabulary list in store
       } else {
         if (activeDeck.id === 'temp_selected') {
-          const selectedWords = location.state?.selectedWords || [];
+          const selectedWords = location.state?.selectedWords || location.state?.preloadedCards || [];
           setActiveDeckCards(selectedWords);
-        } else {
-          const isNumericDeck = activeDeck.id && !isNaN(Number(activeDeck.id));
-          if (isNumericDeck) {
-            setIsLoadingDeckCards(true);
-            try {
-              const data = await apiRequest(`/flashcard?deckId=${activeDeck.id}&language=${language}`, { auth: true });
-              setActiveDeckCards(data || []);
-            } catch (err) {
-              console.error("Error loading active deck cards:", err);
-            } finally {
-              setIsLoadingDeckCards(false);
-            }
+          return;
+        }
+
+        if (location.state?.preloadedCards && String(location.state?.targetDeckId) === String(activeDeck.id)) {
+          setActiveDeckCards(location.state.preloadedCards);
+          return;
+        }
+
+        const isNumericDeck = activeDeck.id && !isNaN(Number(activeDeck.id));
+        if (isNumericDeck) {
+          // Instant display from in-memory cache if available!
+          const cached = (vocabList || []).filter(c => String(c.deckId) === String(activeDeck.id));
+          if (cached.length > 0) {
+            setActiveDeckCards(cached);
           } else {
-            setActiveDeckCards(vocabList);
+            setIsLoadingDeckCards(true);
           }
+
+          try {
+            const data = await apiRequest('/flashcard?deckId=' + activeDeck.id + '&language=' + language, { auth: true });
+            if (data && data.length > 0) {
+              setActiveDeckCards(data);
+            }
+          } catch (err) {
+            console.error("Error loading active deck cards:", err);
+          } finally {
+            setIsLoadingDeckCards(false);
+          }
+        } else {
+          setActiveDeckCards(vocabList);
         }
       }
     };
@@ -1873,7 +1896,12 @@ export function FlashcardPage() {
 
             {/* 4. Main Flashcard Area */}
             <div className="flashcard-area-wrapper">
-              {isSessionComplete ? (
+              {isLoadingDeckCards || isLoadingDecks || store.isLoading ? (
+                <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
+                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                  <p className="text-sm font-bold text-slate-600">{isEn ? 'Loading flashcard deck...' : 'Đang tải bộ thẻ flashcard...'}</p>
+                </div>
+              ) : isSessionComplete ? (
                 <div className="session-complete-view animate-in">
                   <div className="celebration-icon">
                     <div className="icon-ring"></div>

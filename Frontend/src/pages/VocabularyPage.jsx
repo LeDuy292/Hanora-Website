@@ -228,11 +228,13 @@ export function VocabularyPage() {
     }
     setIsSavingDeck(true);
     try {
-      const selectedWordsList = fullVocabularyDataset
-        .filter(w => selectedRows.includes(w.selectionKey))
+      const selectedWordsObjects = fullVocabularyDataset
+        .filter(w => selectedRows.includes(w.selectionKey));
+
+      const selectedWordsList = selectedWordsObjects
         .map(w => w.text.split('_')[0]);
 
-      await createFlashcardSet(
+      const res = await createFlashcardSet(
         newDeckName.trim(),
         deckDescription.trim() || null,
         deckDocumentId,
@@ -242,7 +244,30 @@ export function VocabularyPage() {
       useToastStore.getState().addToast(isEn ? 'Created Flashcard deck successfully!' : 'Đã tạo bộ Flashcard thành công!', 'success');
       setShowCreateDeckModal(false);
       setSelectedRows([]);
-      navigate('/flashcards');
+
+      const newDeckId = res?.deckId || res?.data?.id;
+      const preloadedCards = selectedWordsObjects.map((w, idx) => ({
+        id: w.flashcardId || w.id || (idx + 1),
+        deckId: newDeckId,
+        text: w.text,
+        pinyin: w.pinyin,
+        translation: w.translation || w.definition,
+        definition: w.definition || w.translation,
+        definitionEn: w.definitionEn,
+        definitionVn: w.definitionVn,
+        hanViet: w.hanViet,
+        wordType: w.wordType || 'Other',
+        srsLevel: w.srsLevel || 0,
+        examples: w.examples || []
+      }));
+
+      navigate(newDeckId ? '/flashcards?deckId=' + newDeckId : '/flashcards', {
+        state: {
+          targetDeckId: newDeckId,
+          targetDeckTitle: newDeckName.trim(),
+          preloadedCards: preloadedCards
+        }
+      });
     } catch (err) {
       console.error(err);
       useToastStore.getState().addToast(isEn ? 'Error creating Flashcard deck.' : 'Có lỗi xảy ra khi tạo bộ Flashcard.', 'error');

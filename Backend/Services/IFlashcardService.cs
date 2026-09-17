@@ -17,7 +17,7 @@ public interface IFlashcardService
     Task<bool> DeleteDeckAsync(long userId, long deckId);
     Task<bool> UpdateDeckAsync(long userId, long deckId, string name, string? description);
     Task<bool> RemoveCardFromDeckAsync(long userId, long cardId);
-    Task<bool> CreateFlashcardSetAsync(long userId, CreateFlashcardSetRequest request);
+    Task<FlashcardDeck?> CreateFlashcardSetAsync(long userId, CreateFlashcardSetRequest request);
     Task<FlashcardDeck?> DuplicateDeckAsync(long userId, long deckId);
     Task<object> GetDashboardStatsAsync(long userId);
 
