@@ -233,12 +233,14 @@ export function VocabularyPage() {
 
       const selectedWordsList = selectedWordsObjects.flatMap(w => {
 
+
         const identifiers = [];
         if (w.userVocabularyId) identifiers.push(String(w.userVocabularyId));
         if (w.id && String(w.id) !== String(w.userVocabularyId)) identifiers.push(String(w.id));
         const wordText = w.text?.split('_')[0]?.trim();
         if (wordText && !identifiers.includes(wordText)) identifiers.push(wordText);
         return identifiers.length > 0 ? identifiers : [w.text];
+
 
       });
 
@@ -253,6 +255,7 @@ export function VocabularyPage() {
         isEn 
           ? `Created Flashcard deck with ${selectedWordsObjects.length} cards successfully!` 
           : `Đã tạo bộ Flashcard với ${selectedWordsObjects.length} thẻ thành công!`, 
+
 
         'success'
       );
@@ -282,6 +285,7 @@ export function VocabularyPage() {
           preloadedCards: preloadedCards
         }
       });
+
     } catch (err) {
       console.error(err);
       useToastStore.getState().addToast(

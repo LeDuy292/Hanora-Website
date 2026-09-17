@@ -349,6 +349,7 @@ public class FlashcardService : IFlashcardService
             {
                 stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + newCount;
 
+
                 stats.UpdatedAt = DateTime.UtcNow;
                 _db.UserStats.Update(stats);
             }
@@ -357,6 +358,7 @@ public class FlashcardService : IFlashcardService
             var progress = await _db.LearningProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
             if (progress != null)
+
             {
                 progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + newCount;
                 progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + newCount;
@@ -404,6 +406,7 @@ public class FlashcardService : IFlashcardService
                 }
                 catch { }
             });
+
 
         }
 
@@ -576,6 +579,7 @@ public class FlashcardService : IFlashcardService
         {
             if (!existingUvDict.ContainsKey(vocabId))
 
+
             {
                 var newUv = new UserVocabulary
                 {
@@ -606,6 +610,7 @@ public class FlashcardService : IFlashcardService
                 stats.UpdatedAt = DateTime.UtcNow;
                 _db.UserStats.Update(stats);
 
+
             }
             await _db.SaveChangesAsync();
         }
@@ -620,6 +625,7 @@ public class FlashcardService : IFlashcardService
             var progress = await _db.LearningProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
             if (progress != null)
+
 
             {
                 progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + newCount;
@@ -668,6 +674,7 @@ public class FlashcardService : IFlashcardService
                 }
                 catch { }
             });
+
 
         }
 
@@ -1082,7 +1089,24 @@ public class FlashcardService : IFlashcardService
                         else if (first.ValueKind == JsonValueKind.String)
                         {
                             candidateVn = first.GetString() ?? "";
+
                         }
+                        else if (first.ValueKind == JsonValueKind.String)
+                        {
+                            candidateVn = first.GetString() ?? "";
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(candidateEn)) defEn = candidateEn;
+                    if (!string.IsNullOrEmpty(candidateVn))
+                    {
+                        string trimmedCand = candidateVn.Trim();
+                        if ((trimmedCand.StartsWith("[") && trimmedCand.EndsWith("]")) || (trimmedCand.StartsWith("{") && trimmedCand.EndsWith("}")) || (trimmedCand.StartsWith("\"") && trimmedCand.EndsWith("\"")))
+                        {
+                            current = trimmedCand;
+                            continue;
+                        }
+                        defVn = candidateVn;
                     }
 
                     if (!string.IsNullOrEmpty(candidateEn)) defEn = candidateEn;
