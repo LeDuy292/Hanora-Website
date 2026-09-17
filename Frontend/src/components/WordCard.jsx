@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { translateSentence, compareSentences, reportTranslationError } from '../lib/api';
 import { useToastStore } from '../store/toastStore';
 import { useVocabularyStore } from '../store/vocabularyStore';
@@ -252,7 +252,7 @@ const WordCard = ({ word, data, isLoading, onWordClick, documentId, documentTitl
         {/* Translation Card */}
         <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100">
           <h3 className="text-[11px] font-black text-blue-800 uppercase tracking-widest mb-1.5">{t('reader.sentence.translationTitle')}</h3>
-          <p className="text-base text-gray-800 font-bold leading-relaxed">{sentenceData.translation || sentenceData.vietnamese}</p>
+          <p className="text-base text-gray-800 font-bold leading-relaxed">{sentenceData.translation || sentenceData.translatedText || sentenceData.vietnamese || sentenceData.Vietnamese}</p>
         </div>
 
         {/* Grammar Analysis */}

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Threading.Tasks;
 
@@ -29,13 +29,17 @@ public class TranslationController : ControllerBase
             return BadRequest(new { success = false, message = "Failed to translate text." });
         }
 
+        var translationText = !string.IsNullOrEmpty(analysis.Translation) ? analysis.Translation : analysis.Vietnamese;
+
         return Ok(new
         {
             success = true,
             data = new
             {
                 originalText = analysis.OriginalText,
-                translatedText = analysis.Vietnamese,
+                translatedText = translationText,
+                translation = translationText,
+                vietnamese = analysis.Vietnamese,
                 sourceLanguage = request.SourceLanguage ?? "auto",
                 targetLanguage = request.TargetLanguage ?? "vi",
                 pinyin = analysis.Pinyin,
