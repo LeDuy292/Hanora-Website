@@ -270,7 +270,10 @@ public class FlashcardService : IFlashcardService
         }
 
         var cleanWords = request.Words
-
+            .Where(w => !string.IsNullOrWhiteSpace(w))
+            .Select(w => w.Trim())
+            .Distinct()
+            .ToList();
 
         if (!cleanWords.Any()) return false;
 
@@ -609,29 +612,18 @@ public class FlashcardService : IFlashcardService
                 stats.TotalWordsSaved = (stats.TotalWordsSaved ?? 0) + newCount;
                 stats.UpdatedAt = DateTime.UtcNow;
                 _db.UserStats.Update(stats);
-
-
             }
-            await _db.SaveChangesAsync();
-        }
-
-        var uvIds = userVocabsToUse.Select(uv => uv.Id).ToList();
-        var existingFlashcardsUvIds = (await _db.Flashcards
-            .Where(f => f.DeckId == deck.Id && uvIds.Contains(f.UserVocabularyId))
-            .Select(f => f.UserVocabularyId)
-            .ToListAsync()).ToHashSet();
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow + TimeSpan.FromHours(7));
             var progress = await _db.LearningProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId && p.ActivityDate == today);
             if (progress != null)
-
-
             {
                 progress.NewWordsSaved = (progress.NewWordsSaved ?? 0) + newCount;
                 progress.TotalWordsSaved = (progress.TotalWordsSaved ?? 0) + newCount;
                 _db.LearningProgresses.Update(progress);
             }
+            await _db.SaveChangesAsync();
         }
 
         var allUvIds = existingUvDict.Values.Select(uv => uv.Id).Distinct().ToList();
@@ -1089,24 +1081,7 @@ public class FlashcardService : IFlashcardService
                         else if (first.ValueKind == JsonValueKind.String)
                         {
                             candidateVn = first.GetString() ?? "";
-
                         }
-                        else if (first.ValueKind == JsonValueKind.String)
-                        {
-                            candidateVn = first.GetString() ?? "";
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(candidateEn)) defEn = candidateEn;
-                    if (!string.IsNullOrEmpty(candidateVn))
-                    {
-                        string trimmedCand = candidateVn.Trim();
-                        if ((trimmedCand.StartsWith("[") && trimmedCand.EndsWith("]")) || (trimmedCand.StartsWith("{") && trimmedCand.EndsWith("}")) || (trimmedCand.StartsWith("\"") && trimmedCand.EndsWith("\"")))
-                        {
-                            current = trimmedCand;
-                            continue;
-                        }
-                        defVn = candidateVn;
                     }
 
                     if (!string.IsNullOrEmpty(candidateEn)) defEn = candidateEn;

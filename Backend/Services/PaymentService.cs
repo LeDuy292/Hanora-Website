@@ -29,9 +29,9 @@ namespace Services
             _config = config;
             _logger = logger;
 
-            var clientId = _config["PayOS:ClientId"] ?? "58dcc779-3a75-4563-83ee-20d4c9aed97d";
-            var apiKey = _config["PayOS:ApiKey"] ?? "e6b9cff6-ee2c-4e75-bf79-1a85b22ed389";
-            var checksumKey = _config["PayOS:ChecksumKey"] ?? "2f25d0cdd5cfb7aacf02eb5752dc7a927274c78396e4a6233285f77be092a3af";
+            var clientId = !string.IsNullOrWhiteSpace(_config["PayOS:ClientId"]) ? _config["PayOS:ClientId"]! : "58dcc779-3a75-4563-83ee-20d4c9aed97d";
+            var apiKey = !string.IsNullOrWhiteSpace(_config["PayOS:ApiKey"]) ? _config["PayOS:ApiKey"]! : "e6b9cff6-ee2c-4e75-bf79-1a85b22ed389";
+            var checksumKey = !string.IsNullOrWhiteSpace(_config["PayOS:ChecksumKey"]) ? _config["PayOS:ChecksumKey"]! : "2f25d0cdd5cfb7aacf02eb5752dc7a927274c78396e4a6233285f77be092a3af";
 
             _payOSClient = new PayOSClient(clientId, apiKey, checksumKey);
 
