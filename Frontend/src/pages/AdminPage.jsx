@@ -23,6 +23,9 @@ import {
   Users,
   WalletCards,
   X,
+  QrCode,
+  ExternalLink,
+  Copy,
 } from 'lucide-react';
 import {
   Area,
@@ -57,6 +60,9 @@ const STATUS_STYLES = {
   Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   Rejected: 'bg-red-50 text-red-700 border-red-200',
+  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+  CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
 const STATUS_LABELS = {
@@ -68,6 +74,9 @@ const STATUS_LABELS = {
   Completed: 'Hoàn tất',
   Approved: 'Đã duyệt',
   Rejected: 'Từ chối',
+  PAID: 'Đã thanh toán',
+  PENDING: 'Chờ quét mã',
+  CANCELLED: 'Đã hủy',
 };
 
 function getScreenFromHash() {
@@ -91,14 +100,16 @@ function formatDate(value) {
   if (!value) return '--';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function StatusBadge({ value }) {
-  const style = STATUS_STYLES[value] || 'bg-[#f2f3fd] text-[#414753] border-[#c1c6d6]';
+  const normalizedKey = Object.keys(STATUS_STYLES).find(k => k.toLowerCase() === String(value).toLowerCase()) || value;
+  const style = STATUS_STYLES[normalizedKey] || 'bg-[#f2f3fd] text-[#414753] border-[#c1c6d6]';
+  const label = STATUS_LABELS[normalizedKey] || value;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${style}`}>
-      {STATUS_LABELS[value] || value}
+      {label}
     </span>
   );
 }
@@ -383,7 +394,7 @@ export function AdminPage() {
       )}
 
       {screen === 'dashboard' && <DashboardScreen overview={overview} loading={loading} onRefresh={refresh} />}
-      {screen === 'revenue' && <RevenueScreen revenue={revenue} loading={loading} />}
+      {screen === 'revenue' && <RevenueScreen revenue={revenue} loading={loading} onRefresh={refresh} />}
       {screen === 'users' && (
         <UsersScreen
           data={usersData}
@@ -684,18 +695,23 @@ function DashboardScreen({ overview, loading, onRefresh }) {
   );
 }
 
-function RevenueScreen({ revenue, loading }) {
+function RevenueScreen({ revenue, loading, onRefresh }) {
   if (loading && !revenue) return <LoadingState />;
   if (!revenue) {
     return (
       <section id="revenue">
         <PageTitle
-          eyebrow="Revenue"
-          title="Doanh thu"
-          description="Tong hop doanh thu quy doi tu hoat dong nguoi dung va tai lieu trong database hien tai."
-          action={<button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753]"><Download className="h-4 w-4" />Xuat bao cao</button>}
+          eyebrow="Revenue & PayOS"
+          title="Doanh thu & Theo dõi thanh toán"
+          description="Tổng hợp số liệu doanh thu thực tế, lịch sử đơn hàng và đối soát trạng thái VietQR PayOS."
+          action={
+            <button onClick={onRefresh} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Làm mới
+            </button>
+          }
         />
-        <EmptyState icon={WalletCards} title="Chua tai duoc du lieu doanh thu." />
+        <EmptyState icon={WalletCards} title="Chưa tải được dữ liệu doanh thu." />
       </section>
     );
   }
@@ -705,10 +721,15 @@ function RevenueScreen({ revenue, loading }) {
   return (
     <section id="revenue">
       <PageTitle
-        eyebrow="Revenue"
-        title="Doanh thu"
-        description="Tổng hợp doanh thu quy đổi từ hoạt động người dùng và tài liệu trong database hiện tại."
-        action={<button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#c1c6d6]/70 bg-white px-4 text-sm font-black text-[#414753]"><Download className="h-4 w-4" />Xuất báo cáo</button>}
+        eyebrow="Revenue & PayOS"
+        title="Doanh thu & Theo dõi thanh toán"
+        description="Tổng hợp số liệu doanh thu thực tế, lịch sử đơn hàng và đối soát trạng thái VietQR PayOS theo thời gian thực."
+        action={
+          <button onClick={onRefresh} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#005cb9] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0b74e5]">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        }
       />
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -770,7 +791,7 @@ function RevenueScreen({ revenue, loading }) {
         </div>
       </ChartCard>
 
-      <TransactionsTable rows={revenue?.recentTransactions || []} />
+      <TransactionsTable rows={revenue?.recentTransactions || []} onRefresh={onRefresh} />
     </section>
   );
 }
@@ -1443,35 +1464,189 @@ function MiniList({ title, rows }) {
   );
 }
 
-function TransactionsTable({ rows }) {
+function TransactionsTable({ rows = [], onRefresh }) {
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [syncingId, setSyncingId] = useState(null);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      const matchesStatus =
+        filterStatus === 'ALL' ||
+        String(r.status).toUpperCase() === filterStatus;
+      const query = searchQuery.toLowerCase().trim();
+      const matchesQuery =
+        !query ||
+        String(r.id).toLowerCase().includes(query) ||
+        String(r.customer).toLowerCase().includes(query) ||
+        String(r.email || '').toLowerCase().includes(query) ||
+        String(r.description || '').toLowerCase().includes(query);
+      return matchesStatus && matchesQuery;
+    });
+  }, [rows, filterStatus, searchQuery]);
+
+  const handleSync = async (orderCode) => {
+    try {
+      setSyncingId(orderCode);
+      const res = await adminApi.syncPayment(orderCode);
+      toast.success(res.message || 'Đã đồng bộ trạng thái thành công!');
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      toast.error(err.message || 'Không thể đồng bộ với cổng PayOS.');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const copyOrderCode = (id) => {
+    navigator.clipboard.writeText(id);
+    toast.success(`Đã sao chép mã đơn #${id}`);
+  };
+
   return (
     <div className={`${CARD} mt-8 overflow-hidden`}>
-      <div className="border-b border-[#c1c6d6]/50 px-6 py-5">
-        <h2 className="text-base font-black text-[#181c22]">Giao dịch gần đây</h2>
+      {/* Table Header with Filters */}
+      <div className="border-b border-[#c1c6d6]/50 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-black text-[#181c22]">Lịch sử giao dịch PayOS</h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              PayOS VietQR
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-[#717785] mt-0.5">
+            Theo dõi đơn hàng, đối soát trạng thái thực tế từ PayOS và đồng bộ tức thì
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search box */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#717785]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm mã đơn, khách hàng..."
+              className="h-9 w-48 sm:w-60 rounded-xl border border-[#c1c6d6]/70 bg-white pl-8 pr-3 text-xs font-bold text-[#181c22] outline-none transition focus:border-[#0b74e5] focus:ring-2 focus:ring-[#abc7ff]/30"
+            />
+          </div>
+
+          {/* Status Filter Buttons */}
+          <div className="flex items-center gap-1 bg-[#f2f3fd] p-1 rounded-xl text-xs font-bold">
+            {[
+              { id: 'ALL', label: 'Tất cả' },
+              { id: 'PAID', label: 'Đã thanh toán' },
+              { id: 'PENDING', label: 'Chờ thanh toán' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterStatus === tab.id
+                    ? 'bg-white text-[#005cb9] shadow-sm font-black'
+                    : 'text-[#414753] hover:text-[#181c22]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Table contents */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left">
+        <table className="w-full min-w-[800px] text-left">
           <thead className="bg-[#f2f3fd] text-xs uppercase tracking-wider text-[#414753]">
             <tr>
-              <th className="px-6 py-4 font-black">ID</th>
+              <th className="px-6 py-4 font-black">Mã đơn (OrderCode)</th>
               <th className="px-6 py-4 font-black">Khách hàng</th>
-              <th className="px-6 py-4 font-black">Nội dung</th>
+              <th className="px-6 py-4 font-black">Gói dịch vụ</th>
               <th className="px-6 py-4 font-black">Số tiền</th>
+              <th className="px-6 py-4 font-black">Cổng TT</th>
               <th className="px-6 py-4 font-black">Trạng thái</th>
-              <th className="px-6 py-4 font-black">Ngày</th>
+              <th className="px-6 py-4 font-black">Thời gian</th>
+              <th className="px-6 py-4 font-black text-right">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#c1c6d6]/30 bg-white">
-            {rows.map((row) => (
-              <tr key={row.id} className="hover:bg-[#f2f3fd]/70">
-                <td className="px-6 py-4 text-sm font-black text-[#181c22]">{row.id}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#414753]">{row.customer}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#414753]">{row.description}</td>
-                <td className="px-6 py-4 text-sm font-black text-[#005cb9]">{formatMoney(row.amount)}</td>
-                <td className="px-6 py-4"><StatusBadge value={row.status} /></td>
-                <td className="px-6 py-4 text-sm font-semibold text-[#414753]">{formatDate(row.createdAt)}</td>
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-xs font-bold text-[#717785]">
+                  Chưa có giao dịch nào phù hợp với bộ lọc.
+                </td>
               </tr>
-            ))}
+            ) : (
+              filteredRows.map((row) => {
+                const isSyncing = syncingId === row.id;
+
+                return (
+                  <tr key={row.id} className="hover:bg-[#f2f3fd]/70 transition-colors">
+                    <td className="px-6 py-4 text-xs font-mono font-black text-[#181c22]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                          #{row.id}
+                        </span>
+                        <button
+                          onClick={() => copyOrderCode(row.id)}
+                          className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+                          title="Sao chép mã đơn"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      <div className="font-black text-[#181c22]">{row.customer}</div>
+                      {row.email && <div className="text-[11px] text-[#717785] font-medium">{row.email}</div>}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-[#414753]">
+                      {row.description}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-black text-[#005cb9]">
+                      {formatMoney(row.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-slate-600">
+                      <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                        PayOS VietQR
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <StatusBadge value={row.status} />
+                    </td>
+                    <td className="px-6 py-4 text-xs font-medium text-[#717785]">
+                      {formatDate(row.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {row.checkoutUrl && (
+                          <a
+                            href={row.checkoutUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                            title="Mở cổng thanh toán PayOS"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleSync(row.id)}
+                          disabled={isSyncing}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition active:scale-95 disabled:opacity-50"
+                          title="Kiểm tra trạng thái thời gian thực từ PayOS"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
+                          <span>{isSyncing ? 'Đang check...' : 'Đồng bộ PayOS'}</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

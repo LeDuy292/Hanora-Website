@@ -18,7 +18,7 @@ import { useAuthStore } from '../../store/authStore';
 
 const adminSections = [
   { id: 'dashboard', label: 'Dashboard tổng quan', icon: BarChart3 },
-  { id: 'revenue', label: 'Doanh thu', icon: WalletCards },
+  { id: 'revenue', label: 'Doanh thu & Thanh toán', icon: WalletCards },
   { id: 'users', label: 'Quản lý người dùng', icon: Users },
   { id: 'search', label: 'Thống kê tra cứu từ', icon: TrendingUp },
   { id: 'translations', label: 'Phê duyệt dịch thuật', icon: BookOpenCheck },

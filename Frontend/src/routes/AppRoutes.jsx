@@ -19,6 +19,9 @@ import { QuizPage } from '../pages/QuizPage';
 import { PracticeHistoryPage } from '../pages/PracticeHistoryPage';
 import { AdminPage } from '../pages/AdminPage';
 import { LibraryPage } from '../pages/LibraryPage';
+import { PaymentPage } from '../pages/PaymentPage';
+import { PaymentSuccessPage } from '../pages/PaymentSuccessPage';
+import { PaymentCancelPage } from '../pages/PaymentCancelPage';
 
 
 export function AppRoutes() {
@@ -35,6 +38,18 @@ export function AppRoutes() {
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <LoginPage />}
+      />
+      <Route
+        path="/payment"
+        element={<PaymentPage />}
+      />
+      <Route
+        path="/payment/success"
+        element={<PaymentSuccessPage />}
+      />
+      <Route
+        path="/payment/cancel"
+        element={<PaymentCancelPage />}
       />
 
       {/* Protected Routes inside MainLayout */}

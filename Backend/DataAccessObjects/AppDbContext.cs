@@ -86,6 +86,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<LeaderboardReward> LeaderboardRewards { get; set; }
 
+    public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -1274,6 +1276,30 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.LeaderboardRewards)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("leaderboard_rewards_user_id_fkey");
+        });
+
+        modelBuilder.Entity<PaymentTransaction>(entity =>
+        {
+            entity.HasKey(e => e.OrderCode).HasName("payment_transactions_pkey");
+            entity.ToTable("payment_transactions");
+
+            entity.Property(e => e.OrderCode).ValueGeneratedNever().HasColumnName("order_code");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.PlanId).HasMaxLength(50).HasColumnName("plan_id");
+            entity.Property(e => e.Amount).HasColumnName("amount");
+            entity.Property(e => e.Description).HasMaxLength(255).HasColumnName("description");
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("PENDING").HasColumnName("status");
+            entity.Property(e => e.PaymentLinkId).HasMaxLength(100).HasColumnName("payment_link_id");
+            entity.Property(e => e.CheckoutUrl).HasColumnName("checkout_url");
+            entity.Property(e => e.QrCode).HasColumnName("qr_code");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()").HasColumnName("updated_at");
+            entity.Property(e => e.PaidAt).HasColumnName("paid_at");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("payment_transactions_user_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
