@@ -14,10 +14,12 @@ namespace Hanora.Controllers
     public class AdminController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly Services.IPaymentService _paymentService;
 
-        public AdminController(AppDbContext db)
+        public AdminController(AppDbContext db, Services.IPaymentService paymentService)
         {
             _db = db;
+            _paymentService = paymentService;
         }
 
         [HttpGet("overview")]
@@ -127,14 +129,48 @@ namespace Hanora.Controllers
         public async Task<ActionResult<AdminRevenueDto>> GetRevenue()
         {
             var today = DateTime.UtcNow.Date;
+            var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
+            var startOfMonth = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var dailyStart = today.AddDays(-13);
             var yearStart = DateTime.SpecifyKind(new DateTime(today.Year, 1, 1), DateTimeKind.Utc);
+
+            var allTransactions = await _db.PaymentTransactions
+                .AsNoTracking()
+                .Include(t => t.User)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            var paidTransactions = allTransactions
+                .Where(t => string.Equals(t.Status, "PAID", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var todayRevenue = paidTransactions
+                .Where(t => (t.PaidAt ?? t.CreatedAt)?.Date == today)
+                .Sum(t => (decimal)t.Amount);
+
+            var thisWeekRevenue = paidTransactions
+                .Where(t => (t.PaidAt ?? t.CreatedAt) >= startOfWeek)
+                .Sum(t => (decimal)t.Amount);
+
+            var thisMonthRevenue = paidTransactions
+                .Where(t => (t.PaidAt ?? t.CreatedAt) >= startOfMonth)
+                .Sum(t => (decimal)t.Amount);
+
+            var totalPaidOrders = paidTransactions.Count;
+            var averageOrderValue = totalPaidOrders > 0
+                ? paidTransactions.Average(t => (decimal)t.Amount)
+                : 0m;
 
             var dailyRevenue = Enumerable.Range(0, 14)
                 .Select(offset =>
                 {
                     var date = dailyStart.AddDays(offset);
-                    return new AdminChartPointDto(date.ToString("dd/MM"), date, 0m, 0);
+                    var daySum = paidTransactions
+                        .Where(t => (t.PaidAt ?? t.CreatedAt)?.Date == date)
+                        .Sum(t => (decimal)t.Amount);
+                    var dayCount = paidTransactions
+                        .Count(t => (t.PaidAt ?? t.CreatedAt)?.Date == date);
+                    return new AdminChartPointDto(date.ToString("dd/MM"), date, daySum, dayCount);
                 })
                 .ToList();
 
@@ -142,26 +178,66 @@ namespace Hanora.Controllers
                 .Select(offset =>
                 {
                     var month = yearStart.AddMonths(offset);
-                    return new AdminChartPointDto(month.ToString("MMM"), month, 0m, 0);
+                    var monthEnd = month.AddMonths(1);
+                    var monthSum = paidTransactions
+                        .Where(t => (t.PaidAt ?? t.CreatedAt) >= month && (t.PaidAt ?? t.CreatedAt) < monthEnd)
+                        .Sum(t => (decimal)t.Amount);
+                    var monthCount = paidTransactions
+                        .Count(t => (t.PaidAt ?? t.CreatedAt) >= month && (t.PaidAt ?? t.CreatedAt) < monthEnd);
+                    return new AdminChartPointDto(month.ToString("MMM"), month, monthSum, monthCount);
                 })
                 .ToList();
 
-            var activeUsers = await _db.Users.CountAsync(u => u.IsActive != false);
+            var proUsers = await _db.Users.CountAsync(u => u.Role == "Pro");
             var admins = await _db.Users.CountAsync(u => u.Role == "Admin");
+            var freeUsers = await _db.Users.CountAsync(u => u.Role != "Pro" && u.Role != "Admin");
+
             var planSegments = new List<AdminSegmentDto>
             {
-                new("Gói Miễn phí (Free)", Math.Max(activeUsers - admins, 0), "#005cb9"),
+                new("Gói Miễn phí (Free)", freeUsers, "#005cb9"),
+                new("Gói Nâng cao (Pro)", proUsers, "#00a86b"),
                 new("Tài khoản Quản trị", admins, "#2d3038")
             };
 
-            var recentTransactions = new List<AdminRevenueTransactionDto>();
+            var recentTransactions = allTransactions
+                .Take(50)
+                .Select(t => new AdminRevenueTransactionDto(
+                    t.OrderCode.ToString(),
+                    t.User?.DisplayName ?? t.User?.Username ?? t.User?.Email ?? "Khách vãng lai",
+                    t.PlanId == "yearly" ? "Gói Năm (Hanora VIP)" : "Gói Tháng (Hanora Pro)",
+                    t.Amount,
+                    t.Status,
+                    t.CreatedAt,
+                    t.User?.Email,
+                    t.PlanId,
+                    t.CheckoutUrl
+                ))
+                .ToList();
 
             return Ok(new AdminRevenueDto(
-                new AdminRevenueSummaryDto(0m, 0m, 0m, 0, 0m),
+                new AdminRevenueSummaryDto(todayRevenue, thisWeekRevenue, thisMonthRevenue, allTransactions.Count, averageOrderValue),
                 dailyRevenue,
                 monthlyRevenue,
                 planSegments,
                 recentTransactions));
+        }
+
+        [HttpPost("payments/{orderCode:long}/sync")]
+        public async Task<IActionResult> SyncPayment(long orderCode)
+        {
+            var result = await _paymentService.GetPaymentStatusAsync(orderCode);
+            if (result == null)
+            {
+                return NotFound(new { error = "Không tìm thấy giao dịch này." });
+            }
+
+            return Ok(new
+            {
+                message = "Đã đồng bộ trạng thái từ PayOS thành công.",
+                orderCode = result.OrderCode,
+                status = result.Status,
+                isProActivated = result.IsProActivated
+            });
         }
 
         [HttpGet("search-stats")]
@@ -807,7 +883,17 @@ namespace Hanora.Controllers
 
     public record AdminRevenueSummaryDto(decimal Today, decimal ThisWeek, decimal ThisMonth, int TotalOrders, decimal AverageOrderValue);
 
-    public record AdminRevenueTransactionDto(string Id, string Customer, string Description, decimal Amount, string Status, DateTime? CreatedAt);
+    public record AdminRevenueTransactionDto(
+        string Id,
+        string Customer,
+        string Description,
+        decimal Amount,
+        string Status,
+        DateTime? CreatedAt,
+        string? Email = null,
+        string? PlanId = null,
+        string? CheckoutUrl = null
+    );
 
     public record AdminSearchStatsDto(
         AdminSearchSummaryDto Summary,

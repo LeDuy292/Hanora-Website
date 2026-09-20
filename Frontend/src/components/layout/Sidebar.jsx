@@ -9,7 +9,8 @@ import {
   TrendingUp,
   LayoutDashboard,
   BookMarked,
-  Library
+  Library,
+  Crown
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
@@ -135,6 +136,25 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Pro Upgrade Widget if not Pro */}
+      {!user?.isPro && user?.role !== 'Admin' && (
+        <div className="mx-3 my-2 p-3 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 text-white shadow-lg shadow-blue-500/20 text-center relative overflow-hidden">
+          <div className="flex items-center justify-center gap-1.5 mb-1 text-xs font-black uppercase tracking-wider">
+            <Crown className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+            <span>Nâng Cấp Hanora Pro</span>
+          </div>
+          <p className="text-[10px] text-blue-100 mb-2.5 leading-snug">
+            Mở khóa OCR tài liệu & AI không giới hạn
+          </p>
+          <NavLink
+            to="/payment"
+            className="block w-full py-1.5 rounded-xl bg-white text-blue-700 font-extrabold text-xs shadow-sm hover:bg-blue-50 transition-all active:scale-[0.98]"
+          >
+            Mua gói ngay
+          </NavLink>
+        </div>
+      )}
 
       {/* Language Switcher in Sidebar */}
       <div className="px-4 py-2 border-t border-slate-100">

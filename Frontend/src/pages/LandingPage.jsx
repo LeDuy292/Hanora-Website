@@ -659,7 +659,7 @@ export function LandingPage() {
                 </ul>
               </div>
               <button
-                onClick={handleStart}
+                onClick={() => navigate('/payment?plan=monthly')}
                 className="w-full mt-4 sm:mt-10 py-2 sm:py-5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-500/25 transition-all text-[9px] xs:text-xs sm:text-sm"
               >
                 Đăng ký
@@ -700,7 +700,7 @@ export function LandingPage() {
                 </ul>
               </div>
               <button
-                onClick={handleStart}
+                onClick={() => navigate('/payment?plan=yearly')}
                 className="w-full mt-4 sm:mt-10 py-2 sm:py-5 rounded-lg xs:rounded-xl sm:rounded-2xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 shadow-sm transition-all text-[9px] xs:text-xs sm:text-sm"
               >
                 Đăng ký
