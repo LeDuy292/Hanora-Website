@@ -108,6 +108,7 @@ namespace Hanora
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<ICommunityRepository, CommunityRepository>();
             builder.Services.AddScoped<ICommunityService, CommunityService>();
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
 
             // JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"]!;

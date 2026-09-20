@@ -5,6 +5,11 @@ export const adminApi = {
 
   revenue: () => apiRequest('/admin/revenue', { auth: true }),
 
+  syncPayment: (orderCode) => apiRequest(`/admin/payments/${orderCode}/sync`, {
+    method: 'POST',
+    auth: true,
+  }),
+
   searchStats: () => apiRequest('/admin/search-stats', { auth: true }),
 
   translationApprovals: (params = {}) => apiRequest(`/admin/translation-approvals${toQuery(params)}`, { auth: true }),

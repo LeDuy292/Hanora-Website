@@ -427,6 +427,16 @@ export function ProfilePage() {
 
           {/* Quick Edit Actions Stacks */}
           <div className="w-full flex flex-col gap-2.5">
+            {!user?.isPro && (
+              <button 
+                onClick={() => navigate('/payment')}
+                className="flex min-h-11 w-full items-center justify-center gap-3 rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 px-4 py-3 text-xs font-black text-amber-800 shadow-sm transition-all hover:border-amber-400 hover:bg-amber-100/50 active:scale-[0.98] sm:justify-start"
+              >
+                <Crown className="w-4 h-4 text-amber-600 fill-amber-600 shrink-0" />
+                <span>{language === 'en' ? 'Upgrade to Pro' : 'Nâng cấp gói Pro'}</span>
+              </button>
+            )}
+
             <button 
               onClick={() => {
                 setEditForm(prev => ({ ...prev, name: fullName }));
